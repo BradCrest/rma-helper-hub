@@ -1,6 +1,6 @@
-import { LogOut, Package, ClipboardList, Settings } from "lucide-react";
+import { LogOut, Package, ClipboardList, Settings, Home } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 const AdminDashboard = () => {
   const { user, signOut } = useAuth();
@@ -18,8 +18,15 @@ const AdminDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <h1 className="text-xl font-bold text-foreground">RMA 管理後台</h1>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">{user?.email}</span>
+              <Link
+                to="/"
+                className="rma-btn-secondary text-sm"
+              >
+                <Home className="w-4 h-4" />
+                首頁
+              </Link>
               <button
                 onClick={handleSignOut}
                 className="rma-btn-secondary text-sm"
