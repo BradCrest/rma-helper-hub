@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Loader2 } from "lucide-react";
+import { LogIn, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
@@ -14,7 +14,8 @@ const Admin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, isAdmin, isLoading, signIn } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { user, isAdmin, isLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already logged in as admin
@@ -37,21 +38,40 @@ const Admin = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await signIn(email, password);
+      if (isSignUp) {
+        const { error, userId } = await signUp(email, password);
 
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          toast.error("帳號或密碼錯誤");
-        } else {
-          toast.error("登入失敗，請稍後再試");
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast.error("此信箱已註冊過");
+          } else {
+            toast.error("註冊失敗：" + error.message);
+          }
+          return;
         }
-        return;
-      }
 
-      // Wait for admin check to complete
-      setTimeout(() => {
-        toast.success("登入成功");
-      }, 500);
+        toast.success("註冊成功！請聯繫系統管理員授權管理員權限", {
+          description: `用戶 ID: ${userId}`,
+          duration: 10000,
+        });
+        setIsSignUp(false);
+      } else {
+        const { error } = await signIn(email, password);
+
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            toast.error("帳號或密碼錯誤");
+          } else {
+            toast.error("登入失敗，請稍後再試");
+          }
+          return;
+        }
+
+        // Wait for admin check to complete
+        setTimeout(() => {
+          toast.success("登入成功");
+        }, 500);
+      }
     } catch (err) {
       toast.error("發生錯誤，請稍後再試");
     } finally {
@@ -76,7 +96,9 @@ const Admin = () => {
             <h1 className="text-2xl font-bold text-foreground mb-2">
               RMA 管理系統
             </h1>
-            <p className="text-muted-foreground">請輸入您的管理員帳號密碼</p>
+            <p className="text-muted-foreground">
+              {isSignUp ? "建立管理員帳號" : "請輸入您的管理員帳號密碼"}
+            </p>
           </div>
 
           {/* Form */}
@@ -112,15 +134,31 @@ const Admin = () => {
             >
               {isSubmitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isSignUp ? (
+                <UserPlus className="w-5 h-5" />
               ) : (
                 <LogIn className="w-5 h-5" />
               )}
-              {isSubmitting ? "登入中..." : "登入管理系統"}
+              {isSubmitting 
+                ? (isSignUp ? "註冊中..." : "登入中...") 
+                : (isSignUp ? "註冊帳號" : "登入管理系統")
+              }
             </button>
           </form>
 
+          {/* Toggle Sign Up / Sign In */}
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
+            >
+              {isSignUp ? "已有帳號？登入" : "還沒有帳號？註冊"}
+            </button>
+          </div>
+
           {/* Back Link */}
-          <div className="text-center mt-6">
+          <div className="text-center mt-4">
             <Link
               to="/"
               className="text-sm text-foreground hover:text-primary transition-colors font-medium"
