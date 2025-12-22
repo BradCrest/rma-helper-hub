@@ -1,20 +1,71 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { LogIn } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { LogIn, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email("請輸入有效的電子郵件"),
+  password: z.string().min(6, "密碼至少需要 6 個字元"),
+});
 
 const Admin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user, isAdmin, isLoading, signIn } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already logged in as admin
+  useEffect(() => {
+    if (!isLoading && user && isAdmin) {
+      navigate("/admin/dashboard");
+    }
+  }, [user, isAdmin, isLoading, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
-      toast.error("請填寫完整的登入資訊");
+
+    // Validate input
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      toast.error(result.error.errors[0].message);
       return;
     }
-    toast.info("正在登入...");
+
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await signIn(email, password);
+
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          toast.error("帳號或密碼錯誤");
+        } else {
+          toast.error("登入失敗，請稍後再試");
+        }
+        return;
+      }
+
+      // Wait for admin check to complete
+      setTimeout(() => {
+        toast.success("登入成功");
+      }, 500);
+    } catch (err) {
+      toast.error("發生錯誤，請稍後再試");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -38,6 +89,7 @@ const Admin = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@example.com"
                 className="rma-input"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -49,15 +101,21 @@ const Admin = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder=""
                 className="rma-input"
+                disabled={isSubmitting}
               />
             </div>
 
             <button
               type="submit"
               className="w-full rma-btn-primary py-4 text-base mt-6"
+              disabled={isSubmitting}
             >
-              <LogIn className="w-5 h-5" />
-              登入管理系統
+              {isSubmitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <LogIn className="w-5 h-5" />
+              )}
+              {isSubmitting ? "登入中..." : "登入管理系統"}
             </button>
           </form>
 
