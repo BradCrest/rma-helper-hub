@@ -113,10 +113,8 @@ const RmaForm = () => {
 
       if (error) throw error;
 
-      toast.success(`RMA 申請已成功提交！您的申請編號為 ${data.rma_number}`);
-      
-      // Navigate to track page with the RMA number
-      navigate(`/track?rma=${data.rma_number}`);
+      // Navigate to confirmation page with the RMA number
+      navigate(`/rma-confirmation?rma=${data.rma_number}`);
     } catch (error: any) {
       console.error("Error submitting RMA:", error);
       toast.error("提交失敗，請稍後再試");

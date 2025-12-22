@@ -12,6 +12,7 @@ import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRmaList from "./pages/AdminRmaList";
 import AdminSettings from "./pages/AdminSettings";
+import RmaConfirmation from "./pages/RmaConfirmation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/rma-confirmation" element={<RmaConfirmation />} />
             <Route path="/track" element={<Track />} />
             <Route path="/shipping" element={<Shipping />} />
             <Route path="/admin" element={<Admin />} />
