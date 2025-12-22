@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Printer, Download, ArrowLeft, CheckCircle } from "lucide-react";
+import { Printer, Download, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 interface RmaData {
   rma_number: string;
@@ -26,6 +28,7 @@ const RmaConfirmation = () => {
   const navigate = useNavigate();
   const [rmaData, setRmaData] = useState<RmaData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   const rmaNumber = searchParams.get("rma");
@@ -57,6 +60,49 @@ const RmaConfirmation = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!printRef.current || !rmaData) return;
+    
+    setGeneratingPdf(true);
+    try {
+      const canvas = await html2canvas(printRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      pdf.save(`${rmaData.rma_number}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setGeneratingPdf(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -101,6 +147,23 @@ const RmaConfirmation = () => {
           >
             <Printer className="w-4 h-4" />
             列印
+          </button>
+          <button
+            onClick={handleDownloadPdf}
+            disabled={generatingPdf}
+            className="rma-btn-primary flex items-center gap-2 disabled:opacity-50"
+          >
+            {generatingPdf ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                產生中...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                下載 PDF
+              </>
+            )}
           </button>
           <button
             onClick={() => navigate(`/track?rma=${rmaData.rma_number}`)}
