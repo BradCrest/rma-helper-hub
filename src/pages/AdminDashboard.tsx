@@ -134,7 +134,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* 系統設定 */}
-          <div className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
+          <Link to="/admin/settings" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Settings className="w-6 h-6 text-primary" />
@@ -144,7 +144,7 @@ const AdminDashboard = () => {
                 <p className="text-sm text-muted-foreground">管理系統配置與權限</p>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Stats Section */}
