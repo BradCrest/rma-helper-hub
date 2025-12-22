@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      rma_requests: {
+        Row: {
+          created_at: string
+          customer_address: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          issue_description: string
+          issue_type: string
+          product_model: string | null
+          product_name: string
+          purchase_date: string | null
+          rma_number: string
+          serial_number: string | null
+          status: Database["public"]["Enums"]["rma_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_address?: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          id?: string
+          issue_description: string
+          issue_type: string
+          product_model?: string | null
+          product_name: string
+          purchase_date?: string | null
+          rma_number: string
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          id?: string
+          issue_description?: string
+          issue_type?: string
+          product_model?: string | null
+          product_name?: string
+          purchase_date?: string | null
+          rma_number?: string
+          serial_number?: string | null
+          status?: Database["public"]["Enums"]["rma_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rma_shipping: {
+        Row: {
+          carrier: string | null
+          created_at: string
+          delivery_date: string | null
+          direction: string
+          id: string
+          notes: string | null
+          rma_request_id: string
+          ship_date: string | null
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          carrier?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          direction: string
+          id?: string
+          notes?: string | null
+          rma_request_id: string
+          ship_date?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          carrier?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          direction?: string
+          id?: string
+          notes?: string | null
+          rma_request_id?: string
+          ship_date?: string | null
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_shipping_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rma_status_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          rma_request_id: string
+          status: Database["public"]["Enums"]["rma_status"]
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rma_request_id: string
+          status: Database["public"]["Enums"]["rma_status"]
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          rma_request_id?: string
+          status?: Database["public"]["Enums"]["rma_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_status_history_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -50,6 +186,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      rma_status:
+        | "pending"
+        | "processing"
+        | "shipped"
+        | "received"
+        | "repairing"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -178,6 +322,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      rma_status: [
+        "pending",
+        "processing",
+        "shipped",
+        "received",
+        "repairing",
+        "completed",
+        "cancelled",
+      ],
     },
   },
 } as const
