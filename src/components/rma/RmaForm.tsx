@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Upload, Check } from "lucide-react";
+import { Upload, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 const customerTypes = [
   { id: "consumer", label: "一般消費者" },
@@ -30,10 +32,23 @@ const accessories = [
 ];
 
 const RmaForm = () => {
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerType, setCustomerType] = useState("consumer");
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [agreed, setAgreed] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+
+  // Form fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [productModel, setProductModel] = useState("");
+  const [issueType, setIssueType] = useState("");
+  const [purchaseDate, setPurchaseDate] = useState("");
+  const [issueDescription, setIssueDescription] = useState("");
 
   const handleAccessoryToggle = (id: string) => {
     setSelectedAccessories((prev) =>
@@ -41,13 +56,72 @@ const RmaForm = () => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!agreed) {
       toast.error("請先同意服務條款和隱私政策");
       return;
     }
-    toast.success("RMA 申請已成功提交！");
+
+    // Validate required fields
+    if (!customerName.trim()) {
+      toast.error("請輸入客戶姓名");
+      return;
+    }
+    if (!customerEmail.trim()) {
+      toast.error("請輸入電子郵件");
+      return;
+    }
+    if (!customerPhone.trim()) {
+      toast.error("請輸入客戶電話");
+      return;
+    }
+    if (!issueType) {
+      toast.error("請選擇故障問題");
+      return;
+    }
+    if (!issueDescription.trim()) {
+      toast.error("請描述問題");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Build product name from customer type and model
+      const customerTypeLabel = customerTypes.find(t => t.id === customerType)?.label || customerType;
+      const productName = productModel.trim() || "未指定型號";
+
+      const { data, error } = await supabase
+        .from("rma_requests")
+        .insert([{
+          customer_name: customerName.trim(),
+          customer_email: customerEmail.trim(),
+          customer_phone: customerPhone.trim(),
+          customer_address: customerAddress.trim() || null,
+          product_name: productName,
+          product_model: productModel.trim() || null,
+          serial_number: serialNumber.trim() || null,
+          issue_type: issueType,
+          issue_description: `[${customerTypeLabel}] ${issueDescription.trim()}${selectedAccessories.length > 0 ? `\n\n隨附物品: ${selectedAccessories.map(id => accessories.find(a => a.id === id)?.label).join(", ")}` : ""}`,
+          purchase_date: purchaseDate || null,
+        }])
+        .select("rma_number")
+        .single();
+
+      if (error) throw error;
+
+      toast.success(`RMA 申請已成功提交！您的申請編號為 ${data.rma_number}`);
+      
+      // Navigate to track page with the RMA number
+      navigate(`/track?rma=${data.rma_number}`);
+    } catch (error: any) {
+      console.error("Error submitting RMA:", error);
+      toast.error("提交失敗，請稍後再試");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -95,30 +169,39 @@ const RmaForm = () => {
       {/* Customer Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="rma-label">客戶姓名</label>
+          <label className="rma-label">客戶姓名 *</label>
           <input
             type="text"
             placeholder="請輸入客戶姓名"
             className="rma-input"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            required
           />
         </div>
         <div>
-          <label className="rma-label">電子郵件</label>
+          <label className="rma-label">電子郵件 *</label>
           <input
             type="email"
             placeholder="請輸入電子郵件"
             className="rma-input"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            required
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="rma-label">客戶電話</label>
+          <label className="rma-label">客戶電話 *</label>
           <input
             type="tel"
             placeholder="請輸入客戶電話"
             className="rma-input"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            required
           />
         </div>
         <div>
@@ -127,6 +210,8 @@ const RmaForm = () => {
             type="text"
             placeholder="請輸入產品序號"
             className="rma-input"
+            value={serialNumber}
+            onChange={(e) => setSerialNumber(e.target.value)}
           />
         </div>
       </div>
@@ -136,6 +221,8 @@ const RmaForm = () => {
         <textarea
           placeholder="請輸入客戶地址"
           className="rma-input min-h-[80px] resize-none"
+          value={customerAddress}
+          onChange={(e) => setCustomerAddress(e.target.value)}
         />
       </div>
 
@@ -147,11 +234,18 @@ const RmaForm = () => {
             type="text"
             placeholder="請輸入電腦錶型號"
             className="rma-input"
+            value={productModel}
+            onChange={(e) => setProductModel(e.target.value)}
           />
         </div>
         <div>
-          <label className="rma-label">故障問題</label>
-          <select className="rma-input">
+          <label className="rma-label">故障問題 *</label>
+          <select 
+            className="rma-input"
+            value={issueType}
+            onChange={(e) => setIssueType(e.target.value)}
+            required
+          >
             <option value="">選擇故障問題</option>
             {issueTypes.map((issue) => (
               <option key={issue} value={issue}>
@@ -164,14 +258,22 @@ const RmaForm = () => {
 
       <div className="mb-4">
         <label className="rma-label">購買日期</label>
-        <input type="date" className="rma-input" />
+        <input 
+          type="date" 
+          className="rma-input"
+          value={purchaseDate}
+          onChange={(e) => setPurchaseDate(e.target.value)}
+        />
       </div>
 
       <div className="mb-4">
-        <label className="rma-label">問題描述</label>
+        <label className="rma-label">問題描述 *</label>
         <textarea
           placeholder="請詳細描述問題..."
           className="rma-input min-h-[120px] resize-none"
+          value={issueDescription}
+          onChange={(e) => setIssueDescription(e.target.value)}
+          required
         />
       </div>
 
@@ -250,8 +352,19 @@ const RmaForm = () => {
       </div>
 
       {/* Submit */}
-      <button type="submit" className="w-full rma-btn-primary py-4 text-base">
-        建立RMA
+      <button 
+        type="submit" 
+        className="w-full rma-btn-primary py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            提交中...
+          </>
+        ) : (
+          "建立RMA"
+        )}
       </button>
     </form>
   );
