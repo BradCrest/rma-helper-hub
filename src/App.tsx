@@ -10,6 +10,7 @@ import Track from "./pages/Track";
 import Shipping from "./pages/Shipping";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminRmaList from "./pages/AdminRmaList";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/rma-list"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminRmaList />
                 </ProtectedRoute>
               }
             />
