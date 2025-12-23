@@ -21,17 +21,17 @@ const AdminDashboard = () => {
         const { data: pendingData } = await supabase
           .from("rma_requests")
           .select("id", { count: "exact", head: true })
-          .eq("status", "pending");
+          .eq("status", "registered");
 
         const { data: processingData } = await supabase
           .from("rma_requests")
           .select("id", { count: "exact", head: true })
-          .in("status", ["processing", "received", "repairing", "shipped"]);
+          .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "repairing"]);
 
         const { data: completedData } = await supabase
           .from("rma_requests")
           .select("id", { count: "exact", head: true })
-          .eq("status", "completed");
+          .eq("status", "closed");
 
         // Get this month's count
         const startOfMonth = new Date();
@@ -52,9 +52,9 @@ const AdminDashboard = () => {
 
         // Re-fetch with actual counts
         const [p, pr, c] = await Promise.all([
-          supabase.from("rma_requests").select("id").eq("status", "pending"),
-          supabase.from("rma_requests").select("id").in("status", ["processing", "received", "repairing", "shipped"]),
-          supabase.from("rma_requests").select("id").eq("status", "completed"),
+          supabase.from("rma_requests").select("id").eq("status", "registered"),
+          supabase.from("rma_requests").select("id").in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "repairing"]),
+          supabase.from("rma_requests").select("id").eq("status", "closed"),
         ]);
 
         setStats({

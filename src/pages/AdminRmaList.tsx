@@ -41,26 +41,36 @@ type RmaShipping = Database["public"]["Tables"]["rma_shipping"]["Row"];
 type RmaStatusHistory = Database["public"]["Tables"]["rma_status_history"]["Row"];
 
 const statusLabels: Record<RmaStatus, string> = {
-  pending: "待處理",
-  processing: "處理中",
+  registered: "已登記",
   shipped: "已寄出",
   received: "已收件",
+  inspecting: "檢修中",
+  contacting: "聯系中",
+  quote_confirmed: "確認報價",
+  paid: "已付費",
+  no_repair: "不維修",
   repairing: "維修中",
-  completed: "已完成",
-  cancelled: "已取消",
+  shipped_back: "已回寄",
+  follow_up: "後續關懷",
+  closed: "已結案",
 };
 
 const statusColors: Record<RmaStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  processing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  registered: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   shipped: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
   received: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  inspecting: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  contacting: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+  quote_confirmed: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  paid: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
+  no_repair: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
   repairing: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  shipped_back: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
+  closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
 };
 
-const allStatuses: RmaStatus[] = ["pending", "processing", "shipped", "received", "repairing", "completed", "cancelled"];
+const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "follow_up", "closed"];
 
 const AdminRmaList = () => {
   const { user, signOut } = useAuth();
@@ -261,7 +271,7 @@ const AdminRmaList = () => {
       
       // Refresh data
       setOutboundShipping(data.shipping);
-      setSelectedRma({ ...selectedRma, status: "completed" });
+      setSelectedRma({ ...selectedRma, status: "shipped_back" });
       setOutboundForm({ carrier: "", tracking_number: "", notes: "" });
       fetchRmaList();
     } catch (error: any) {
@@ -815,7 +825,7 @@ const AdminRmaList = () => {
                       </div>
                     )}
                   </div>
-                ) : (selectedRma.status === "received" || selectedRma.status === "repairing") ? (
+                ) : (selectedRma.status === "received" || selectedRma.status === "inspecting" || selectedRma.status === "contacting" || selectedRma.status === "quote_confirmed" || selectedRma.status === "paid" || selectedRma.status === "repairing") ? (
                   // Show form for adding outbound shipping
                   <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -861,10 +871,10 @@ const AdminRmaList = () => {
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {selectedRma.status === "pending" || selectedRma.status === "processing" || selectedRma.status === "shipped"
+                    {selectedRma.status === "registered" || selectedRma.status === "shipped"
                       ? "需先確認收件後才能填寫回寄資訊"
-                      : selectedRma.status === "cancelled"
-                      ? "此 RMA 已取消"
+                      : selectedRma.status === "no_repair"
+                      ? "此 RMA 不維修"
                       : "尚無回寄記錄"}
                   </p>
                 )}

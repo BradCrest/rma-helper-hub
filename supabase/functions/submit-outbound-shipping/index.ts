@@ -113,10 +113,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update RMA status to completed
+    // Update RMA status to shipped_back
     const { error: updateError } = await supabase
       .from('rma_requests')
-      .update({ status: 'completed' })
+      .update({ status: 'shipped_back' })
       .eq('id', rma_request_id);
 
     if (updateError) {
