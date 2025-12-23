@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { LogIn, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -50,11 +51,26 @@ const Admin = () => {
           return;
         }
 
-        toast.success("註冊成功！請聯繫系統管理員授權管理員權限", {
-          description: `用戶 ID: ${userId}`,
+        // Create pending admin registration
+        if (userId) {
+          const { error: regError } = await supabase
+            .from("pending_admin_registrations")
+            .insert({
+              user_id: userId,
+              email: email,
+            });
+
+          if (regError) {
+            console.error("Error creating pending registration:", regError);
+          }
+        }
+
+        toast.success("註冊成功！您的申請已送出，請等待現有管理員審核批准。", {
           duration: 10000,
         });
         setIsSignUp(false);
+        setEmail("");
+        setPassword("");
       } else {
         const { error } = await signIn(email, password);
 

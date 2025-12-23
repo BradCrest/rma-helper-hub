@@ -9,7 +9,10 @@ import {
   RefreshCw,
   Shield,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Check,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,14 +25,25 @@ interface Admin {
   created_at: string;
 }
 
+interface PendingRegistration {
+  id: string;
+  user_id: string;
+  email: string;
+  requested_at: string;
+  status: string;
+}
+
 const AdminSettings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPendingLoading, setIsPendingLoading] = useState(true);
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const fetchAdmins = async () => {
     setIsLoading(true);
@@ -61,8 +75,27 @@ const AdminSettings = () => {
     }
   };
 
+  const fetchPendingRegistrations = async () => {
+    setIsPendingLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("pending_admin_registrations")
+        .select("*")
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false });
+
+      if (error) throw error;
+      setPendingRegistrations(data || []);
+    } catch (error: any) {
+      console.error("Error fetching pending registrations:", error);
+    } finally {
+      setIsPendingLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAdmins();
+    fetchPendingRegistrations();
   }, []);
 
   const handleAddAdmin = async (e: React.FormEvent) => {
@@ -158,6 +191,66 @@ const AdminSettings = () => {
     }
   };
 
+  const handleApproveRegistration = async (registration: PendingRegistration) => {
+    setProcessingId(registration.id);
+    try {
+      // Add the admin role
+      const { error: insertError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: registration.user_id,
+          role: 'admin'
+        });
+
+      if (insertError) throw insertError;
+
+      // Update the pending registration status
+      const { error: updateError } = await supabase
+        .from('pending_admin_registrations')
+        .update({
+          status: 'approved',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', registration.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`已批准 ${registration.email} 為管理員`);
+      fetchAdmins();
+      fetchPendingRegistrations();
+    } catch (error: any) {
+      console.error("Error approving registration:", error);
+      toast.error("批准失敗：" + (error.message || "請稍後再試"));
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleRejectRegistration = async (registration: PendingRegistration) => {
+    setProcessingId(registration.id);
+    try {
+      const { error } = await supabase
+        .from('pending_admin_registrations')
+        .update({
+          status: 'rejected',
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('id', registration.id);
+
+      if (error) throw error;
+
+      toast.success(`已拒絕 ${registration.email} 的管理員申請`);
+      fetchPendingRegistrations();
+    } catch (error: any) {
+      console.error("Error rejecting registration:", error);
+      toast.error("拒絕失敗");
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/admin");
@@ -238,6 +331,86 @@ const AdminSettings = () => {
             <AlertCircle className="w-4 h-4" />
             用戶必須先在管理登入頁面註冊帳號，才能被新增為管理員
           </p>
+        </div>
+
+        {/* Pending Registrations */}
+        <div className="rma-card mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              待審核申請
+              {pendingRegistrations.length > 0 && (
+                <span className="bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {pendingRegistrations.length}
+                </span>
+              )}
+            </h2>
+            <button
+              onClick={fetchPendingRegistrations}
+              disabled={isPendingLoading}
+              className="rma-btn-secondary text-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isPendingLoading ? "animate-spin" : ""}`} />
+              重新整理
+            </button>
+          </div>
+
+          {isPendingLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-muted-foreground mt-2 text-sm">載入中...</p>
+            </div>
+          ) : pendingRegistrations.length === 0 ? (
+            <div className="text-center py-8">
+              <Clock className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+              <p className="text-muted-foreground text-sm">目前沒有待審核的申請</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingRegistrations.map((reg) => (
+                <div
+                  key={reg.id}
+                  className="flex items-center justify-between p-4 rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-900 dark:bg-orange-950/30"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/50 flex items-center justify-center">
+                      <UserPlus className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{reg.email}</p>
+                      <p className="text-sm text-muted-foreground">
+                        申請於 {formatDate(reg.requested_at)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleApproveRegistration(reg)}
+                      disabled={processingId === reg.id}
+                      className="flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                      title="批准"
+                    >
+                      {processingId === reg.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      批准
+                    </button>
+                    <button
+                      onClick={() => handleRejectRegistration(reg)}
+                      disabled={processingId === reg.id}
+                      className="flex items-center gap-1 px-3 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                      title="拒絕"
+                    >
+                      <X className="w-4 h-4" />
+                      拒絕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Admin List */}
