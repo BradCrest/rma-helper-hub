@@ -2,6 +2,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import TabNavigation from "@/components/rma/TabNavigation";
 import RmaForm from "@/components/rma/RmaForm";
+import logo from "@/assets/logo.png";
 
 const Index = () => {
   return (
@@ -13,11 +14,11 @@ const Index = () => {
         <section className="py-8 md:py-12 border-b border-border bg-card">
           <div className="container mx-auto px-4">
             <div className="mb-4">
-              <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-                <span className="text-foreground">C </span>
-                <span className="text-primary">R </span>
-                <span className="text-foreground">E S T</span>
-              </h1>
+              <img 
+                src={logo} 
+                alt="CREST Logo" 
+                className="h-12 md:h-16 w-auto"
+              />
             </div>
             <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
               CREST 產品申請報修系統
