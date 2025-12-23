@@ -83,10 +83,56 @@ const Admin = () => {
           return;
         }
 
-        // Wait for admin check to complete
-        setTimeout(() => {
-          toast.success("登入成功");
-        }, 500);
+        // Get current user after login
+        const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+        
+        if (loggedInUser) {
+          // Check if user is already an admin
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", loggedInUser.id)
+            .eq("role", "admin")
+            .maybeSingle();
+
+          if (roleData) {
+            // User is admin, will be redirected by useEffect
+            toast.success("登入成功");
+          } else {
+            // Check if user has pending registration
+            const { data: pendingData } = await supabase
+              .from("pending_admin_registrations")
+              .select("id, status")
+              .eq("user_id", loggedInUser.id)
+              .maybeSingle();
+
+            if (pendingData) {
+              if (pendingData.status === "pending") {
+                toast.info("您的管理員申請正在審核中，請耐心等待。", { duration: 5000 });
+              } else if (pendingData.status === "rejected") {
+                toast.error("您的管理員申請已被拒絕。如有疑問請聯繫管理員。", { duration: 5000 });
+              }
+            } else {
+              // No pending registration, create one
+              const { error: regError } = await supabase
+                .from("pending_admin_registrations")
+                .insert({
+                  user_id: loggedInUser.id,
+                  email: loggedInUser.email || email,
+                });
+
+              if (regError) {
+                console.error("Error creating pending registration:", regError);
+                toast.error("提交申請失敗，請稍後再試");
+              } else {
+                toast.success("您的管理員申請已送出，請等待現有管理員審核批准。", { duration: 10000 });
+              }
+            }
+            
+            // Sign out since user is not an admin
+            await supabase.auth.signOut();
+          }
+        }
       }
     } catch (err) {
       toast.error("發生錯誤，請稍後再試");
