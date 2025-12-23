@@ -95,6 +95,28 @@ const RmaForm = () => {
       const customerTypeLabel = customerTypes.find(t => t.id === customerType)?.label || customerType;
       const productName = productModel.trim() || "未指定型號";
 
+      // Upload photos to storage
+      const photoUrls: string[] = [];
+      for (const file of uploadedFiles) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `rma-photos/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('rma-photos')
+          .upload(fileName, file);
+        
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('rma-photos')
+            .getPublicUrl(fileName);
+          
+          if (urlData?.publicUrl) {
+            photoUrls.push(urlData.publicUrl);
+          }
+        }
+      }
+
       const { data, error } = await supabase
         .from("rma_requests")
         .insert([{
@@ -109,6 +131,7 @@ const RmaForm = () => {
           issue_type: issueType,
           issue_description: `[${customerTypeLabel}] ${issueDescription.trim()}${selectedAccessories.length > 0 ? `\n\n隨附物品: ${selectedAccessories.map(id => accessories.find(a => a.id === id)?.label).join(", ")}` : ""}`,
           purchase_date: purchaseDate || null,
+          photo_urls: photoUrls.length > 0 ? photoUrls : null,
         }])
         .select("rma_number")
         .single();

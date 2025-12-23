@@ -20,6 +20,7 @@ interface RmaData {
   purchase_date: string | null;
   created_at: string;
   status: string;
+  photo_urls: string[] | null;
 }
 
 const RmaConfirmation = () => {
@@ -283,6 +284,26 @@ const RmaConfirmation = () => {
               </div>
             </div>
           </div>
+
+          {/* Uploaded Photos */}
+          {rmaData.photo_urls && rmaData.photo_urls.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4 pb-2 border-b border-border">
+                上傳照片
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {rmaData.photo_urls.map((url, index) => (
+                  <div key={index} className="aspect-square rounded-lg border border-border overflow-hidden bg-muted">
+                    <img
+                      src={url}
+                      alt={`產品照片 ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Instructions */}
           <div className="bg-muted/50 rounded-lg p-4 print:bg-gray-100">
