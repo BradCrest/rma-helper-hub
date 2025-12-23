@@ -15,7 +15,9 @@ import {
   CalendarIcon,
   X,
   Clock,
-  History
+  History,
+  PackageCheck,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,8 +73,12 @@ const AdminRmaList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedRma, setSelectedRma] = useState<RmaRequest | null>(null);
   const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
+  const [outboundShipping, setOutboundShipping] = useState<RmaShipping | null>(null);
   const [statusHistory, setStatusHistory] = useState<RmaStatusHistory[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isConfirmingReceive, setIsConfirmingReceive] = useState(false);
+  const [isSubmittingOutbound, setIsSubmittingOutbound] = useState(false);
+  const [outboundForm, setOutboundForm] = useState({ carrier: "", tracking_number: "", notes: "" });
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const pageSize = 10;
@@ -154,14 +160,21 @@ const AdminRmaList = () => {
 
   const handleViewRma = async (rma: RmaRequest) => {
     setSelectedRma(rma);
-    // Fetch shipping info and status history for this RMA
+    setOutboundForm({ carrier: "", tracking_number: "", notes: "" });
+    // Fetch shipping info (inbound & outbound) and status history for this RMA
     try {
-      const [shippingResult, historyResult] = await Promise.all([
+      const [inboundResult, outboundResult, historyResult] = await Promise.all([
         supabase
           .from("rma_shipping")
           .select("*")
           .eq("rma_request_id", rma.id)
           .eq("direction", "inbound")
+          .maybeSingle(),
+        supabase
+          .from("rma_shipping")
+          .select("*")
+          .eq("rma_request_id", rma.id)
+          .eq("direction", "outbound")
           .maybeSingle(),
         supabase
           .from("rma_status_history")
@@ -170,12 +183,92 @@ const AdminRmaList = () => {
           .order("created_at", { ascending: false })
       ]);
       
-      setSelectedRmaShipping(shippingResult.data);
+      setSelectedRmaShipping(inboundResult.data);
+      setOutboundShipping(outboundResult.data);
       setStatusHistory(historyResult.data || []);
     } catch (error) {
       console.error("Error fetching RMA details:", error);
       setSelectedRmaShipping(null);
+      setOutboundShipping(null);
       setStatusHistory([]);
+    }
+  };
+
+  const handleConfirmReceive = async () => {
+    if (!selectedRma || !selectedRmaShipping) return;
+    
+    setIsConfirmingReceive(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Update delivery_date in rma_shipping
+      const { error: shippingError } = await supabase
+        .from("rma_shipping")
+        .update({ delivery_date: today })
+        .eq("id", selectedRmaShipping.id);
+
+      if (shippingError) throw shippingError;
+
+      // Update RMA status to received
+      const { error: rmaError } = await supabase
+        .from("rma_requests")
+        .update({ status: "received" })
+        .eq("id", selectedRma.id);
+
+      if (rmaError) throw rmaError;
+
+      toast.success("已確認收件");
+      
+      // Refresh data
+      setSelectedRmaShipping({ ...selectedRmaShipping, delivery_date: today });
+      setSelectedRma({ ...selectedRma, status: "received" });
+      fetchRmaList();
+    } catch (error) {
+      console.error("Error confirming receive:", error);
+      toast.error("確認收件失敗");
+    } finally {
+      setIsConfirmingReceive(false);
+    }
+  };
+
+  const handleSubmitOutbound = async () => {
+    if (!selectedRma) return;
+    
+    if (!outboundForm.carrier.trim()) {
+      toast.error("請填寫物流名稱");
+      return;
+    }
+    if (!outboundForm.tracking_number.trim()) {
+      toast.error("請填寫物流單號");
+      return;
+    }
+
+    setIsSubmittingOutbound(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("submit-outbound-shipping", {
+        body: {
+          rma_request_id: selectedRma.id,
+          carrier: outboundForm.carrier,
+          tracking_number: outboundForm.tracking_number,
+          notes: outboundForm.notes || null,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success("回寄資訊已成功提交");
+      
+      // Refresh data
+      setOutboundShipping(data.shipping);
+      setSelectedRma({ ...selectedRma, status: "completed" });
+      setOutboundForm({ carrier: "", tracking_number: "", notes: "" });
+      fetchRmaList();
+    } catch (error: any) {
+      console.error("Error submitting outbound shipping:", error);
+      toast.error(error.message || "提交回寄資訊失敗");
+    } finally {
+      setIsSubmittingOutbound(false);
     }
   };
 
@@ -631,12 +724,22 @@ const AdminRmaList = () => {
                         <p className="text-foreground font-mono">{selectedRmaShipping.tracking_number}</p>
                       </div>
                     </div>
-                    {selectedRmaShipping.ship_date && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">寄出日期</p>
-                        <p className="text-foreground">{selectedRmaShipping.ship_date}</p>
-                      </div>
-                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedRmaShipping.ship_date && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">寄出日期</p>
+                          <p className="text-foreground">{selectedRmaShipping.ship_date}</p>
+                        </div>
+                      )}
+                      {selectedRmaShipping.delivery_date && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">收件日期</p>
+                          <p className="text-foreground text-green-600 dark:text-green-400 font-medium">
+                            ✓ {selectedRmaShipping.delivery_date}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                     {selectedRmaShipping.photo_url && (
                       <div>
                         <p className="text-xs text-muted-foreground mb-2">寄件單據照片</p>
@@ -654,6 +757,18 @@ const AdminRmaList = () => {
                         </a>
                       </div>
                     )}
+                    
+                    {/* Confirm Receive Button */}
+                    {selectedRma.status === "shipped" && !selectedRmaShipping.delivery_date && (
+                      <button
+                        onClick={handleConfirmReceive}
+                        disabled={isConfirmingReceive}
+                        className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                      >
+                        <PackageCheck className="w-4 h-4" />
+                        {isConfirmingReceive ? "處理中..." : "確認收件"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -666,6 +781,94 @@ const AdminRmaList = () => {
                   </div>
                 </div>
               )}
+
+              {/* Outbound Shipping Section */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Send className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">回寄資訊</p>
+                </div>
+                
+                {outboundShipping ? (
+                  // Display existing outbound shipping info
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">物流名稱</p>
+                        <p className="text-foreground font-medium">{outboundShipping.carrier}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">物流單號</p>
+                        <p className="text-foreground font-mono">{outboundShipping.tracking_number}</p>
+                      </div>
+                    </div>
+                    {outboundShipping.ship_date && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">寄出日期</p>
+                        <p className="text-foreground">{outboundShipping.ship_date}</p>
+                      </div>
+                    )}
+                    {outboundShipping.notes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">備註</p>
+                        <p className="text-foreground">{outboundShipping.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (selectedRma.status === "received" || selectedRma.status === "repairing") ? (
+                  // Show form for adding outbound shipping
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">物流名稱 *</label>
+                        <input
+                          type="text"
+                          className="rma-input"
+                          placeholder="例：黑貓宅急便"
+                          value={outboundForm.carrier}
+                          onChange={(e) => setOutboundForm({ ...outboundForm, carrier: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">物流單號 *</label>
+                        <input
+                          type="text"
+                          className="rma-input"
+                          placeholder="請輸入物流單號"
+                          value={outboundForm.tracking_number}
+                          onChange={(e) => setOutboundForm({ ...outboundForm, tracking_number: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">備註（選填）</label>
+                      <input
+                        type="text"
+                        className="rma-input"
+                        placeholder="例：已更換新品"
+                        value={outboundForm.notes}
+                        onChange={(e) => setOutboundForm({ ...outboundForm, notes: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      onClick={handleSubmitOutbound}
+                      disabled={isSubmittingOutbound}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      {isSubmittingOutbound ? "處理中..." : "確認回寄"}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedRma.status === "pending" || selectedRma.status === "processing" || selectedRma.status === "shipped"
+                      ? "需先確認收件後才能填寫回寄資訊"
+                      : selectedRma.status === "cancelled"
+                      ? "此 RMA 已取消"
+                      : "尚無回寄記錄"}
+                  </p>
+                )}
+              </div>
 
               {/* Status History Timeline */}
               <div className="pt-4 border-t border-border">
