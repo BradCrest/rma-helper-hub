@@ -13,7 +13,9 @@ import {
   Truck,
   Download,
   CalendarIcon,
-  X
+  X,
+  Clock,
+  History
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +36,7 @@ import {
 type RmaStatus = Database["public"]["Enums"]["rma_status"];
 type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
 type RmaShipping = Database["public"]["Tables"]["rma_shipping"]["Row"];
+type RmaStatusHistory = Database["public"]["Tables"]["rma_status_history"]["Row"];
 
 const statusLabels: Record<RmaStatus, string> = {
   pending: "待處理",
@@ -68,6 +71,7 @@ const AdminRmaList = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [selectedRma, setSelectedRma] = useState<RmaRequest | null>(null);
   const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
+  const [statusHistory, setStatusHistory] = useState<RmaStatusHistory[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -150,19 +154,28 @@ const AdminRmaList = () => {
 
   const handleViewRma = async (rma: RmaRequest) => {
     setSelectedRma(rma);
-    // Fetch shipping info for this RMA
+    // Fetch shipping info and status history for this RMA
     try {
-      const { data: shippingData } = await supabase
-        .from("rma_shipping")
-        .select("*")
-        .eq("rma_request_id", rma.id)
-        .eq("direction", "inbound")
-        .maybeSingle();
+      const [shippingResult, historyResult] = await Promise.all([
+        supabase
+          .from("rma_shipping")
+          .select("*")
+          .eq("rma_request_id", rma.id)
+          .eq("direction", "inbound")
+          .maybeSingle(),
+        supabase
+          .from("rma_status_history")
+          .select("*")
+          .eq("rma_request_id", rma.id)
+          .order("created_at", { ascending: false })
+      ]);
       
-      setSelectedRmaShipping(shippingData);
+      setSelectedRmaShipping(shippingResult.data);
+      setStatusHistory(historyResult.data || []);
     } catch (error) {
-      console.error("Error fetching shipping info:", error);
+      console.error("Error fetching RMA details:", error);
       setSelectedRmaShipping(null);
+      setStatusHistory([]);
     }
   };
 
@@ -653,6 +666,46 @@ const AdminRmaList = () => {
                   </div>
                 </div>
               )}
+
+              {/* Status History Timeline */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">狀態歷史記錄</p>
+                </div>
+                {statusHistory.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">尚無狀態變更記錄</p>
+                ) : (
+                  <div className="relative pl-4 space-y-4">
+                    {/* Timeline line */}
+                    <div className="absolute left-[7px] top-2 bottom-2 w-0.5 bg-border" />
+                    
+                    {statusHistory.map((history, index) => (
+                      <div key={history.id} className="relative flex items-start gap-3">
+                        {/* Timeline dot */}
+                        <div className={`absolute left-[-8px] w-4 h-4 rounded-full border-2 border-card ${
+                          index === 0 ? 'bg-primary' : 'bg-muted-foreground/30'
+                        }`} />
+                        
+                        <div className="flex-1 ml-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[history.status]}`}>
+                              {statusLabels[history.status]}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3" />
+                            {formatDate(history.created_at)}
+                          </div>
+                          {history.notes && (
+                            <p className="mt-1 text-sm text-muted-foreground">{history.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Status Update */}
               <div className="pt-4 border-t border-border">
