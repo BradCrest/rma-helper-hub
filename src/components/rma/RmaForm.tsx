@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Upload, Check, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Upload, Check, Loader2, X, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -33,11 +33,13 @@ const accessories = [
 
 const RmaForm = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [customerType, setCustomerType] = useState("consumer");
   const [selectedAccessories, setSelectedAccessories] = useState<string[]>([]);
   const [agreed, setAgreed] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   // Form fields
   const [customerName, setCustomerName] = useState("");
@@ -131,6 +133,53 @@ const RmaForm = () => {
     } else if (e.type === "dragleave") {
       setDragActive(false);
     }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
+      handleFiles(files);
+    }
+  };
+
+  const handleFiles = (files: File[]) => {
+    const validFiles = files.filter(file => {
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        toast.error(`${file.name} 不是有效的圖片格式`);
+        return false;
+      }
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} 超過 10MB 限制`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles].slice(0, 5)); // Max 5 files
+      if (uploadedFiles.length + validFiles.length > 5) {
+        toast.info("最多只能上傳 5 張照片");
+      }
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
@@ -279,8 +328,16 @@ const RmaForm = () => {
       {/* Photo Upload */}
       <div className="mb-6">
         <label className="rma-label">產品照片</label>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileInput}
+          accept="image/*"
+          multiple
+          className="hidden"
+        />
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
             dragActive
               ? "border-primary bg-accent"
               : "border-border hover:border-primary/50"
@@ -288,22 +345,50 @@ const RmaForm = () => {
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragActive(false);
-          }}
+          onDrop={handleDrop}
+          onClick={handleUploadClick}
         >
           <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            <span className="text-primary font-medium cursor-pointer hover:underline">
-              上傳照片
+            <span className="text-primary font-medium hover:underline">
+              點擊上傳照片
             </span>{" "}
             或拖放到此處
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            PNG, JPG, GIF 最大 10MB
+            PNG, JPG, GIF 最大 10MB，最多 5 張
           </p>
         </div>
+
+        {/* Uploaded Files Preview */}
+        {uploadedFiles.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {uploadedFiles.map((file, index) => (
+              <div key={index} className="relative group">
+                <div className="aspect-square rounded-lg border border-border overflow-hidden bg-muted">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt={file.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(index);
+                  }}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <p className="text-xs text-muted-foreground mt-1 truncate">
+                  {file.name}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Accessories */}
