@@ -4,15 +4,19 @@ import { Search, ArrowLeft, Globe, X, Upload, Camera, Loader2, Check } from "luc
 import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 
-type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
+interface RmaResult {
+  id: string;
+  rma_number: string;
+  status: string;
+  product_name: string;
+}
 
 const Shipping = () => {
   const [showModal, setShowModal] = useState(false);
   const [rmaNumber, setRmaNumber] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [foundRma, setFoundRma] = useState<RmaRequest | null>(null);
+  const [foundRma, setFoundRma] = useState<RmaResult | null>(null);
   const [step, setStep] = useState<"search" | "form">("search");
   
   // Shipping form state
@@ -52,35 +56,31 @@ const Shipping = () => {
 
     setIsSearching(true);
     try {
-      const normalizedInput = rmaNumber.trim().toUpperCase();
-      
-      let query = supabase.from("rma_requests").select("*");
-      
-      if (normalizedInput.includes("-")) {
-        query = query.ilike("rma_number", `%${normalizedInput}%`);
-      } else {
-        query = query.ilike("rma_number", `%${normalizedInput.replace(/RMA/i, "").replace(/(\d{8})(\d{3})/, "$1-$2")}%`);
-      }
+      // Use the secure Edge Function to lookup RMA
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaNumber.trim())}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      const { data, error } = await query;
+      const result = await response.json();
 
-      if (error) throw error;
-
-      const inputWithoutDashes = normalizedInput.replace(/-/g, "");
-      const filtered = data?.filter(r => 
-        r.rma_number.replace(/-/g, "").toUpperCase().includes(inputWithoutDashes)
-      ) || [];
-
-      if (filtered.length === 0) {
+      if (!response.ok || !result.results || result.results.length === 0) {
         toast.error("找不到此 RMA 編號");
         return;
       }
+
+      const rma = result.results[0];
 
       // Check if already has shipping info
       const { data: shippingData } = await supabase
         .from("rma_shipping")
         .select("*")
-        .eq("rma_request_id", filtered[0].id)
+        .eq("rma_request_id", rma.id)
         .eq("direction", "inbound")
         .maybeSingle();
 
@@ -89,7 +89,12 @@ const Shipping = () => {
         return;
       }
 
-      setFoundRma(filtered[0]);
+      setFoundRma({
+        id: rma.id,
+        rma_number: rma.rma_number,
+        status: rma.status,
+        product_name: rma.product_name,
+      });
       setStep("form");
       toast.success("已找到 RMA，請填寫寄件資訊");
     } catch (error) {
