@@ -8,8 +8,29 @@ import type { Database } from "@/integrations/supabase/types";
 
 type TabType = "customer" | "rma";
 type RmaStatus = Database["public"]["Enums"]["rma_status"];
-type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
-type RmaStatusHistory = Database["public"]["Tables"]["rma_status_history"]["Row"];
+
+interface RmaResult {
+  id: string;
+  rma_number: string;
+  status: RmaStatus;
+  product_name: string;
+  product_model: string | null;
+  serial_number: string | null;
+  issue_type: string;
+  purchase_date: string | null;
+  created_at: string;
+  updated_at: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  customer_address: string | null;
+  status_history: Array<{
+    id: string;
+    status: RmaStatus;
+    created_at: string;
+    notes: string | null;
+  }>;
+}
 
 const statusLabels: Record<RmaStatus, string> = {
   pending: "待處理",
@@ -48,9 +69,8 @@ const Track = () => {
   const [phone, setPhone] = useState("");
   const [rmaNumber, setRmaNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<RmaRequest[]>([]);
-  const [selectedRma, setSelectedRma] = useState<RmaRequest | null>(null);
-  const [statusHistory, setStatusHistory] = useState<RmaStatusHistory[]>([]);
+  const [results, setResults] = useState<RmaResult[]>([]);
+  const [selectedRma, setSelectedRma] = useState<RmaResult | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   // Auto-search if RMA number is in URL
@@ -67,36 +87,39 @@ const Track = () => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      // Normalize input: remove spaces and convert to uppercase
-      const normalizedInput = rma.trim().toUpperCase();
-      
-      // Try exact match first (with or without dashes)
-      let query = supabase.from("rma_requests").select("*");
-      
-      // If input contains dashes, search directly
-      if (normalizedInput.includes("-")) {
-        query = query.ilike("rma_number", `%${normalizedInput}%`);
-      } else {
-        // If no dashes, search with wildcard pattern that matches the format RMA-XXXXXXXX-XXX
-        // Convert "RMA20251223002" to pattern that matches "RMA-20251223-002"
-        query = query.ilike("rma_number", `%${normalizedInput.replace(/RMA/i, "").replace(/(\d{8})(\d{3})/, "$1-$2")}%`);
+      const { data, error } = await supabase.functions.invoke('lookup-rma', {
+        body: null,
+        headers: {},
+      });
+
+      // Use GET method with query params via URL
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rma.trim())}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast.error("找不到符合的 RMA 申請");
+          setResults([]);
+          return;
+        }
+        throw new Error(result.error || '查詢失敗');
       }
 
-      const { data, error } = await query;
+      const rmaResults = result.results as RmaResult[];
+      setResults(rmaResults);
 
-      if (error) throw error;
-
-      // Filter results to find matches (handle both formats)
-      const inputWithoutDashes = normalizedInput.replace(/-/g, "");
-      const filtered = data?.filter(r => 
-        r.rma_number.replace(/-/g, "").toUpperCase().includes(inputWithoutDashes)
-      ) || [];
-
-      setResults(filtered);
-
-      if (filtered.length === 1) {
-        await loadRmaDetails(filtered[0]);
-      } else if (filtered.length === 0) {
+      if (rmaResults.length === 1) {
+        setSelectedRma(rmaResults[0]);
+      } else if (rmaResults.length === 0) {
         toast.error("找不到符合的 RMA 申請");
       }
     } catch (error) {
@@ -111,20 +134,33 @@ const Track = () => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const { data, error } = await supabase
-        .from("rma_requests")
-        .select("*")
-        .ilike("customer_name", `%${customerName.trim()}%`)
-        .ilike("customer_phone", `%${phone.trim()}%`)
-        .order("created_at", { ascending: false });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?customer_name=${encodeURIComponent(customerName.trim())}&customer_phone=${encodeURIComponent(phone.trim())}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      if (error) throw error;
+      const result = await response.json();
 
-      setResults(data || []);
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast.error("找不到符合的 RMA 申請");
+          setResults([]);
+          return;
+        }
+        throw new Error(result.error || '查詢失敗');
+      }
 
-      if (data && data.length === 1) {
-        await loadRmaDetails(data[0]);
-      } else if (!data || data.length === 0) {
+      const rmaResults = result.results as RmaResult[];
+      setResults(rmaResults);
+
+      if (rmaResults.length === 1) {
+        setSelectedRma(rmaResults[0]);
+      } else if (rmaResults.length === 0) {
         toast.error("找不到符合的 RMA 申請");
       }
     } catch (error) {
@@ -135,26 +171,9 @@ const Track = () => {
     }
   };
 
-  const loadRmaDetails = async (rma: RmaRequest) => {
-    setSelectedRma(rma);
-    try {
-      const { data: history, error } = await supabase
-        .from("rma_status_history")
-        .select("*")
-        .eq("rma_request_id", rma.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setStatusHistory(history || []);
-    } catch (error) {
-      console.error("Error loading history:", error);
-    }
-  };
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSelectedRma(null);
-    setStatusHistory([]);
 
     if (activeTab === "customer") {
       if (!customerName.trim() || !phone.trim()) {
@@ -184,7 +203,6 @@ const Track = () => {
   const resetSearch = () => {
     setResults([]);
     setSelectedRma(null);
-    setStatusHistory([]);
     setHasSearched(false);
   };
 
@@ -326,7 +344,7 @@ const Track = () => {
                       {results.map((rma) => (
                         <button
                           key={rma.id}
-                          onClick={() => loadRmaDetails(rma)}
+                          onClick={() => setSelectedRma(rma)}
                           className="w-full text-left p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/30 transition-colors"
                         >
                           <div className="flex items-center justify-between">
@@ -353,7 +371,7 @@ const Track = () => {
               <div className="space-y-6 animate-fade-in">
                 {/* Back Button */}
                 <button
-                  onClick={() => { setSelectedRma(null); setStatusHistory([]); }}
+                  onClick={() => { setSelectedRma(null); }}
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -397,7 +415,7 @@ const Track = () => {
                 <div className="rma-card">
                   <h3 className="text-lg font-semibold text-foreground mb-6">進度歷史</h3>
                   
-                  {statusHistory.length === 0 ? (
+                  {selectedRma.status_history.length === 0 ? (
                     <div className="text-center py-8">
                       <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
                       <p className="text-muted-foreground">尚無狀態更新記錄</p>
@@ -423,59 +441,47 @@ const Track = () => {
                         </div>
 
                         {/* History */}
-                        {statusHistory.map((history, index) => (
+                        {selectedRma.status_history.map((history) => (
                           <div key={history.id} className="relative flex items-start gap-4">
                             <div className="relative z-10 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                               {statusIcons[history.status]}
                             </div>
                             <div className="flex-1 pt-1">
                               <p className="font-medium text-foreground">{statusLabels[history.status]}</p>
-                              <p className="text-sm text-muted-foreground">{formatDate(history.created_at)}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formatDate(history.created_at)}
+                              </p>
                               {history.notes && (
-                                <p className="text-sm text-muted-foreground mt-1 bg-muted/50 rounded-lg p-2">
-                                  {history.notes}
-                                </p>
+                                <p className="text-sm text-muted-foreground mt-1">{history.notes}</p>
                               )}
                             </div>
                           </div>
                         ))}
-
-                        {/* Created */}
-                        <div className="relative flex items-start gap-4">
-                          <div className="relative z-10 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                            <Package className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1 pt-1">
-                            <p className="font-medium text-foreground">申請建立</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(selectedRma.created_at)}</p>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Contact Info */}
+                {/* Contact Info (Masked) */}
                 <div className="rma-card">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">申請資訊</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">聯絡資訊</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">客戶姓名</p>
                       <p className="text-foreground">{selectedRma.customer_name}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">聯絡電話</p>
+                      <p className="text-sm text-muted-foreground">電話</p>
                       <p className="text-foreground">{selectedRma.customer_phone}</p>
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-sm text-muted-foreground">電子郵件</p>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Email</p>
                       <p className="text-foreground">{selectedRma.customer_email}</p>
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-sm text-muted-foreground">問題描述</p>
-                      <p className="text-foreground whitespace-pre-wrap">{selectedRma.issue_description}</p>
-                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    * 為保護您的隱私，部分資訊已遮蔽
+                  </p>
                 </div>
               </div>
             )}

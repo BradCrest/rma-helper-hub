@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Printer, Download, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -40,19 +39,48 @@ const RmaConfirmation = () => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("rma_requests")
-        .select("*")
-        .eq("rma_number", rmaNumber)
-        .single();
+      try {
+        // Use the secure Edge Function with full_details=true for confirmation page
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaNumber)}&full_details=true`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
+        );
 
-      if (error || !data) {
+        const result = await response.json();
+
+        if (!response.ok || !result.results || result.results.length === 0) {
+          navigate("/");
+          return;
+        }
+
+        // Map the result to RmaData interface
+        const rma = result.results[0];
+        setRmaData({
+          rma_number: rma.rma_number,
+          customer_name: rma.customer_name,
+          customer_email: rma.customer_email,
+          customer_phone: rma.customer_phone,
+          customer_address: rma.customer_address,
+          product_name: rma.product_name,
+          product_model: rma.product_model,
+          serial_number: rma.serial_number,
+          issue_type: rma.issue_type,
+          issue_description: rma.issue_description || '',
+          purchase_date: rma.purchase_date,
+          created_at: rma.created_at,
+          status: rma.status,
+          photo_urls: rma.photo_urls,
+        });
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching RMA data:", error);
         navigate("/");
-        return;
       }
-
-      setRmaData(data);
-      setLoading(false);
     };
 
     fetchRmaData();
