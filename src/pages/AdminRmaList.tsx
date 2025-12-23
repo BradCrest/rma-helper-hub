@@ -72,7 +72,48 @@ const statusColors: Record<RmaStatus, string> = {
 
 const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "follow_up", "closed"];
 
+// Status allowed days (null = no limit)
+const statusAllowedDays: Record<RmaStatus, number | null> = {
+  registered: 7,
+  shipped: 7,
+  received: 3,
+  inspecting: 3,
+  contacting: 3,
+  quote_confirmed: 3,
+  paid: 3,
+  no_repair: 2,
+  repairing: 14,
+  shipped_back: 7,
+  follow_up: 14,
+  closed: null,
+};
+
+// Calculate days in current status
+const calculateStatusDays = (updatedAt: string): number => {
+  const updated = new Date(updatedAt);
+  const now = new Date();
+  const diffTime = now.getTime() - updated.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+// Get status duration display info
+const getStatusDurationInfo = (status: RmaStatus, updatedAt: string): { elapsed: number; remaining: number | null; isOverdue: boolean } => {
+  const elapsed = calculateStatusDays(updatedAt);
+  const allowed = statusAllowedDays[status];
+  
+  if (allowed === null) {
+    return { elapsed, remaining: null, isOverdue: false };
+  }
+  
+  const remaining = allowed - elapsed;
+  const isOverdue = remaining < 0;
+  
+  return { elapsed, remaining, isOverdue };
+};
+
 const AdminRmaList = () => {
+
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
@@ -569,9 +610,37 @@ const AdminRmaList = () => {
                     </td>
                   </tr>
                 ) : (
-                  rmaList.map((rma) => (
+                  rmaList.map((rma) => {
+                    const durationInfo = getStatusDurationInfo(rma.status, rma.updated_at);
+                    return (
                     <tr key={rma.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="py-3 px-4 font-mono text-sm text-primary">{rma.rma_number}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          {/* Status Duration Badge */}
+                          {durationInfo.remaining !== null && (
+                            <div 
+                              className={cn(
+                                "flex flex-col items-center justify-center min-w-[40px] px-1.5 py-1 rounded text-xs font-medium",
+                                durationInfo.isOverdue 
+                                  ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                              title={`已過 ${durationInfo.elapsed} 天，${durationInfo.isOverdue ? `超時 ${Math.abs(durationInfo.remaining)} 天` : `剩餘 ${durationInfo.remaining} 天`}`}
+                            >
+                              <span className={cn(durationInfo.isOverdue && "text-red-600 dark:text-red-400")}>
+                                {durationInfo.elapsed}天
+                              </span>
+                              <span className={cn(
+                                "text-[10px]",
+                                durationInfo.isOverdue ? "text-red-500 dark:text-red-400" : "text-muted-foreground/70"
+                              )}>
+                                {durationInfo.isOverdue ? `超${Math.abs(durationInfo.remaining)}` : `剩${durationInfo.remaining}`}
+                              </span>
+                            </div>
+                          )}
+                          <span className="font-mono text-sm text-primary">{rma.rma_number}</span>
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-sm text-foreground">{rma.customer_name}</td>
                       <td className="py-3 px-4 text-sm text-foreground">{rma.customer_phone}</td>
                       <td className="py-3 px-4 text-sm text-foreground">{rma.product_model || "-"}</td>
@@ -591,7 +660,8 @@ const AdminRmaList = () => {
                         </button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
