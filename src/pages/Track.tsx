@@ -67,16 +67,29 @@ const Track = () => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const { data, error } = await supabase
-        .from("rma_requests")
-        .select("*")
-        .ilike("rma_number", `%${rma.replace(/-/g, "")}%`);
+      // Normalize input: remove spaces and convert to uppercase
+      const normalizedInput = rma.trim().toUpperCase();
+      
+      // Try exact match first (with or without dashes)
+      let query = supabase.from("rma_requests").select("*");
+      
+      // If input contains dashes, search directly
+      if (normalizedInput.includes("-")) {
+        query = query.ilike("rma_number", `%${normalizedInput}%`);
+      } else {
+        // If no dashes, search with wildcard pattern that matches the format RMA-XXXXXXXX-XXX
+        // Convert "RMA20251223002" to pattern that matches "RMA-20251223-002"
+        query = query.ilike("rma_number", `%${normalizedInput.replace(/RMA/i, "").replace(/(\d{8})(\d{3})/, "$1-$2")}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      // Filter to find exact match or close matches
+      // Filter results to find matches (handle both formats)
+      const inputWithoutDashes = normalizedInput.replace(/-/g, "");
       const filtered = data?.filter(r => 
-        r.rma_number.replace(/-/g, "").toLowerCase().includes(rma.replace(/-/g, "").toLowerCase())
+        r.rma_number.replace(/-/g, "").toUpperCase().includes(inputWithoutDashes)
       ) || [];
 
       setResults(filtered);
