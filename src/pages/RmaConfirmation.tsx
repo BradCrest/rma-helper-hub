@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Printer, Download, ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 
 interface RmaData {
   rma_number: string;
@@ -64,42 +63,53 @@ const RmaConfirmation = () => {
 
   const handleDownloadPdf = async () => {
     if (!printRef.current || !rmaData) return;
-    
+
+    const w = window as any;
+    const html2canvasFn = w.html2canvas as any;
+    const JsPdfCtor = (w.jspdf && w.jspdf.jsPDF) || w.jsPDF;
+
+    if (!html2canvasFn || !JsPdfCtor) {
+      toast.error("PDF 元件尚未載入，請重新整理後再試");
+      return;
+    }
+
     setGeneratingPdf(true);
     try {
-      const canvas = await html2canvas(printRef.current, {
+      const canvas = await html2canvasFn(printRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
       });
-      
+
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
+      const pdf = new JsPdfCtor({
         orientation: "portrait",
         unit: "mm",
         format: "a4",
       });
-      
+
       const imgWidth = 210;
       const pageHeight = 297;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
       let position = 0;
-      
+
       pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
       heightLeft -= pageHeight;
-      
+
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
-      
+
       pdf.save(`${rmaData.rma_number}.pdf`);
+      toast.success("已下載 PDF");
     } catch (error) {
       console.error("Error generating PDF:", error);
+      toast.error("PDF 產生失敗，請稍後再試");
     } finally {
       setGeneratingPdf(false);
     }
