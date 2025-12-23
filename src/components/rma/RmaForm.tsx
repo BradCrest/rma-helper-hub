@@ -300,10 +300,10 @@ const RmaForm = () => {
       {/* Product Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="rma-label">電腦錶型號</label>
+          <label className="rma-label">產品型號</label>
           <input
             type="text"
-            placeholder="請輸入電腦錶型號"
+            placeholder="請輸入產品型號"
             className="rma-input"
             value={productModel}
             onChange={(e) => setProductModel(e.target.value)}
