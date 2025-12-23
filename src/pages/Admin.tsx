@@ -215,7 +215,7 @@ const Admin = () => {
               onClick={() => setIsSignUp(!isSignUp)}
               className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
             >
-              {isSignUp ? "已有帳號？登入" : "還沒有帳號？註冊"}
+              {isSignUp ? "已有帳號？登入" : "申請管理員帳號"}
             </button>
           </div>
 
