@@ -10,7 +10,8 @@ import {
   Home,
   LogOut,
   Package,
-  Truck
+  Truck,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -145,6 +146,67 @@ const AdminRmaList = () => {
     navigate("/admin");
   };
 
+  const handleExportCsv = () => {
+    if (rmaList.length === 0) {
+      toast.error("沒有資料可下載");
+      return;
+    }
+
+    // CSV headers
+    const headers = [
+      "RMA編號",
+      "客戶名稱",
+      "電話",
+      "Email",
+      "地址",
+      "產品名稱",
+      "產品型號",
+      "序號",
+      "購買日期",
+      "問題類型",
+      "問題描述",
+      "狀態",
+      "建立日期"
+    ];
+
+    // CSV rows
+    const rows = rmaList.map(rma => [
+      rma.rma_number,
+      rma.customer_name,
+      rma.customer_phone,
+      rma.customer_email,
+      rma.customer_address || "",
+      rma.product_name,
+      rma.product_model || "",
+      rma.serial_number || "",
+      rma.purchase_date || "",
+      rma.issue_type,
+      rma.issue_description.replace(/"/g, '""'), // Escape quotes
+      statusLabels[rma.status],
+      new Date(rma.created_at).toLocaleString("zh-TW")
+    ]);
+
+    // Build CSV content with BOM for Excel compatibility
+    const BOM = "\uFEFF";
+    const csvContent = BOM + [
+      headers.join(","),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+    ].join("\n");
+
+    // Download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `RMA_列表_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success("CSV 檔案已下載");
+  };
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const formatDate = (dateString: string) => {
@@ -231,6 +293,16 @@ const AdminRmaList = () => {
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
               重新整理
+            </button>
+
+            {/* Export CSV */}
+            <button
+              onClick={handleExportCsv}
+              className="rma-btn-secondary"
+              disabled={isLoading || rmaList.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              下載 CSV
             </button>
           </div>
         </div>
