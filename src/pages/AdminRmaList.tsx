@@ -38,7 +38,7 @@ type RmaShipping = Database["public"]["Tables"]["rma_shipping"]["Row"];
 const statusLabels: Record<RmaStatus, string> = {
   pending: "待處理",
   processing: "處理中",
-  shipped: "已出貨",
+  shipped: "已寄出",
   received: "已收件",
   repairing: "維修中",
   completed: "已完成",
