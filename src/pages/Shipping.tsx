@@ -76,18 +76,7 @@ const Shipping = () => {
 
       const rma = result.results[0];
 
-      // Check if already has shipping info
-      const { data: shippingData } = await supabase
-        .from("rma_shipping")
-        .select("*")
-        .eq("rma_request_id", rma.id)
-        .eq("direction", "inbound")
-        .maybeSingle();
-
-      if (shippingData) {
-        toast.error("此 RMA 已有寄件資訊，無法重複新增");
-        return;
-      }
+      // Note: Shipping duplicate check will be done by the edge function
 
       setFoundRma({
         id: rma.id,
@@ -159,25 +148,28 @@ const Shipping = () => {
         photoUrl = urlData.publicUrl;
       }
 
-      // Insert shipping record
-      const { error: insertError } = await supabase
-        .from("rma_shipping")
-        .insert({
-          rma_request_id: foundRma.id,
-          direction: "inbound",
-          carrier: carrier.trim(),
-          tracking_number: trackingNumber.trim(),
-          photo_url: photoUrl,
-          ship_date: new Date().toISOString().split("T")[0],
-        });
+      // Submit shipping via Edge Function (bypasses RLS)
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-shipping`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            rma_request_id: foundRma.id,
+            carrier: carrier.trim(),
+            tracking_number: trackingNumber.trim(),
+            photo_url: photoUrl,
+          }),
+        }
+      );
 
-      if (insertError) throw insertError;
+      const result = await response.json();
 
-      // Update RMA status to shipped
-      await supabase
-        .from("rma_requests")
-        .update({ status: "shipped" })
-        .eq("id", foundRma.id);
+      if (!response.ok) {
+        throw new Error(result.error || "提交失敗");
+      }
 
       toast.success("寄件資訊已新增成功！");
       resetModal();
