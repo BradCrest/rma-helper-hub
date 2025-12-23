@@ -87,11 +87,6 @@ const Track = () => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      const { data, error } = await supabase.functions.invoke('lookup-rma', {
-        body: null,
-        headers: {},
-      });
-
       // Use GET method with query params via URL
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rma.trim())}`,
