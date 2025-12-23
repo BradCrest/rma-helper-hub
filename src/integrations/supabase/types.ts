@@ -109,6 +109,7 @@ export type Database = {
           direction: string
           id: string
           notes: string | null
+          photo_url: string | null
           rma_request_id: string
           ship_date: string | null
           tracking_number: string | null
@@ -121,6 +122,7 @@ export type Database = {
           direction: string
           id?: string
           notes?: string | null
+          photo_url?: string | null
           rma_request_id: string
           ship_date?: string | null
           tracking_number?: string | null
@@ -133,6 +135,7 @@ export type Database = {
           direction?: string
           id?: string
           notes?: string | null
+          photo_url?: string | null
           rma_request_id?: string
           ship_date?: string | null
           tracking_number?: string | null
