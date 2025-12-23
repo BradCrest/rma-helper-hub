@@ -11,13 +11,25 @@ import {
   LogOut,
   Package,
   Truck,
-  Download
+  Download,
+  CalendarIcon,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import type { Database } from "@/integrations/supabase/types";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type RmaStatus = Database["public"]["Enums"]["rma_status"];
 type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
@@ -57,6 +69,8 @@ const AdminRmaList = () => {
   const [selectedRma, setSelectedRma] = useState<RmaRequest | null>(null);
   const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const pageSize = 10;
 
   const fetchRmaList = async () => {
@@ -76,6 +90,17 @@ const AdminRmaList = () => {
         query = query.or(
           `rma_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%`
         );
+      }
+
+      // Apply date range filter
+      if (startDate) {
+        query = query.gte("created_at", startDate.toISOString());
+      }
+      if (endDate) {
+        // Set end of day for end date
+        const endOfDay = new Date(endDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", endOfDay.toISOString());
       }
 
       // Pagination
@@ -100,7 +125,7 @@ const AdminRmaList = () => {
 
   useEffect(() => {
     fetchRmaList();
-  }, [currentPage, statusFilter, searchTerm]);
+  }, [currentPage, statusFilter, searchTerm, startDate, endDate]);
 
   const handleStatusUpdate = async (rmaId: string, newStatus: RmaStatus) => {
     setIsUpdatingStatus(true);
@@ -284,7 +309,95 @@ const AdminRmaList = () => {
                 ))}
               </select>
             </div>
+          </div>
 
+          {/* Date Range Filter */}
+          <div className="flex flex-wrap items-center gap-4 mt-4">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">日期範圍：</span>
+            </div>
+            
+            {/* Start Date */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[160px] justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "yyyy/MM/dd", { locale: zhTW }) : "開始日期"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={(date) => {
+                    setStartDate(date);
+                    setCurrentPage(1);
+                  }}
+                  disabled={(date) => endDate ? date > endDate : false}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+
+            <span className="text-muted-foreground">至</span>
+
+            {/* End Date */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[160px] justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "yyyy/MM/dd", { locale: zhTW }) : "結束日期"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(date) => {
+                    setEndDate(date);
+                    setCurrentPage(1);
+                  }}
+                  disabled={(date) => startDate ? date < startDate : false}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Clear Date Filter */}
+            {(startDate || endDate) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDate(undefined);
+                  setEndDate(undefined);
+                  setCurrentPage(1);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4 mr-1" />
+                清除日期
+              </Button>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2 mt-4">
             {/* Refresh */}
             <button
               onClick={fetchRmaList}
