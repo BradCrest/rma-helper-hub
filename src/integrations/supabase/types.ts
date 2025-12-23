@@ -24,6 +24,7 @@ export type Database = {
           id: string
           issue_description: string
           issue_type: string
+          photo_urls: string[] | null
           product_model: string | null
           product_name: string
           purchase_date: string | null
@@ -41,6 +42,7 @@ export type Database = {
           id?: string
           issue_description: string
           issue_type: string
+          photo_urls?: string[] | null
           product_model?: string | null
           product_name: string
           purchase_date?: string | null
@@ -58,6 +60,7 @@ export type Database = {
           id?: string
           issue_description?: string
           issue_type?: string
+          photo_urls?: string[] | null
           product_model?: string | null
           product_name?: string
           purchase_date?: string | null
