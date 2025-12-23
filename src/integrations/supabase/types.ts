@@ -223,13 +223,18 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       rma_status:
-        | "pending"
-        | "processing"
+        | "registered"
         | "shipped"
         | "received"
+        | "inspecting"
+        | "contacting"
+        | "quote_confirmed"
+        | "paid"
+        | "no_repair"
         | "repairing"
-        | "completed"
-        | "cancelled"
+        | "shipped_back"
+        | "follow_up"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -359,13 +364,18 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       rma_status: [
-        "pending",
-        "processing",
+        "registered",
         "shipped",
         "received",
+        "inspecting",
+        "contacting",
+        "quote_confirmed",
+        "paid",
+        "no_repair",
         "repairing",
-        "completed",
-        "cancelled",
+        "shipped_back",
+        "follow_up",
+        "closed",
       ],
     },
   },

@@ -33,33 +33,48 @@ interface RmaResult {
 }
 
 const statusLabels: Record<RmaStatus, string> = {
-  pending: "待處理",
-  processing: "處理中",
-  shipped: "已出貨",
+  registered: "已登記",
+  shipped: "已寄出",
   received: "已收件",
+  inspecting: "檢修中",
+  contacting: "聯系中",
+  quote_confirmed: "確認報價",
+  paid: "已付費",
+  no_repair: "不維修",
   repairing: "維修中",
-  completed: "已完成",
-  cancelled: "已取消",
+  shipped_back: "已回寄",
+  follow_up: "後續關懷",
+  closed: "已結案",
 };
 
 const statusIcons: Record<RmaStatus, React.ReactNode> = {
-  pending: <Clock className="w-5 h-5" />,
-  processing: <Package className="w-5 h-5" />,
+  registered: <Clock className="w-5 h-5" />,
   shipped: <Truck className="w-5 h-5" />,
   received: <Package className="w-5 h-5" />,
+  inspecting: <Wrench className="w-5 h-5" />,
+  contacting: <Clock className="w-5 h-5" />,
+  quote_confirmed: <Package className="w-5 h-5" />,
+  paid: <CheckCircle2 className="w-5 h-5" />,
+  no_repair: <XCircle className="w-5 h-5" />,
   repairing: <Wrench className="w-5 h-5" />,
-  completed: <CheckCircle2 className="w-5 h-5" />,
-  cancelled: <XCircle className="w-5 h-5" />,
+  shipped_back: <Truck className="w-5 h-5" />,
+  follow_up: <Clock className="w-5 h-5" />,
+  closed: <CheckCircle2 className="w-5 h-5" />,
 };
 
 const statusColors: Record<RmaStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  processing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  registered: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
   shipped: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
   received: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
+  inspecting: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  contacting: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+  quote_confirmed: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  paid: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
+  no_repair: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
   repairing: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  completed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  cancelled: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+  shipped_back: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
+  closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
 };
 
 const Track = () => {

@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update RMA status to shipped
+    // Update RMA status to shipped (客戶已寄出)
     const { error: updateError } = await supabase
       .from("rma_requests")
       .update({ status: "shipped" })
