@@ -8,7 +8,9 @@ import {
   Eye,
   RefreshCw,
   Home,
-  LogOut
+  LogOut,
+  Package,
+  Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,6 +20,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type RmaStatus = Database["public"]["Enums"]["rma_status"];
 type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
+type RmaShipping = Database["public"]["Tables"]["rma_shipping"]["Row"];
 
 const statusLabels: Record<RmaStatus, string> = {
   pending: "待處理",
@@ -51,6 +54,7 @@ const AdminRmaList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedRma, setSelectedRma] = useState<RmaRequest | null>(null);
+  const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const pageSize = 10;
 
@@ -115,6 +119,24 @@ const AdminRmaList = () => {
       toast.error("更新狀態失敗");
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleViewRma = async (rma: RmaRequest) => {
+    setSelectedRma(rma);
+    // Fetch shipping info for this RMA
+    try {
+      const { data: shippingData } = await supabase
+        .from("rma_shipping")
+        .select("*")
+        .eq("rma_request_id", rma.id)
+        .eq("direction", "inbound")
+        .maybeSingle();
+      
+      setSelectedRmaShipping(shippingData);
+    } catch (error) {
+      console.error("Error fetching shipping info:", error);
+      setSelectedRmaShipping(null);
     }
   };
 
@@ -261,7 +283,7 @@ const AdminRmaList = () => {
                       <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(rma.created_at)}</td>
                       <td className="py-3 px-4">
                         <button
-                          onClick={() => setSelectedRma(rma)}
+                          onClick={() => handleViewRma(rma)}
                           className="text-primary hover:text-primary/80 transition-colors"
                         >
                           <Eye className="w-5 h-5" />
@@ -392,6 +414,60 @@ const AdminRmaList = () => {
                 <p className="text-sm text-muted-foreground">建立日期</p>
                 <p className="text-foreground">{formatDate(selectedRma.created_at)}</p>
               </div>
+
+              {/* Shipping Info */}
+              {selectedRmaShipping && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">客戶寄件資訊</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground">物流名稱</p>
+                        <p className="text-foreground font-medium">{selectedRmaShipping.carrier}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">物流單號</p>
+                        <p className="text-foreground font-mono">{selectedRmaShipping.tracking_number}</p>
+                      </div>
+                    </div>
+                    {selectedRmaShipping.ship_date && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">寄出日期</p>
+                        <p className="text-foreground">{selectedRmaShipping.ship_date}</p>
+                      </div>
+                    )}
+                    {selectedRmaShipping.photo_url && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">寄件單據照片</p>
+                        <a 
+                          href={selectedRmaShipping.photo_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block"
+                        >
+                          <img 
+                            src={selectedRmaShipping.photo_url} 
+                            alt="寄件單據" 
+                            className="w-full max-h-48 object-cover rounded-lg border border-border hover:opacity-80 transition-opacity"
+                          />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!selectedRmaShipping && (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Package className="w-4 h-4" />
+                    <p className="text-sm">客戶尚未提供寄件資訊</p>
+                  </div>
+                </div>
+              )}
 
               {/* Status Update */}
               <div className="pt-4 border-t border-border">
