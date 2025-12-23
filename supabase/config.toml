@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.lookup-rma]
 verify_jwt = false
+
+[functions.submit-shipping]
+verify_jwt = false
