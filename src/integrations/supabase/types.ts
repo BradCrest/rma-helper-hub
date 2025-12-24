@@ -44,60 +44,213 @@ export type Database = {
         }
         Relationships: []
       }
+      rma_customer_contacts: {
+        Row: {
+          contact_date: string
+          contact_method: string | null
+          contact_notes: string | null
+          created_at: string
+          id: string
+          rma_request_id: string
+        }
+        Insert: {
+          contact_date: string
+          contact_method?: string | null
+          contact_notes?: string | null
+          created_at?: string
+          id?: string
+          rma_request_id: string
+        }
+        Update: {
+          contact_date?: string
+          contact_method?: string | null
+          contact_notes?: string | null
+          created_at?: string
+          id?: string
+          rma_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_customer_contacts_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rma_customer_feedback: {
+        Row: {
+          created_at: string
+          feedback: string | null
+          follow_up_date: string | null
+          follow_up_method: string | null
+          id: string
+          rma_request_id: string
+          satisfaction_score: number | null
+        }
+        Insert: {
+          created_at?: string
+          feedback?: string | null
+          follow_up_date?: string | null
+          follow_up_method?: string | null
+          id?: string
+          rma_request_id: string
+          satisfaction_score?: number | null
+        }
+        Update: {
+          created_at?: string
+          feedback?: string | null
+          follow_up_date?: string | null
+          follow_up_method?: string | null
+          id?: string
+          rma_request_id?: string
+          satisfaction_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_customer_feedback_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rma_repair_details: {
+        Row: {
+          actual_cost: number | null
+          actual_method: string | null
+          created_at: string
+          estimated_cost: number | null
+          id: string
+          internal_reference: string | null
+          planned_method: string | null
+          replacement_model: string | null
+          replacement_serial: string | null
+          rma_request_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          actual_method?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          internal_reference?: string | null
+          planned_method?: string | null
+          replacement_model?: string | null
+          replacement_serial?: string | null
+          rma_request_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_cost?: number | null
+          actual_method?: string | null
+          created_at?: string
+          estimated_cost?: number | null
+          id?: string
+          internal_reference?: string | null
+          planned_method?: string | null
+          replacement_model?: string | null
+          replacement_serial?: string | null
+          rma_request_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_repair_details_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: true
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rma_requests: {
         Row: {
           created_at: string
           customer_address: string | null
           customer_email: string
+          customer_issue: string | null
           customer_name: string
+          customer_notes: string | null
           customer_phone: string
+          customer_type: string | null
+          diagnosis_category: string | null
           id: string
+          initial_diagnosis: string | null
           issue_description: string
           issue_type: string
+          mobile_phone: string | null
           photo_urls: string[] | null
           product_model: string | null
           product_name: string
           purchase_date: string | null
+          received_date: string | null
           rma_number: string
           serial_number: string | null
+          social_account: string | null
           status: Database["public"]["Enums"]["rma_status"]
           updated_at: string
+          warranty_date: string | null
+          warranty_status: string | null
         }
         Insert: {
           created_at?: string
           customer_address?: string | null
           customer_email: string
+          customer_issue?: string | null
           customer_name: string
+          customer_notes?: string | null
           customer_phone: string
+          customer_type?: string | null
+          diagnosis_category?: string | null
           id?: string
+          initial_diagnosis?: string | null
           issue_description: string
           issue_type: string
+          mobile_phone?: string | null
           photo_urls?: string[] | null
           product_model?: string | null
           product_name: string
           purchase_date?: string | null
+          received_date?: string | null
           rma_number: string
           serial_number?: string | null
+          social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string
+          warranty_date?: string | null
+          warranty_status?: string | null
         }
         Update: {
           created_at?: string
           customer_address?: string | null
           customer_email?: string
+          customer_issue?: string | null
           customer_name?: string
+          customer_notes?: string | null
           customer_phone?: string
+          customer_type?: string | null
+          diagnosis_category?: string | null
           id?: string
+          initial_diagnosis?: string | null
           issue_description?: string
           issue_type?: string
+          mobile_phone?: string | null
           photo_urls?: string[] | null
           product_model?: string | null
           product_name?: string
           purchase_date?: string | null
+          received_date?: string | null
           rma_number?: string
           serial_number?: string | null
+          social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string
+          warranty_date?: string | null
+          warranty_status?: string | null
         }
         Relationships: []
       }
@@ -179,6 +332,77 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rma_status_history_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rma_supplier_repairs: {
+        Row: {
+          created_at: string
+          factory_analysis: string | null
+          factory_repair_cost: number | null
+          factory_repair_method: string | null
+          factory_return_date: string | null
+          id: string
+          inspection_result: string | null
+          post_repair_action: string | null
+          production_batch: string | null
+          repair_count: number | null
+          repair_requirement: string | null
+          rma_request_id: string
+          sent_carrier: string | null
+          sent_to_factory_date: string | null
+          sent_tracking_number: string | null
+          supplier_status: string | null
+          supplier_warranty_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          factory_analysis?: string | null
+          factory_repair_cost?: number | null
+          factory_repair_method?: string | null
+          factory_return_date?: string | null
+          id?: string
+          inspection_result?: string | null
+          post_repair_action?: string | null
+          production_batch?: string | null
+          repair_count?: number | null
+          repair_requirement?: string | null
+          rma_request_id: string
+          sent_carrier?: string | null
+          sent_to_factory_date?: string | null
+          sent_tracking_number?: string | null
+          supplier_status?: string | null
+          supplier_warranty_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          factory_analysis?: string | null
+          factory_repair_cost?: number | null
+          factory_repair_method?: string | null
+          factory_return_date?: string | null
+          id?: string
+          inspection_result?: string | null
+          post_repair_action?: string | null
+          production_batch?: string | null
+          repair_count?: number | null
+          repair_requirement?: string | null
+          rma_request_id?: string
+          sent_carrier?: string | null
+          sent_to_factory_date?: string | null
+          sent_tracking_number?: string | null
+          supplier_status?: string | null
+          supplier_warranty_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_supplier_repairs_rma_request_id_fkey"
             columns: ["rma_request_id"]
             isOneToOne: false
             referencedRelation: "rma_requests"
