@@ -17,7 +17,8 @@ import {
   Clock,
   History,
   PackageCheck,
-  Send
+  Send,
+  Upload
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -574,6 +575,12 @@ const AdminRmaList = () => {
               <Download className="w-4 h-4" />
               下載 CSV
             </button>
+
+            {/* Import CSV */}
+            <Link to="/admin/csv-import" className="rma-btn-secondary inline-flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              匯入 CSV
+            </Link>
           </div>
         </div>
 

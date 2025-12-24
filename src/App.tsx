@@ -12,6 +12,7 @@ import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRmaList from "./pages/AdminRmaList";
 import AdminSettings from "./pages/AdminSettings";
+import AdminCsvImport from "./pages/AdminCsvImport";
 import RmaConfirmation from "./pages/RmaConfirmation";
 import NotFound from "./pages/NotFound";
 
@@ -51,6 +52,14 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <AdminSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/csv-import"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminCsvImport />
                 </ProtectedRoute>
               }
             />
