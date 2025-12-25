@@ -240,9 +240,9 @@ export function parseCSV(csvContent: string): ParsedRmaRecord[] {
     
     const columns = parseCSVLine(line);
     
-    // Skip if no RMA number
+    // Skip if no RMA number (allow any format, not just RC prefix)
     const rmaNumber = cleanString(columns[0]);
-    if (!rmaNumber || !rmaNumber.startsWith('RC')) continue;
+    if (!rmaNumber) continue;
     
     const record: ParsedRmaRecord = {
       rma_number: rmaNumber,
