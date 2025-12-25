@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle, Download, Printer, Home, Eye, FileText } from "lucide-react";
+import { CheckCircle, Download, Printer, Home, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import RmaDetailDialog from "@/components/rma/RmaDetailDialog";
+
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -48,8 +48,6 @@ const RmaMultiConfirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [results, setResults] = useState<RmaResult[]>([]);
-  const [selectedRma, setSelectedRma] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
@@ -80,11 +78,6 @@ const RmaMultiConfirmation = () => {
 
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleViewDetail = (rmaNumber: string) => {
-    setSelectedRma(rmaNumber);
-    setDialogOpen(true);
   };
 
   const fetchRmaDetails = async (rmaNumber: string): Promise<RmaFullData | null> => {
@@ -346,7 +339,6 @@ const RmaMultiConfirmation = () => {
                     <TableHead>RMA 編號</TableHead>
                     <TableHead>產品型號</TableHead>
                     <TableHead>產品序號</TableHead>
-                    <TableHead className="w-24">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -360,17 +352,6 @@ const RmaMultiConfirmation = () => {
                       </TableCell>
                       <TableCell>{result.productModel}</TableCell>
                       <TableCell>{result.serialNumber}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewDetail(result.rmaNumber)}
-                          className="gap-1 h-8 px-2"
-                        >
-                          <Eye className="w-3 h-3" />
-                          查看
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -404,12 +385,6 @@ const RmaMultiConfirmation = () => {
         </div>
       </main>
       <Footer />
-
-      <RmaDetailDialog
-        rmaNumber={selectedRma}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-      />
     </div>
   );
 };
