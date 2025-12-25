@@ -190,7 +190,6 @@ const CsvImportSection = ({ onImport }: CsvImportSectionProps) => {
         <ul className="text-xs text-muted-foreground space-y-1">
           <li>• <strong>產品型號</strong> (必填)：產品的型號名稱</li>
           <li>• <strong>產品序號</strong> (必填)：產品的序列號</li>
-          <li>• <strong>故障問題</strong>：螢幕問題/電池問題/充電問題/按鍵問題/軟體問題/外觀損壞/其他</li>
           <li>• <strong>問題描述</strong>：詳細的問題說明</li>
           <li>• <strong>購買日期</strong>：格式 YYYY-MM-DD</li>
           <li>• <strong>隨附物品</strong>：多項用逗號分隔</li>
