@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -11,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { AlertCircle, CheckCircle } from "lucide-react";
+import { ParseError } from "@/lib/rmaMultiCsvParser";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CustomerInfo {
   customerName: string;
@@ -24,14 +26,16 @@ interface CsvCustomerInfoDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (info: CustomerInfo) => void;
   productCount: number;
+  errors?: ParseError[];
 }
 
-const CsvCustomerInfoDialog = ({
+const CsvCustomerInfoDialog = forwardRef<HTMLDivElement, CsvCustomerInfoDialogProps>(({
   open,
   onOpenChange,
   onConfirm,
   productCount,
-}: CsvCustomerInfoDialogProps) => {
+  errors = [],
+}, ref) => {
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -80,7 +84,7 @@ const CsvCustomerInfoDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent ref={ref} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>填寫客戶資訊</DialogTitle>
           <DialogDescription>
@@ -88,7 +92,34 @@ const CsvCustomerInfoDialog = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        {/* Display errors if any */}
+        {errors.length > 0 && (
+          <div className="border border-destructive/50 rounded-lg p-3 bg-destructive/10">
+            <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-2">
+              <AlertCircle className="w-4 h-4" />
+              解析錯誤：{errors.length} 筆資料無法匯入
+            </div>
+            <ScrollArea className="max-h-24">
+              <div className="space-y-1">
+                {errors.map((error, index) => (
+                  <p key={index} className="text-xs text-destructive">
+                    第 {error.row} 行：{error.message}
+                  </p>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+
+        {/* Success count */}
+        {productCount > 0 && (
+          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+            <CheckCircle className="w-4 h-4" />
+            成功解析：{productCount} 筆
+          </div>
+        )}
+
+        <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="csv-customer-name">客戶姓名 *</Label>
             <Input
@@ -132,15 +163,19 @@ const CsvCustomerInfoDialog = ({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={handleCancel}>
             取消
           </Button>
-          <Button onClick={handleConfirm}>確認並繼續</Button>
-        </DialogFooter>
+          <Button onClick={handleConfirm} disabled={productCount === 0}>
+            確認並繼續
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
-};
+});
+
+CsvCustomerInfoDialog.displayName = "CsvCustomerInfoDialog";
 
 export default CsvCustomerInfoDialog;

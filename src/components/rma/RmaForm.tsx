@@ -3,7 +3,7 @@ import { Upload, Check, Loader2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { ProductEntry } from "@/lib/rmaMultiCsvParser";
+import { ProductEntry, ParseError } from "@/lib/rmaMultiCsvParser";
 import MultiProductForm from "./MultiProductForm";
 import CsvImportSection from "./CsvImportSection";
 import CsvCustomerInfoDialog from "./CsvCustomerInfoDialog";
@@ -72,6 +72,7 @@ const RmaForm = () => {
   ]);
   const [showCsvDialog, setShowCsvDialog] = useState(false);
   const [csvProducts, setCsvProducts] = useState<ProductEntry[]>([]);
+  const [csvErrors, setCsvErrors] = useState<ParseError[]>([]);
   const [showPreview, setShowPreview] = useState(false);
 
   const handleAccessoryToggle = (id: string) => {
@@ -318,8 +319,9 @@ const RmaForm = () => {
   };
 
   // CSV import handlers
-  const handleCsvImport = (products: ProductEntry[]) => {
+  const handleCsvImport = (products: ProductEntry[], errors: ParseError[]) => {
     setCsvProducts(products);
+    setCsvErrors(errors);
     setShowCsvDialog(true);
   };
 
@@ -415,6 +417,7 @@ const RmaForm = () => {
           onBack={() => setShowPreview(false)}
           onSubmit={handleMultiSubmit}
           isSubmitting={isSubmitting}
+          errors={csvErrors}
         />
       </div>
     );
@@ -735,6 +738,7 @@ const RmaForm = () => {
         onOpenChange={setShowCsvDialog}
         onConfirm={handleCsvCustomerConfirm}
         productCount={csvProducts.length}
+        errors={csvErrors}
       />
     </>
   );

@@ -1,6 +1,7 @@
-import { ArrowLeft, Send, Package, User } from "lucide-react";
+import { forwardRef } from "react";
+import { ArrowLeft, Send, Package, User, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ProductEntry } from "@/lib/rmaMultiCsvParser";
+import { ProductEntry, ParseError } from "@/lib/rmaMultiCsvParser";
 import {
   Table,
   TableBody,
@@ -25,18 +26,20 @@ interface MultiProductPreviewProps {
   onBack: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
+  errors?: ParseError[];
 }
 
-const MultiProductPreview = ({
+const MultiProductPreview = forwardRef<HTMLDivElement, MultiProductPreviewProps>(({
   customerInfo,
   products,
   photoCount,
   onBack,
   onSubmit,
   isSubmitting,
-}: MultiProductPreviewProps) => {
+  errors = [],
+}, ref) => {
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <Button
           type="button"
@@ -50,6 +53,25 @@ const MultiProductPreview = ({
         </Button>
         <h2 className="text-xl font-bold text-foreground">預覽確認</h2>
       </div>
+
+      {/* Display errors if any */}
+      {errors.length > 0 && (
+        <div className="border border-destructive/50 rounded-lg p-4 bg-destructive/10">
+          <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-2">
+            <AlertCircle className="w-4 h-4" />
+            以下資料有錯誤，將不會被提交：
+          </div>
+          <ScrollArea className="max-h-32">
+            <div className="space-y-1">
+              {errors.map((error, index) => (
+                <p key={index} className="text-xs text-destructive">
+                  第 {error.row} 行：{error.message}
+                </p>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* Customer Info Card */}
       <div className="border border-border rounded-lg p-4 bg-card">
@@ -140,7 +162,7 @@ const MultiProductPreview = ({
         <Button
           type="button"
           onClick={onSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || products.length === 0}
           className="gap-2"
         >
           {isSubmitting ? (
@@ -158,6 +180,8 @@ const MultiProductPreview = ({
       </div>
     </div>
   );
-};
+});
+
+MultiProductPreview.displayName = "MultiProductPreview";
 
 export default MultiProductPreview;
