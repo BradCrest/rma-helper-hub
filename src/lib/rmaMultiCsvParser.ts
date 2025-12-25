@@ -33,7 +33,6 @@ const VALID_ISSUE_TYPES = [
 const COLUMN_MAPPING: Record<string, keyof ProductEntry> = {
   '產品型號': 'productModel',
   '產品序號': 'serialNumber',
-  '故障問題': 'issueType',
   '問題描述': 'issueDescription',
   '購買日期': 'purchaseDate',
   '隨附物品': 'accessories',
@@ -132,22 +131,15 @@ export function parseCsvContent(content: string): ParseResult {
       continue;
     }
     
-    const issueType = values[columnIndices.issueType ?? -1]?.trim() || '';
     const issueDescription = values[columnIndices.issueDescription ?? -1]?.trim() || '';
     const purchaseDate = formatDate(values[columnIndices.purchaseDate ?? -1]?.trim() || '');
     const accessoriesStr = values[columnIndices.accessories ?? -1]?.trim() || '';
-    
-    // Validate issue type if provided
-    if (issueType && !VALID_ISSUE_TYPES.includes(issueType)) {
-      errors.push({ row: rowNum, message: `無效的故障問題類型：${issueType}` });
-      continue;
-    }
     
     success.push({
       id: generateId(),
       productModel,
       serialNumber,
-      issueType,
+      issueType: '', // Keep empty, database column preserved
       issueDescription,
       purchaseDate,
       accessories: parseAccessories(accessoriesStr),
@@ -214,22 +206,15 @@ export function parseExcelContent(buffer: ArrayBuffer): ParseResult {
         continue;
       }
       
-      const issueType = String(row[columnIndices.issueType ?? -1] || '').trim();
       const issueDescription = String(row[columnIndices.issueDescription ?? -1] || '').trim();
       const purchaseDate = formatDate(row[columnIndices.purchaseDate ?? -1]);
       const accessoriesStr = String(row[columnIndices.accessories ?? -1] || '').trim();
-      
-      // Validate issue type if provided
-      if (issueType && !VALID_ISSUE_TYPES.includes(issueType)) {
-        errors.push({ row: rowNum, message: `無效的故障問題類型：${issueType}` });
-        continue;
-      }
       
       success.push({
         id: generateId(),
         productModel,
         serialNumber,
-        issueType,
+        issueType: '', // Keep empty, database column preserved
         issueDescription,
         purchaseDate,
         accessories: parseAccessories(accessoriesStr),
@@ -267,8 +252,8 @@ function parseCSVLine(line: string): string[] {
 
 export function generateCsvTemplate(): string {
   const BOM = '\uFEFF';
-  const headers = ['產品型號', '產品序號', '故障問題', '問題描述', '購買日期', '隨附物品'];
-  const exampleRow = ['RC-PRO-500', 'SN2024001234', '螢幕問題', '螢幕有白點', '2024-06-15', '充電器,說明書'];
+  const headers = ['產品型號', '產品序號', '問題描述', '購買日期', '隨附物品'];
+  const exampleRow = ['RC-PRO-500', 'SN2024001234', '螢幕有白點', '2024-06-15', '充電器,說明書'];
   
   return BOM + headers.join(',') + '\n' + exampleRow.join(',');
 }
