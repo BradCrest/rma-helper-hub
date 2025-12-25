@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      login_logs: {
+        Row: {
+          created_at: string
+          email: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       pending_admin_registrations: {
         Row: {
           email: string
