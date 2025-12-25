@@ -87,17 +87,18 @@ const Admin = () => {
         const { data: { user: loggedInUser } } = await supabase.auth.getUser();
         
         if (loggedInUser) {
-          // Check if user is already an admin
+          // Check if user is already an admin or super_admin
           const { data: roleData } = await supabase
             .from("user_roles")
             .select("role")
             .eq("user_id", loggedInUser.id)
-            .eq("role", "admin")
+            .in("role", ["admin", "super_admin"])
             .maybeSingle();
 
           if (roleData) {
-            // User is admin, will be redirected by useEffect
+            // User is admin, navigate directly
             toast.success("登入成功");
+            navigate("/admin/dashboard");
           } else {
             // Check if user has pending registration
             const { data: pendingData } = await supabase
