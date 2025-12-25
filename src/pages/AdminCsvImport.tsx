@@ -27,8 +27,8 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { parseCSV, validateRecord, getParseStats, type ParsedRmaRecord } from "@/lib/csvParser";
-import { ArrowLeft, Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { parseCSVWithDiagnostics, validateRecord, getParseStats, type ParsedRmaRecord, type SkippedRecord } from "@/lib/csvParser";
+import { ArrowLeft, Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2, SkipForward } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 type ImportMode = 'skip' | 'update';
@@ -49,6 +49,7 @@ const statusLabels: Record<string, string> = {
   shipped_back_new: '已寄出全新品',
   follow_up: '後續關懷',
   closed: '已結案',
+  unknown: '未知狀態',
 };
 
 const AdminCsvImport = () => {
@@ -58,6 +59,8 @@ const AdminCsvImport = () => {
   
   const [file, setFile] = useState<File | null>(null);
   const [parsedRecords, setParsedRecords] = useState<ParsedRmaRecord[]>([]);
+  const [skippedRecords, setSkippedRecords] = useState<SkippedRecord[]>([]);
+  const [totalCsvLines, setTotalCsvLines] = useState<number>(0);
   const [parseStats, setParseStats] = useState<ReturnType<typeof getParseStats> | null>(null);
   const [importMode, setImportMode] = useState<ImportMode>('skip');
   const [isImporting, setIsImporting] = useState(false);
@@ -79,11 +82,12 @@ const AdminCsvImport = () => {
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'complete'>('upload');
   const [showInvalidConfirm, setShowInvalidConfirm] = useState(false);
   const [showInvalidList, setShowInvalidList] = useState(false);
+  const [showSkippedList, setShowSkippedList] = useState(false);
   
   // Memoize invalid records for performance
   const invalidRecords = useMemo(() => {
     return parsedRecords
-      .map((record, index) => ({ record, index: index + 3, validation: validateRecord(record) }))
+      .map((record, index) => ({ record, index: index + 2, validation: validateRecord(record) }))
       .filter(item => !item.validation.valid);
   }, [parsedRecords]);
   
@@ -110,16 +114,19 @@ const AdminCsvImport = () => {
     reader.onload = (event) => {
       try {
         const content = event.target?.result as string;
-        const records = parseCSV(content);
-        const stats = getParseStats(records);
+        const result = parseCSVWithDiagnostics(content);
+        const stats = getParseStats(result.records);
         
-        setParsedRecords(records);
+        setParsedRecords(result.records);
+        setSkippedRecords(result.skipped);
+        setTotalCsvLines(result.totalLines);
         setParseStats(stats);
         setStep('preview');
         
+        const skippedCount = result.skipped.filter(s => s.reason !== '空白行').length;
         toast({
           title: "檔案解析完成",
-          description: `共解析 ${stats.total} 筆記錄`,
+          description: `CSV 共 ${result.totalLines} 行資料，解析成功 ${result.records.length} 筆${skippedCount > 0 ? `，跳過 ${skippedCount} 筆` : ''}`,
         });
       } catch (error) {
         toast({
@@ -286,6 +293,8 @@ const AdminCsvImport = () => {
   const resetImport = () => {
     setFile(null);
     setParsedRecords([]);
+    setSkippedRecords([]);
+    setTotalCsvLines(0);
     setParseStats(null);
     setImportResults(null);
     setStep('upload');
@@ -296,6 +305,7 @@ const AdminCsvImport = () => {
     setElapsedTime('00:00');
     setCurrentBatch(0);
     setTotalBatches(0);
+    setShowSkippedList(false);
     importedCountRef.current = 0;
     importStartTimeRef.current = null;
   };
@@ -374,14 +384,48 @@ const AdminCsvImport = () => {
                     檔案預覽
                   </CardTitle>
                   <CardDescription>
-                    {file?.name} - {parseStats.total} 筆記錄
+                    {file?.name} - CSV 共 {totalCsvLines} 行資料
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {/* Parsing summary - shows CSV lines vs parsed records */}
+                  {skippedRecords.filter(s => s.reason !== '空白行').length > 0 && (
+                    <Alert className="mb-6" variant="default">
+                      <SkipForward className="h-4 w-4" />
+                      <AlertTitle>解析摘要</AlertTitle>
+                      <AlertDescription>
+                        CSV 共 {totalCsvLines} 行資料，成功解析 {parsedRecords.length} 筆記錄，
+                        <span 
+                          className="text-orange-600 font-medium cursor-pointer underline decoration-dotted"
+                          onClick={() => setShowSkippedList(true)}
+                        >
+                          跳過 {skippedRecords.filter(s => s.reason !== '空白行').length} 行
+                        </span>
+                        （報修單號為空或無效）
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <div className="text-2xl font-bold text-foreground">{totalCsvLines}</div>
+                      <div className="text-sm text-muted-foreground">CSV 行數</div>
+                    </div>
                     <div className="p-4 bg-muted rounded-lg">
                       <div className="text-2xl font-bold text-foreground">{parseStats.total}</div>
-                      <div className="text-sm text-muted-foreground">總記錄數</div>
+                      <div className="text-sm text-muted-foreground">解析成功</div>
+                    </div>
+                    <div 
+                      className={`p-4 bg-orange-500/10 rounded-lg ${skippedRecords.filter(s => s.reason !== '空白行').length > 0 ? 'cursor-pointer hover:bg-orange-500/20 transition-colors' : ''}`}
+                      onClick={() => skippedRecords.filter(s => s.reason !== '空白行').length > 0 && setShowSkippedList(true)}
+                      title={skippedRecords.filter(s => s.reason !== '空白行').length > 0 ? '點擊查看被跳過的行' : undefined}
+                    >
+                      <div className={`text-2xl font-bold text-orange-600 ${skippedRecords.filter(s => s.reason !== '空白行').length > 0 ? 'underline decoration-dotted' : ''}`}>
+                        {skippedRecords.filter(s => s.reason !== '空白行').length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        解析跳過{skippedRecords.filter(s => s.reason !== '空白行').length > 0 && ' (點擊)'}
+                      </div>
                     </div>
                     <div className="p-4 bg-green-500/10 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">{parseStats.valid}</div>
@@ -396,14 +440,8 @@ const AdminCsvImport = () => {
                         {parseStats.invalid}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        無效記錄{parseStats.invalid > 0 && ' (點擊查看)'}
+                        無效記錄{parseStats.invalid > 0 && ' (點擊)'}
                       </div>
-                    </div>
-                    <div className="p-4 bg-blue-500/10 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {Object.keys(parseStats.byStatus).length}
-                      </div>
-                      <div className="text-sm text-muted-foreground">狀態類型</div>
                     </div>
                   </div>
 
@@ -585,6 +623,51 @@ const AdminCsvImport = () => {
                                   </Badge>
                                 ))}
                               </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {/* Skipped records list dialog */}
+              <Dialog open={showSkippedList} onOpenChange={setShowSkippedList}>
+                <DialogContent className="max-w-4xl max-h-[80vh]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <SkipForward className="w-5 h-5 text-orange-600" />
+                      解析時跳過的行 ({skippedRecords.filter(s => s.reason !== '空白行').length} 行)
+                    </DialogTitle>
+                    <DialogDescription>
+                      以下 CSV 行因報修單號為空或無效而在解析時被跳過，不會匯入
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="overflow-auto max-h-[60vh]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky top-0 bg-background w-20">CSV 行號</TableHead>
+                          <TableHead className="sticky top-0 bg-background w-48">跳過原因</TableHead>
+                          <TableHead className="sticky top-0 bg-background">原始內容（前 100 字元）</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {skippedRecords
+                          .filter(s => s.reason !== '空白行')
+                          .map((item) => (
+                          <TableRow key={item.lineNumber}>
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {item.lineNumber}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                {item.reason}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground max-w-md truncate">
+                              {item.rawContent || <span className="italic">（空行）</span>}
                             </TableCell>
                           </TableRow>
                         ))}
