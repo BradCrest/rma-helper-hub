@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Clock,
   Check,
-  X
+  X,
+  Crown
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ interface Admin {
   id: string;
   user_id: string;
   email: string;
+  role: string;
   created_at: string;
 }
 
@@ -34,7 +36,7 @@ interface PendingRegistration {
 }
 
 const AdminSettings = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([]);
@@ -162,13 +164,13 @@ const AdminSettings = () => {
   };
 
   const handleRemoveAdmin = async (admin: Admin) => {
-    if (admin.user_id === user?.id) {
-      toast.error("無法移除自己的管理員權限");
+    if (admin.role === 'super_admin') {
+      toast.error("無法移除超級管理員");
       return;
     }
 
-    if (admins.length <= 1) {
-      toast.error("系統至少需要一位管理員");
+    if (!isSuperAdmin) {
+      toast.error("只有超級管理員可以移除管理員");
       return;
     }
 
@@ -447,9 +449,17 @@ const AdminSettings = () => {
                   key={admin.id}
                   className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-primary" />
+                <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      admin.role === 'super_admin' 
+                        ? 'bg-yellow-500/20' 
+                        : 'bg-primary/10'
+                    }`}>
+                      {admin.role === 'super_admin' ? (
+                        <Crown className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                      ) : (
+                        <Shield className="w-5 h-5 text-primary" />
+                      )}
                     </div>
                     <div>
                       <p className="font-medium text-foreground">{admin.email}</p>
@@ -457,24 +467,31 @@ const AdminSettings = () => {
                         新增於 {formatDate(admin.created_at)}
                       </p>
                     </div>
+                    {admin.role === 'super_admin' && (
+                      <span className="text-xs bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded-full font-medium">
+                        超級管理員
+                      </span>
+                    )}
                     {admin.user_id === user?.id && (
                       <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
                         您
                       </span>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleRemoveAdmin(admin)}
-                    disabled={deletingId === admin.id || admin.user_id === user?.id}
-                    className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                    title={admin.user_id === user?.id ? "無法移除自己" : "移除管理員"}
-                  >
-                    {deletingId === admin.id ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-5 h-5" />
-                    )}
-                  </button>
+                  {isSuperAdmin && admin.role !== 'super_admin' && (
+                    <button
+                      onClick={() => handleRemoveAdmin(admin)}
+                      disabled={deletingId === admin.id}
+                      className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+                      title="移除管理員"
+                    >
+                      {deletingId === admin.id ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-5 h-5" />
+                      )}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
