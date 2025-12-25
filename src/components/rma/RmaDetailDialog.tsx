@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface RmaData {
   rma_number: string;
@@ -344,12 +346,6 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
 
     setGeneratingPdf(true);
     try {
-      // Dynamic imports to avoid TypeScript compiler issues
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas")
-      ]);
-
       const container = document.createElement("div");
       container.style.cssText = "position: absolute; left: -9999px; top: 0;";
       document.body.appendChild(container);
@@ -446,108 +442,102 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
               </div>
 
               {/* Customer Info */}
-              <div>
-                <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
-                  客戶資訊
-                </h3>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg border-b pb-2">客戶資訊</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">客戶姓名：</span>
-                    <span className="text-foreground">{rmaData.customer_name}</span>
+                    <p className="text-muted-foreground">客戶姓名</p>
+                    <p className="font-medium">{rmaData.customer_name}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">客戶類型：</span>
-                    <span className="text-foreground">{rmaData.customer_type || "一般客戶"}</span>
+                    <p className="text-muted-foreground">客戶類型</p>
+                    <p className="font-medium">{rmaData.customer_type || "一般客戶"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">電子郵件：</span>
-                    <span className="text-foreground">{rmaData.customer_email}</span>
+                    <p className="text-muted-foreground">電子郵件</p>
+                    <p className="font-medium">{rmaData.customer_email}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">聯絡電話：</span>
-                    <span className="text-foreground">{rmaData.customer_phone}</span>
+                    <p className="text-muted-foreground">聯絡電話</p>
+                    <p className="font-medium">{rmaData.customer_phone}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">手機號碼：</span>
-                    <span className="text-foreground">{rmaData.mobile_phone || "-"}</span>
+                    <p className="text-muted-foreground">手機號碼</p>
+                    <p className="font-medium">{rmaData.mobile_phone || "-"}</p>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-muted-foreground">聯絡地址：</span>
-                    <span className="text-foreground">{rmaData.customer_address || "-"}</span>
+                    <p className="text-muted-foreground">聯絡地址</p>
+                    <p className="font-medium">{rmaData.customer_address || "-"}</p>
                   </div>
                 </div>
               </div>
 
               {/* Product Info */}
-              <div>
-                <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
-                  產品資訊
-                </h3>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg border-b pb-2">產品資訊</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">產品名稱：</span>
-                    <span className="text-foreground">{rmaData.product_name}</span>
+                    <p className="text-muted-foreground">產品名稱</p>
+                    <p className="font-medium">{rmaData.product_name}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">產品型號：</span>
-                    <span className="text-foreground">{rmaData.product_model || "-"}</span>
+                    <p className="text-muted-foreground">產品型號</p>
+                    <p className="font-medium">{rmaData.product_model || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">產品序號：</span>
-                    <span className="text-foreground">{rmaData.serial_number || "-"}</span>
+                    <p className="text-muted-foreground">產品序號</p>
+                    <p className="font-medium">{rmaData.serial_number || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">購買日期：</span>
-                    <span className="text-foreground">{rmaData.purchase_date || "-"}</span>
+                    <p className="text-muted-foreground">購買日期</p>
+                    <p className="font-medium">{rmaData.purchase_date || "-"}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">保固到期日：</span>
-                    <span className="text-foreground">{rmaData.warranty_date || "-"}</span>
+                    <p className="text-muted-foreground">保固到期日</p>
+                    <p className="font-medium">{rmaData.warranty_date || "-"}</p>
                   </div>
                 </div>
               </div>
 
               {/* Issue Description */}
-              <div>
-                <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
-                  問題描述
-                </h3>
-                <p className="text-sm text-foreground whitespace-pre-wrap bg-muted/50 p-3 rounded">
-                  {rmaData.issue_description}
-                </p>
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg border-b pb-2">問題描述</h3>
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm whitespace-pre-wrap">{rmaData.issue_description}</p>
+                </div>
               </div>
 
               {/* Customer Notes */}
               {rmaData.customer_notes && (
-                <div>
-                  <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
-                    隨附物品 / 備註
-                  </h3>
-                  <p className="text-sm text-foreground whitespace-pre-wrap bg-muted/50 p-3 rounded">
-                    {rmaData.customer_notes}
-                  </p>
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg border-b pb-2">隨附物品 / 備註</h3>
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <p className="text-sm whitespace-pre-wrap">{rmaData.customer_notes}</p>
+                  </div>
                 </div>
               )}
 
               {/* Status */}
-              <div className="flex items-center justify-between pt-4 border-t">
-                <span className="text-sm text-muted-foreground">目前狀態</span>
-                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
-                  {getStatusLabel(rmaData.status)}
-                </span>
+              <div className="pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">目前狀態</span>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
+                    {getStatusLabel(rmaData.status)}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={handlePrint} className="gap-2">
+            {/* Actions */}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={handlePrint} className="flex-1 gap-2">
                 <Printer className="w-4 h-4" />
                 列印
               </Button>
               <Button 
                 onClick={handleDownloadPdf} 
                 disabled={generatingPdf}
-                className="gap-2"
+                className="flex-1 gap-2"
               >
                 <Download className="w-4 h-4" />
                 {generatingPdf ? "生成中..." : "下載 PDF"}
@@ -555,7 +545,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
             </div>
           </>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
+          <div className="py-12 text-center text-muted-foreground">
             無法載入 RMA 資料
           </div>
         )}
