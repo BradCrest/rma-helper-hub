@@ -46,6 +46,7 @@ const AdminCsvImport = () => {
   const [importMode, setImportMode] = useState<ImportMode>('skip');
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
+  const [importedCount, setImportedCount] = useState(0);
   const [importResults, setImportResults] = useState<{
     total: number;
     success: number;
@@ -103,6 +104,7 @@ const AdminCsvImport = () => {
     setStep('importing');
     setIsImporting(true);
     setImportProgress(0);
+    setImportedCount(0);
     
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -145,7 +147,9 @@ const AdminCsvImport = () => {
           totalResults.errors.push(...data.results.errors);
         }
 
-        setImportProgress(Math.round(((i + 1) / batches.length) * 100));
+        const processedCount = Math.min((i + 1) * batchSize, parsedRecords.length);
+        setImportedCount(processedCount);
+        setImportProgress(Math.round((processedCount / parsedRecords.length) * 100));
       }
 
       setImportResults(totalResults);
@@ -174,6 +178,7 @@ const AdminCsvImport = () => {
     setImportResults(null);
     setStep('upload');
     setImportProgress(0);
+    setImportedCount(0);
   };
 
   return (
@@ -378,7 +383,7 @@ const AdminCsvImport = () => {
                 <div className="space-y-4">
                   <Progress value={importProgress} />
                   <p className="text-center text-muted-foreground">
-                    已完成 {importProgress}%
+                    共 {parsedRecords.length} 筆、已上傳 {importedCount} 筆
                   </p>
                 </div>
               </CardContent>
