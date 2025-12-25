@@ -28,7 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { parseCSVWithDiagnostics, validateRecord, getParseStats, type ParsedRmaRecord, type SkippedRecord } from "@/lib/csvParser";
-import { ArrowLeft, Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2, SkipForward } from "lucide-react";
+import { ArrowLeft, Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2, SkipForward, Download } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 type ImportMode = 'skip' | 'update';
@@ -640,8 +640,42 @@ const AdminCsvImport = () => {
                       <SkipForward className="w-5 h-5 text-orange-600" />
                       解析時跳過的行 ({skippedRecords.filter(s => s.reason !== '空白行').length} 行)
                     </DialogTitle>
-                    <DialogDescription>
-                      以下 CSV 行因報修單號為空或無效而在解析時被跳過，不會匯入
+                    <DialogDescription className="flex items-center justify-between">
+                      <span>以下 CSV 行因報修單號為空或無效而在解析時被跳過，不會匯入</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const filteredRecords = skippedRecords.filter(s => s.reason !== '空白行');
+                          const csvContent = [
+                            ['CSV行號', '跳過原因', '原始內容'].join(','),
+                            ...filteredRecords.map(r => 
+                              [
+                                r.lineNumber,
+                                `"${r.reason}"`,
+                                `"${(r.rawContent || '').replace(/"/g, '""')}"`
+                              ].join(',')
+                            )
+                          ].join('\n');
+                          
+                          const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `skipped_records_${new Date().toISOString().slice(0, 10)}.csv`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                          
+                          toast({
+                            title: "匯出成功",
+                            description: `已匯出 ${filteredRecords.length} 筆跳過記錄`,
+                          });
+                        }}
+                        className="ml-2 gap-1"
+                      >
+                        <Download className="w-4 h-4" />
+                        匯出 CSV
+                      </Button>
                     </DialogDescription>
                   </DialogHeader>
                   <div className="overflow-auto max-h-[60vh]">
