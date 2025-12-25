@@ -120,18 +120,18 @@ const AdminDashboard = () => {
             </div>
           </Link>
 
-          {/* 出貨管理 */}
-          <div className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
+          {/* 後勤管理 */}
+          <Link to="/admin/logistics" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                 <Package className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">出貨管理</h3>
-                <p className="text-sm text-muted-foreground">處理寄件資訊與追蹤</p>
+                <h3 className="font-semibold text-foreground">後勤管理</h3>
+                <p className="text-sm text-muted-foreground">收件處理、客戶聯繫、維修追蹤</p>
               </div>
             </div>
-          </div>
+          </Link>
 
           {/* 系統設定 */}
           <Link to="/admin/settings" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
