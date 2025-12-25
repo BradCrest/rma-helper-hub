@@ -28,6 +28,9 @@ const statusLabels: Record<string, string> = {
   no_repair: '不維修',
   repairing: '維修中',
   shipped_back: '已寄回',
+  shipped_back_refurbished: '已寄回整新品',
+  shipped_back_original: '已寄回原錶',
+  shipped_back_new: '已寄出全新品',
   follow_up: '後續關懷',
   closed: '已結案',
 };

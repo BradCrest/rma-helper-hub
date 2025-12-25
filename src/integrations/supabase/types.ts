@@ -459,6 +459,9 @@ export type Database = {
         | "shipped_back"
         | "follow_up"
         | "closed"
+        | "shipped_back_refurbished"
+        | "shipped_back_original"
+        | "shipped_back_new"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -600,6 +603,9 @@ export const Constants = {
         "shipped_back",
         "follow_up",
         "closed",
+        "shipped_back_refurbished",
+        "shipped_back_original",
+        "shipped_back_new",
       ],
     },
   },
