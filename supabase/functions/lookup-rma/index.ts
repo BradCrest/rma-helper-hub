@@ -30,6 +30,24 @@ function maskEmail(email: string): string {
   return username[0] + '***@' + domain;
 }
 
+// Normalize phone number for flexible matching
+function normalizePhone(phone: string): string {
+  // Remove all non-digit characters
+  let digits = phone.replace(/\D/g, '');
+  
+  // Remove Taiwan country code 886
+  if (digits.startsWith('886')) {
+    digits = digits.substring(3);
+  }
+  
+  // Remove leading 0
+  if (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  
+  return digits;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -152,12 +170,11 @@ serve(async (req) => {
       );
 
     } else if (customerName && customerPhone) {
-      // Search by customer name and phone
+      // Search by customer name and phone - fetch all matching names first
       const { data, error } = await supabaseAdmin
         .from('rma_requests')
         .select('*')
         .ilike('customer_name', `%${customerName.trim()}%`)
-        .ilike('customer_phone', `%${customerPhone.trim()}%`)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -168,7 +185,18 @@ serve(async (req) => {
         );
       }
 
-      if (!data || data.length === 0) {
+      // Normalize the input phone for comparison
+      const normalizedInputPhone = normalizePhone(customerPhone);
+      
+      // Filter results by normalized phone number
+      const filteredData = (data || []).filter(rma => {
+        const normalizedDbPhone = normalizePhone(rma.customer_phone || '');
+        // Check if either phone contains the other (flexible matching)
+        return normalizedDbPhone.includes(normalizedInputPhone) || 
+               normalizedInputPhone.includes(normalizedDbPhone);
+      });
+
+      if (filteredData.length === 0) {
         return new Response(
           JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -176,7 +204,7 @@ serve(async (req) => {
       }
 
       // Get status history
-      const rmaIds = data.map(r => r.id);
+      const rmaIds = filteredData.map(r => r.id);
       const { data: historyData } = await supabaseAdmin
         .from('rma_status_history')
         .select('id, rma_request_id, status, created_at, notes')
@@ -196,7 +224,7 @@ serve(async (req) => {
         });
       });
 
-      const maskedResults = data.map(rma => ({
+      const maskedResults = filteredData.map(rma => ({
         id: rma.id,
         rma_number: rma.rma_number,
         status: rma.status,
@@ -214,7 +242,7 @@ serve(async (req) => {
         status_history: historyByRmaId[rma.id] || [],
       }));
 
-      console.log(`Found ${maskedResults.length} RMA(s) for customer: ${customerName}`);
+      console.log(`Found ${maskedResults.length} RMA(s) for customer: ${customerName}, phone: ${customerPhone} (normalized: ${normalizedInputPhone})`);
 
       return new Response(
         JSON.stringify({ results: maskedResults }),
