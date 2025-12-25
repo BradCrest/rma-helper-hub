@@ -64,6 +64,10 @@ const AdminCsvImport = () => {
   const [importProgress, setImportProgress] = useState(0);
   const [importedCount, setImportedCount] = useState(0);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<string | null>(null);
+  const [recordsPerSecond, setRecordsPerSecond] = useState<number>(0);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00');
+  const [currentBatch, setCurrentBatch] = useState(0);
+  const [totalBatches, setTotalBatches] = useState(0);
   const [importResults, setImportResults] = useState<{
     total: number;
     success: number;
@@ -143,7 +147,14 @@ const AdminCsvImport = () => {
     }
   };
 
-  // Update progress display every 3 seconds
+  // Format elapsed time as mm:ss
+  const formatElapsedTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Update progress display every 1 second
   useEffect(() => {
     if (!isImporting) return;
     
@@ -151,18 +162,21 @@ const AdminCsvImport = () => {
       const currentCount = importedCountRef.current;
       const startTime = importStartTimeRef.current;
       
-      setImportedCount(currentCount);
-      setImportProgress(Math.round((currentCount / parsedRecords.length) * 100));
-      
-      // Calculate estimated time remaining
-      if (startTime && currentCount > 0) {
+      if (startTime) {
         const elapsed = (Date.now() - startTime) / 1000; // seconds
-        const rate = currentCount / elapsed; // records per second
-        const remaining = parsedRecords.length - currentCount;
-        const estimatedSeconds = remaining / rate;
-        setEstimatedTimeRemaining(formatTimeRemaining(estimatedSeconds));
+        setElapsedTime(formatElapsedTime(elapsed));
+        
+        // Calculate speed and estimated time remaining
+        if (currentCount > 0) {
+          const rate = currentCount / elapsed; // records per second
+          setRecordsPerSecond(Math.round(rate * 10) / 10);
+          
+          const remaining = parsedRecords.length - currentCount;
+          const estimatedSeconds = remaining / rate;
+          setEstimatedTimeRemaining(formatTimeRemaining(estimatedSeconds));
+        }
       }
-    }, 3000);
+    }, 1000);
     
     return () => clearInterval(intervalId);
   }, [isImporting, parsedRecords.length]);
@@ -190,6 +204,9 @@ const AdminCsvImport = () => {
     setImportProgress(0);
     setImportedCount(0);
     setEstimatedTimeRemaining(null);
+    setRecordsPerSecond(0);
+    setElapsedTime('00:00');
+    setCurrentBatch(0);
     importedCountRef.current = 0;
     importStartTimeRef.current = Date.now();
     
@@ -205,6 +222,7 @@ const AdminCsvImport = () => {
       for (let i = 0; i < parsedRecords.length; i += batchSize) {
         batches.push(parsedRecords.slice(i, i + batchSize));
       }
+      setTotalBatches(batches.length);
 
       let totalResults = {
         total: parsedRecords.length,
@@ -234,9 +252,12 @@ const AdminCsvImport = () => {
           totalResults.errors.push(...data.results.errors);
         }
 
-        // Update ref immediately for interval to pick up
+        // Update immediately after each batch for responsive UI
         const processedCount = Math.min((i + 1) * batchSize, parsedRecords.length);
         importedCountRef.current = processedCount;
+        setImportedCount(processedCount);
+        setImportProgress(Math.round((processedCount / parsedRecords.length) * 100));
+        setCurrentBatch(i + 1);
       }
 
       // Final update
@@ -271,6 +292,10 @@ const AdminCsvImport = () => {
     setImportProgress(0);
     setImportedCount(0);
     setEstimatedTimeRemaining(null);
+    setRecordsPerSecond(0);
+    setElapsedTime('00:00');
+    setCurrentBatch(0);
+    setTotalBatches(0);
     importedCountRef.current = 0;
     importStartTimeRef.current = null;
   };
@@ -583,12 +608,49 @@ const AdminCsvImport = () => {
               <CardContent>
                 <div className="space-y-4">
                   <Progress value={importProgress} />
-                  <p className="text-center text-muted-foreground">
-                    共 {parsedRecords.length} 筆、已上傳 {importedCount} 筆
-                  </p>
-                  {estimatedTimeRemaining && (
-                    <p className="text-center text-sm text-muted-foreground">
-                      預估剩餘時間：{estimatedTimeRemaining}
+                  
+                  {/* Main progress info */}
+                  <div className="text-center">
+                    <p className="text-lg font-medium text-foreground">
+                      已上傳 {importedCount} / {parsedRecords.length} 筆
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      進度 {importProgress}%
+                    </p>
+                  </div>
+
+                  {/* Detailed status grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <div className="text-lg font-bold text-foreground">
+                        {currentBatch} / {totalBatches}
+                      </div>
+                      <div className="text-xs text-muted-foreground">批次</div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <div className="text-lg font-bold text-foreground">
+                        {recordsPerSecond > 0 ? `${recordsPerSecond} 筆/秒` : '計算中...'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">處理速度</div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <div className="text-lg font-bold text-foreground font-mono">
+                        {elapsedTime}
+                      </div>
+                      <div className="text-xs text-muted-foreground">已耗時</div>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg text-center">
+                      <div className="text-lg font-bold text-foreground">
+                        {estimatedTimeRemaining || '計算中...'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">預估剩餘</div>
+                    </div>
+                  </div>
+
+                  {/* Processing hint when first batch is being processed */}
+                  {currentBatch === 0 && (
+                    <p className="text-center text-sm text-muted-foreground mt-2">
+                      正在處理第一批資料，完成後將開始更新進度...
                     </p>
                   )}
                 </div>
