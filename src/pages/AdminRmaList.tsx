@@ -897,54 +897,65 @@ const AdminRmaList = () => {
                 </button>
                 
                 {/* Page numbers */}
-                {(() => {
-                  const pages: (number | string)[] = [];
-                  const showEllipsisStart = currentPage > 3;
-                  const showEllipsisEnd = currentPage < totalPages - 2;
+              {(() => {
+                  const pages: number[] = [];
                   
-                  // Always show first page
-                  pages.push(1);
-                  
-                  if (showEllipsisStart) {
-                    pages.push("...");
-                  }
-                  
-                  // Show pages around current
-                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-                    if (!pages.includes(i)) {
+                  // Show 3 pages before and after current page
+                  for (let i = currentPage - 3; i <= currentPage + 3; i++) {
+                    if (i >= 1 && i <= totalPages) {
                       pages.push(i);
                     }
                   }
                   
-                  if (showEllipsisEnd) {
-                    pages.push("...");
-                  }
-                  
-                  // Always show last page if more than 1 page
-                  if (totalPages > 1 && !pages.includes(totalPages)) {
-                    pages.push(totalPages);
-                  }
-                  
-                  return pages.map((page, index) => (
-                    typeof page === "number" ? (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={cn(
-                          "min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors",
-                          currentPage === page
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {page}
-                      </button>
-                    ) : (
-                      <span key={`ellipsis-${index}`} className="px-1 text-muted-foreground">
-                        {page}
-                      </span>
-                    )
-                  ));
+                  return (
+                    <>
+                      {/* Show first page and ellipsis if needed */}
+                      {pages[0] > 1 && (
+                        <>
+                          <button
+                            onClick={() => setCurrentPage(1)}
+                            className="min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+                          >
+                            1
+                          </button>
+                          {pages[0] > 2 && (
+                            <span className="px-1 text-muted-foreground">...</span>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Show pages around current */}
+                      {pages.map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={cn(
+                            "min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors",
+                            currentPage === page
+                              ? "bg-primary text-primary-foreground font-medium"
+                              : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      
+                      {/* Show ellipsis and last page if needed */}
+                      {pages[pages.length - 1] < totalPages && (
+                        <>
+                          {pages[pages.length - 1] < totalPages - 1 && (
+                            <span className="px-1 text-muted-foreground">...</span>
+                          )}
+                          <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            className="min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground"
+                          >
+                            {totalPages}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  );
                 })()}
                 
                 {/* Next button */}
@@ -955,6 +966,33 @@ const AdminRmaList = () => {
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
+              </div>
+              
+              {/* Page input field */}
+              <div className="flex items-center gap-2 mt-3 justify-center">
+                <span className="text-sm text-muted-foreground">跳至第</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    if (value >= 1 && value <= totalPages) {
+                      setCurrentPage(value);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = parseInt((e.target as HTMLInputElement).value);
+                      if (value >= 1 && value <= totalPages) {
+                        setCurrentPage(value);
+                      }
+                    }
+                  }}
+                  className="w-16 h-8 px-2 text-sm text-center border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <span className="text-sm text-muted-foreground">頁，共 {totalPages} 頁</span>
               </div>
             </div>
           )}
