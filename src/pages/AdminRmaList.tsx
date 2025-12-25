@@ -18,7 +18,9 @@ import {
   History,
   PackageCheck,
   Send,
-  Upload
+  Upload,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +37,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type RmaStatus = Database["public"]["Enums"]["rma_status"];
 type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
@@ -142,6 +154,8 @@ const AdminRmaList = () => {
   const [outboundForm, setOutboundForm] = useState({ carrier: "", tracking_number: "", notes: "", ship_type: "original" as "original" | "refurbished" | "new" });
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
   const pageSize = 10;
 
   const fetchRmaList = async () => {
@@ -344,6 +358,126 @@ const AdminRmaList = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/admin");
+  };
+
+  const handleExportAllCsv = async (): Promise<boolean> => {
+    try {
+      // Fetch ALL RMA records for export (no pagination)
+      const { data: allRmaData, error } = await supabase
+        .from("rma_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      if (!allRmaData || allRmaData.length === 0) {
+        toast.error("沒有資料可匯出");
+        return false;
+      }
+
+      // CSV headers
+      const headers = [
+        "RMA編號",
+        "客戶名稱",
+        "電話",
+        "Email",
+        "地址",
+        "產品名稱",
+        "產品型號",
+        "序號",
+        "購買日期",
+        "問題類型",
+        "問題描述",
+        "狀態",
+        "建立日期"
+      ];
+
+      // CSV rows
+      const rows = allRmaData.map(rma => [
+        rma.rma_number,
+        rma.customer_name,
+        rma.customer_phone,
+        rma.customer_email,
+        rma.customer_address || "",
+        rma.product_name,
+        rma.product_model || "",
+        rma.serial_number || "",
+        rma.purchase_date || "",
+        rma.issue_type,
+        (rma.issue_description || "").replace(/"/g, '""'),
+        statusLabels[rma.status],
+        new Date(rma.created_at).toLocaleString("zh-TW")
+      ]);
+
+      // Build CSV content with BOM for Excel compatibility
+      const BOM = "\uFEFF";
+      const csvContent = BOM + [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ].join("\n");
+
+      // Download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `RMA_全部備份_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`已匯出 ${allRmaData.length} 筆 RMA 資料`);
+      return true;
+    } catch (error) {
+      console.error("Error exporting all CSV:", error);
+      toast.error("匯出 CSV 失敗");
+      return false;
+    }
+  };
+
+  const handleClearAllData = async () => {
+    setIsClearingAll(true);
+    try {
+      // Step 1: Export all data first
+      const exportSuccess = await handleExportAllCsv();
+      if (!exportSuccess) {
+        setIsClearingAll(false);
+        setShowClearAllDialog(false);
+        return;
+      }
+
+      // Step 2: Delete related data in order (foreign key constraints)
+      // Delete from child tables first, then parent table
+      const { error: feedbackErr } = await supabase.from("rma_customer_feedback").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (feedbackErr) throw new Error(`刪除 feedback 失敗：${feedbackErr.message}`);
+
+      const { error: contactsErr } = await supabase.from("rma_customer_contacts").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (contactsErr) throw new Error(`刪除 contacts 失敗：${contactsErr.message}`);
+
+      const { error: supplierErr } = await supabase.from("rma_supplier_repairs").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (supplierErr) throw new Error(`刪除 supplier_repairs 失敗：${supplierErr.message}`);
+
+      const { error: repairErr } = await supabase.from("rma_repair_details").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (repairErr) throw new Error(`刪除 repair_details 失敗：${repairErr.message}`);
+
+      const { error: shippingErr } = await supabase.from("rma_shipping").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (shippingErr) throw new Error(`刪除 shipping 失敗：${shippingErr.message}`);
+
+      const { error: historyErr } = await supabase.from("rma_status_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (historyErr) throw new Error(`刪除 status_history 失敗：${historyErr.message}`);
+
+      const { error: requestsErr } = await supabase.from("rma_requests").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (requestsErr) throw new Error(`刪除 requests 失敗：${requestsErr.message}`);
+
+      toast.success("所有 RMA 資料已清除");
+      setShowClearAllDialog(false);
+      fetchRmaList();
+    } catch (error: any) {
+      console.error("Error clearing all data:", error);
+      toast.error(error.message || "清除資料失敗");
+    } finally {
+      setIsClearingAll(false);
+    }
   };
 
   const handleExportCsv = () => {
@@ -598,8 +732,60 @@ const AdminRmaList = () => {
               <Upload className="w-4 h-4" />
               匯入 CSV
             </Link>
+
+            {/* Clear All Data */}
+            <button
+              onClick={() => setShowClearAllDialog(true)}
+              className="rma-btn-secondary text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+              disabled={isLoading || totalCount === 0}
+            >
+              <Trash2 className="w-4 h-4" />
+              清除所有資料
+            </button>
           </div>
         </div>
+
+        {/* Clear All Data Confirmation Dialog */}
+        <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="w-5 h-5" />
+                確認清除所有資料
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>此操作將會：</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm">
+                  <li><strong>先匯出</strong>所有 RMA 資料為 CSV 備份檔</li>
+                  <li><strong>再刪除</strong>資料庫中所有 RMA 相關資料</li>
+                </ol>
+                <p className="text-red-600 font-medium mt-4">
+                  ⚠️ 刪除後資料將無法復原，請確認已下載備份檔案！
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isClearingAll}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleClearAllData}
+                disabled={isClearingAll}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isClearingAll ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    處理中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    匯出並清除
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Table */}
         <div className="rma-card overflow-hidden">
