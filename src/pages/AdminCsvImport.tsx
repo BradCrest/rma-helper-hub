@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,7 @@ const AdminCsvImport = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importedCount, setImportedCount] = useState(0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<string | null>(null);
   const [importResults, setImportResults] = useState<{
     total: number;
     success: number;
@@ -56,6 +57,10 @@ const AdminCsvImport = () => {
     errors: { rma_number: string; error: string }[];
   } | null>(null);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'complete'>('upload');
+  
+  // Refs for progress tracking
+  const importedCountRef = useRef(0);
+  const importStartTimeRef = useRef<number | null>(null);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -98,6 +103,45 @@ const AdminCsvImport = () => {
     reader.readAsText(selectedFile, 'UTF-8');
   }, [toast]);
 
+  // Format time remaining
+  const formatTimeRemaining = (seconds: number): string => {
+    if (seconds < 60) {
+      return `約 ${Math.ceil(seconds)} 秒`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = Math.ceil(seconds % 60);
+      return `約 ${minutes} 分 ${secs} 秒`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.ceil((seconds % 3600) / 60);
+      return `約 ${hours} 小時 ${minutes} 分`;
+    }
+  };
+
+  // Update progress display every 3 seconds
+  useEffect(() => {
+    if (!isImporting) return;
+    
+    const intervalId = setInterval(() => {
+      const currentCount = importedCountRef.current;
+      const startTime = importStartTimeRef.current;
+      
+      setImportedCount(currentCount);
+      setImportProgress(Math.round((currentCount / parsedRecords.length) * 100));
+      
+      // Calculate estimated time remaining
+      if (startTime && currentCount > 0) {
+        const elapsed = (Date.now() - startTime) / 1000; // seconds
+        const rate = currentCount / elapsed; // records per second
+        const remaining = parsedRecords.length - currentCount;
+        const estimatedSeconds = remaining / rate;
+        setEstimatedTimeRemaining(formatTimeRemaining(estimatedSeconds));
+      }
+    }, 3000);
+    
+    return () => clearInterval(intervalId);
+  }, [isImporting, parsedRecords.length]);
+
   const handleImport = async () => {
     if (parsedRecords.length === 0) return;
     
@@ -105,6 +149,9 @@ const AdminCsvImport = () => {
     setIsImporting(true);
     setImportProgress(0);
     setImportedCount(0);
+    setEstimatedTimeRemaining(null);
+    importedCountRef.current = 0;
+    importStartTimeRef.current = Date.now();
     
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -147,11 +194,14 @@ const AdminCsvImport = () => {
           totalResults.errors.push(...data.results.errors);
         }
 
+        // Update ref immediately for interval to pick up
         const processedCount = Math.min((i + 1) * batchSize, parsedRecords.length);
-        setImportedCount(processedCount);
-        setImportProgress(Math.round((processedCount / parsedRecords.length) * 100));
+        importedCountRef.current = processedCount;
       }
 
+      // Final update
+      setImportedCount(parsedRecords.length);
+      setImportProgress(100);
       setImportResults(totalResults);
       setStep('complete');
       
@@ -168,6 +218,7 @@ const AdminCsvImport = () => {
       setStep('preview');
     } finally {
       setIsImporting(false);
+      importStartTimeRef.current = null;
     }
   };
 
@@ -179,6 +230,9 @@ const AdminCsvImport = () => {
     setStep('upload');
     setImportProgress(0);
     setImportedCount(0);
+    setEstimatedTimeRemaining(null);
+    importedCountRef.current = 0;
+    importStartTimeRef.current = null;
   };
 
   return (
@@ -385,6 +439,11 @@ const AdminCsvImport = () => {
                   <p className="text-center text-muted-foreground">
                     共 {parsedRecords.length} 筆、已上傳 {importedCount} 筆
                   </p>
+                  {estimatedTimeRemaining && (
+                    <p className="text-center text-sm text-muted-foreground">
+                      預估剩餘時間：{estimatedTimeRemaining}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
