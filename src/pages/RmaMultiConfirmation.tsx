@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { CheckCircle, Download, Printer, Home, ExternalLink } from "lucide-react";
+import { CheckCircle, Download, Printer, Home, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import RmaDetailDialog from "@/components/rma/RmaDetailDialog";
 
 interface RmaResult {
   rmaNumber: string;
@@ -24,6 +25,8 @@ const RmaMultiConfirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [results, setResults] = useState<RmaResult[]>([]);
+  const [selectedRma, setSelectedRma] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     const state = location.state as { results?: RmaResult[] } | null;
@@ -54,6 +57,11 @@ const RmaMultiConfirmation = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleViewDetail = (rmaNumber: string) => {
+    setSelectedRma(rmaNumber);
+    setDialogOpen(true);
   };
 
   if (results.length === 0) {
@@ -106,12 +114,10 @@ const RmaMultiConfirmation = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            navigate(`/rma-confirmation?rma=${result.rmaNumber}`)
-                          }
+                          onClick={() => handleViewDetail(result.rmaNumber)}
                           className="gap-1 h-8 px-2"
                         >
-                          <ExternalLink className="w-3 h-3" />
+                          <Eye className="w-3 h-3" />
                           查看
                         </Button>
                       </TableCell>
@@ -147,6 +153,13 @@ const RmaMultiConfirmation = () => {
         </div>
       </main>
       <Footer />
+
+      {/* RMA Detail Dialog */}
+      <RmaDetailDialog
+        rmaNumber={selectedRma}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   );
 };
