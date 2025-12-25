@@ -14,6 +14,7 @@ import AdminRmaList from "./pages/AdminRmaList";
 import AdminSettings from "./pages/AdminSettings";
 import AdminCsvImport from "./pages/AdminCsvImport";
 import RmaConfirmation from "./pages/RmaConfirmation";
+import RmaMultiConfirmation from "./pages/RmaMultiConfirmation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/rma-confirmation" element={<RmaConfirmation />} />
+            <Route path="/rma-multi-confirmation" element={<RmaMultiConfirmation />} />
             <Route path="/track" element={<Track />} />
             <Route path="/shipping" element={<Shipping />} />
             <Route path="/admin" element={<Admin />} />
