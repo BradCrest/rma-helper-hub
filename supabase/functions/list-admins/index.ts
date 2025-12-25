@@ -44,15 +44,14 @@ serve(async (req) => {
       );
     }
 
-    // Check if the requesting user is an admin
+    // Check if the requesting user is an admin or super_admin
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'admin')
       .maybeSingle();
 
-    if (roleError || !roleData) {
+    if (roleError || !roleData || (roleData.role !== 'admin' && roleData.role !== 'super_admin')) {
       console.log('User is not an admin:', user.id);
       return new Response(
         JSON.stringify({ error: 'Forbidden - Admin access required' }),
@@ -62,11 +61,11 @@ serve(async (req) => {
 
     console.log('Fetching admin list for user:', user.id);
 
-    // Get all admin roles
+    // Get all admin and super_admin roles
     const { data: adminRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('*')
-      .eq('role', 'admin');
+      .in('role', ['admin', 'super_admin']);
 
     if (rolesError) {
       console.log('Error fetching admin roles:', rolesError);
@@ -87,13 +86,14 @@ serve(async (req) => {
       );
     }
 
-    // Map admin roles to include user email
+    // Map admin roles to include user email and role
     const admins = adminRoles?.map(role => {
       const adminUser = users.find(u => u.id === role.user_id);
       return {
         id: role.id,
         user_id: role.user_id,
         email: adminUser?.email || 'Unknown',
+        role: role.role,
         created_at: role.created_at
       };
     }) || [];
