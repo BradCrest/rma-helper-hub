@@ -183,7 +183,7 @@ function cleanString(str: string | null): string | null {
   return str.trim();
 }
 
-// Parse a single CSV line, handling quoted fields
+// Parse a single CSV line, handling quoted fields and in-quote newlines
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
@@ -203,6 +203,9 @@ function parseCSVLine(line: string): string[] {
     } else if (char === ',' && !inQuotes) {
       result.push(current);
       current = '';
+    } else if ((char === '\n' || char === '\r') && inQuotes) {
+      // Convert in-quote newlines to space
+      current += ' ';
     } else {
       current += char;
     }
@@ -210,6 +213,40 @@ function parseCSVLine(line: string): string[] {
   result.push(current);
   
   return result;
+}
+
+// Split CSV content into lines, correctly handling newlines within quoted fields
+function splitCSVLines(content: string): string[] {
+  const lines: string[] = [];
+  let currentLine = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      currentLine += char;
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      // Newline outside quotes = actual line break
+      if (char === '\r' && content[i + 1] === '\n') {
+        i++; // Skip \n in \r\n
+      }
+      if (currentLine.trim()) {
+        lines.push(currentLine);
+      }
+      currentLine = '';
+    } else {
+      currentLine += char;
+    }
+  }
+  
+  // Handle last line
+  if (currentLine.trim()) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
 }
 
 // Map status from Chinese to database enum
@@ -230,11 +267,11 @@ function deriveWarrantyStatus(warrantyInfo: string | null): string | null {
 
 // Parse CSV content into structured records
 export function parseCSV(csvContent: string): ParsedRmaRecord[] {
-  const lines = csvContent.split('\n');
+  const lines = splitCSVLines(csvContent);
   const records: ParsedRmaRecord[] = [];
   
-  // Skip header rows (first 2 lines)
-  for (let i = 2; i < lines.length; i++) {
+  // Skip header row (first 1 line only)
+  for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
