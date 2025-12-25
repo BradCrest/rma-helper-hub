@@ -133,8 +133,9 @@ const MultiProductPreview = forwardRef<HTMLDivElement, MultiProductPreviewProps>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>產品型號</TableHead>
                 <TableHead>產品序號</TableHead>
-                <TableHead>故障問題</TableHead>
-                <TableHead className="hidden md:table-cell">購買日期</TableHead>
+                <TableHead>問題描述</TableHead>
+                <TableHead className="hidden md:table-cell">隨附物品</TableHead>
+                <TableHead className="hidden lg:table-cell">購買日期</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -143,8 +144,13 @@ const MultiProductPreview = forwardRef<HTMLDivElement, MultiProductPreviewProps>
                   <TableCell className="font-medium">{index + 1}</TableCell>
                   <TableCell>{product.productModel}</TableCell>
                   <TableCell>{product.serialNumber}</TableCell>
-                  <TableCell>{product.issueType || "-"}</TableCell>
+                  <TableCell className="max-w-[200px] truncate">
+                    {product.issueDescription || "-"}
+                  </TableCell>
                   <TableCell className="hidden md:table-cell">
+                    {product.accessories?.length > 0 ? product.accessories.join(", ") : "-"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
                     {product.purchaseDate || "-"}
                   </TableCell>
                 </TableRow>
