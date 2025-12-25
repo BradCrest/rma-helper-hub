@@ -9,8 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 interface RmaData {
   rma_number: string;
@@ -50,16 +48,6 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     
     setLoading(true);
     try {
-      // Use GET request with query params and full_details=true
-      const { data, error } = await supabase.functions.invoke("lookup-rma", {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: null,
-      });
-
-      // Fallback: call with URL params via fetch directly
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
@@ -293,7 +281,15 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     </html>
   `;
 
-  const generatePdfHtml = (data: RmaData) => `
+  const generatePdfHtml = (data: RmaData): string => {
+    const notesSection = data.customer_notes ? `
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
+      </div>
+    ` : "";
+
+    return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
         <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 維修服務申請單</div>
@@ -333,12 +329,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
         <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${data.issue_description || "-"}</div>
       </div>
 
-      ${data.customer_notes ? `
-      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
-      </div>
-      ` : ""}
+      ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
         <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
@@ -346,13 +337,19 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       </div>
     </div>
   `;
+  };
 
   const handleDownloadPdf = async () => {
     if (!rmaData) return;
 
     setGeneratingPdf(true);
     try {
-      // Create hidden container for rendering
+      // Dynamic imports to avoid TypeScript compiler issues
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas")
+      ]);
+
       const container = document.createElement("div");
       container.style.cssText = "position: absolute; left: -9999px; top: 0;";
       document.body.appendChild(container);
@@ -376,7 +373,6 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       
       pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pdfHeight));
 
-      // Cleanup
       document.body.removeChild(container);
 
       pdf.save(`RMA_${rmaData.rma_number}.pdf`);
@@ -389,7 +385,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("zh-TW", {
       year: "numeric",
@@ -400,7 +396,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     });
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string): string => {
     const statusMap: Record<string, string> = {
       registered: "已登記",
       shipped: "已寄出",
@@ -456,28 +452,28 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                 </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">姓名</p>
-                    <p className="font-medium">{rmaData.customer_name}</p>
+                    <span className="text-muted-foreground">客戶姓名：</span>
+                    <span className="text-foreground">{rmaData.customer_name}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">客戶類型</p>
-                    <p className="font-medium">{rmaData.customer_type || "一般客戶"}</p>
+                    <span className="text-muted-foreground">客戶類型：</span>
+                    <span className="text-foreground">{rmaData.customer_type || "一般客戶"}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Email</p>
-                    <p className="font-medium">{rmaData.customer_email}</p>
+                    <span className="text-muted-foreground">電子郵件：</span>
+                    <span className="text-foreground">{rmaData.customer_email}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">電話</p>
-                    <p className="font-medium">{rmaData.customer_phone}</p>
+                    <span className="text-muted-foreground">聯絡電話：</span>
+                    <span className="text-foreground">{rmaData.customer_phone}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">手機</p>
-                    <p className="font-medium">{rmaData.mobile_phone || "-"}</p>
+                    <span className="text-muted-foreground">手機號碼：</span>
+                    <span className="text-foreground">{rmaData.mobile_phone || "-"}</span>
                   </div>
                   <div className="col-span-2">
-                    <p className="text-muted-foreground">地址</p>
-                    <p className="font-medium">{rmaData.customer_address || "-"}</p>
+                    <span className="text-muted-foreground">聯絡地址：</span>
+                    <span className="text-foreground">{rmaData.customer_address || "-"}</span>
                   </div>
                 </div>
               </div>
@@ -489,24 +485,24 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                 </h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">產品名稱</p>
-                    <p className="font-medium">{rmaData.product_name}</p>
+                    <span className="text-muted-foreground">產品名稱：</span>
+                    <span className="text-foreground">{rmaData.product_name}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">產品型號</p>
-                    <p className="font-medium">{rmaData.product_model || "-"}</p>
+                    <span className="text-muted-foreground">產品型號：</span>
+                    <span className="text-foreground">{rmaData.product_model || "-"}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">產品序號</p>
-                    <p className="font-medium">{rmaData.serial_number || "-"}</p>
+                    <span className="text-muted-foreground">產品序號：</span>
+                    <span className="text-foreground">{rmaData.serial_number || "-"}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">購買日期</p>
-                    <p className="font-medium">{rmaData.purchase_date || "-"}</p>
+                    <span className="text-muted-foreground">購買日期：</span>
+                    <span className="text-foreground">{rmaData.purchase_date || "-"}</span>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">保固到期日</p>
-                    <p className="font-medium">{rmaData.warranty_date || "-"}</p>
+                    <span className="text-muted-foreground">保固到期日：</span>
+                    <span className="text-foreground">{rmaData.warranty_date || "-"}</span>
                   </div>
                 </div>
               </div>
@@ -516,8 +512,8 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                 <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
                   問題描述
                 </h3>
-                <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
-                  {rmaData.issue_description || "-"}
+                <p className="text-sm text-foreground whitespace-pre-wrap bg-muted/50 p-3 rounded">
+                  {rmaData.issue_description}
                 </p>
               </div>
 
@@ -527,26 +523,29 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                   <h3 className="font-semibold mb-3 text-foreground border-b pb-2">
                     隨附物品 / 備註
                   </h3>
-                  <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-md">
+                  <p className="text-sm text-foreground whitespace-pre-wrap bg-muted/50 p-3 rounded">
                     {rmaData.customer_notes}
                   </p>
                 </div>
               )}
+
+              {/* Status */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <span className="text-sm text-muted-foreground">目前狀態</span>
+                <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                  {getStatusLabel(rmaData.status)}
+                </span>
+              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-center gap-3 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={handlePrint}
-                className="gap-2"
-              >
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={handlePrint} className="gap-2">
                 <Printer className="w-4 h-4" />
                 列印
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleDownloadPdf}
+              <Button 
+                onClick={handleDownloadPdf} 
                 disabled={generatingPdf}
                 className="gap-2"
               >
