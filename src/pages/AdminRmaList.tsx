@@ -52,6 +52,9 @@ const statusLabels: Record<RmaStatus, string> = {
   no_repair: "不維修",
   repairing: "維修中",
   shipped_back: "已回寄",
+  shipped_back_refurbished: "已寄回整新品",
+  shipped_back_original: "已寄回原錶",
+  shipped_back_new: "已寄出全新品",
   follow_up: "後續關懷",
   closed: "已結案",
 };
@@ -67,11 +70,14 @@ const statusColors: Record<RmaStatus, string> = {
   no_repair: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
   repairing: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
   shipped_back: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  shipped_back_refurbished: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+  shipped_back_original: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
+  shipped_back_new: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
 };
 
-const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "follow_up", "closed"];
+const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "shipped_back_refurbished", "shipped_back_original", "shipped_back_new", "follow_up", "closed"];
 
 // Status allowed days (null = no limit)
 const statusAllowedDays: Record<RmaStatus, number | null> = {
@@ -85,6 +91,9 @@ const statusAllowedDays: Record<RmaStatus, number | null> = {
   no_repair: 2,
   repairing: 14,
   shipped_back: 7,
+  shipped_back_refurbished: 7,
+  shipped_back_original: 7,
+  shipped_back_new: 7,
   follow_up: 14,
   closed: null,
 };
@@ -130,7 +139,7 @@ const AdminRmaList = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isConfirmingReceive, setIsConfirmingReceive] = useState(false);
   const [isSubmittingOutbound, setIsSubmittingOutbound] = useState(false);
-  const [outboundForm, setOutboundForm] = useState({ carrier: "", tracking_number: "", notes: "" });
+  const [outboundForm, setOutboundForm] = useState({ carrier: "", tracking_number: "", notes: "", ship_type: "original" as "original" | "refurbished" | "new" });
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const pageSize = 10;
@@ -212,7 +221,7 @@ const AdminRmaList = () => {
 
   const handleViewRma = async (rma: RmaRequest) => {
     setSelectedRma(rma);
-    setOutboundForm({ carrier: "", tracking_number: "", notes: "" });
+    setOutboundForm({ carrier: "", tracking_number: "", notes: "", ship_type: "original" });
     // Fetch shipping info (inbound & outbound) and status history for this RMA
     try {
       const [inboundResult, outboundResult, historyResult] = await Promise.all([
@@ -303,6 +312,7 @@ const AdminRmaList = () => {
           carrier: outboundForm.carrier,
           tracking_number: outboundForm.tracking_number,
           notes: outboundForm.notes || null,
+          ship_type: outboundForm.ship_type,
         },
       });
 
@@ -311,10 +321,17 @@ const AdminRmaList = () => {
 
       toast.success("回寄資訊已成功提交");
       
-      // Refresh data
+      // Refresh data - determine the new status based on ship_type
+      const newStatusMap: Record<string, RmaStatus> = {
+        original: "shipped_back_original",
+        refurbished: "shipped_back_refurbished",
+        new: "shipped_back_new",
+      };
+      const newStatus = newStatusMap[outboundForm.ship_type] || "shipped_back";
+      
       setOutboundShipping(data.shipping);
-      setSelectedRma({ ...selectedRma, status: "shipped_back" });
-      setOutboundForm({ carrier: "", tracking_number: "", notes: "" });
+      setSelectedRma({ ...selectedRma, status: newStatus });
+      setOutboundForm({ carrier: "", tracking_number: "", notes: "", ship_type: "original" });
       fetchRmaList();
     } catch (error: any) {
       console.error("Error submitting outbound shipping:", error);
@@ -905,6 +922,18 @@ const AdminRmaList = () => {
                 ) : (selectedRma.status === "received" || selectedRma.status === "inspecting" || selectedRma.status === "contacting" || selectedRma.status === "quote_confirmed" || selectedRma.status === "paid" || selectedRma.status === "repairing") ? (
                   // Show form for adding outbound shipping
                   <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">回寄類型 *</label>
+                      <select
+                        className="rma-input"
+                        value={outboundForm.ship_type}
+                        onChange={(e) => setOutboundForm({ ...outboundForm, ship_type: e.target.value as "original" | "refurbished" | "new" })}
+                      >
+                        <option value="original">寄回原錶</option>
+                        <option value="refurbished">寄回整新品</option>
+                        <option value="new">寄出全新品</option>
+                      </select>
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block">物流名稱 *</label>

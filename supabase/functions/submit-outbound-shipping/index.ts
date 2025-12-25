@@ -12,13 +12,23 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { rma_request_id, carrier, tracking_number, notes, ship_date } = await req.json();
+    const { rma_request_id, carrier, tracking_number, notes, ship_date, ship_type } = await req.json();
 
     // Validate required fields
     if (!rma_request_id) {
       console.error("Missing rma_request_id");
       return new Response(
         JSON.stringify({ error: "缺少 RMA 編號" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate ship_type
+    const validShipTypes = ['original', 'refurbished', 'new'];
+    if (ship_type && !validShipTypes.includes(ship_type)) {
+      console.error("Invalid ship_type:", ship_type);
+      return new Response(
+        JSON.stringify({ error: "無效的回寄類型" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -113,10 +123,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update RMA status to shipped_back
+    // Determine the new status based on ship_type
+    let newStatus = 'shipped_back_original'; // Default
+    if (ship_type === 'refurbished') {
+      newStatus = 'shipped_back_refurbished';
+    } else if (ship_type === 'new') {
+      newStatus = 'shipped_back_new';
+    } else if (ship_type === 'original') {
+      newStatus = 'shipped_back_original';
+    }
+
+    // Update RMA status
     const { error: updateError } = await supabase
       .from('rma_requests')
-      .update({ status: 'shipped_back' })
+      .update({ status: newStatus })
       .eq('id', rma_request_id);
 
     if (updateError) {
@@ -124,7 +144,7 @@ Deno.serve(async (req) => {
       // Note: shipping was already created, so we log but don't fail
     }
 
-    console.log("Outbound shipping submitted successfully for RMA:", rmaData.rma_number);
+    console.log(`Outbound shipping submitted successfully for RMA: ${rmaData.rma_number}, status: ${newStatus}`);
 
     return new Response(
       JSON.stringify({ 
