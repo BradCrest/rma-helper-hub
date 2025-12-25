@@ -15,8 +15,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import RmaDetailDialog from "@/components/rma/RmaDetailDialog";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 interface RmaResult {
   rmaNumber: string;
@@ -113,7 +111,7 @@ const RmaMultiConfirmation = () => {
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string): string => {
     const statusMap: Record<string, string> = {
       registered: "已登記",
       shipped: "已寄出",
@@ -135,7 +133,7 @@ const RmaMultiConfirmation = () => {
     return statusMap[status] || status;
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string): string => {
     if (!dateString) return "-";
     return new Date(dateString).toLocaleDateString("zh-TW", {
       year: "numeric",
@@ -146,7 +144,15 @@ const RmaMultiConfirmation = () => {
     });
   };
 
-  const generateRmaPageHtml = (data: RmaFullData, index: number, total: number) => `
+  const generateRmaPageHtml = (data: RmaFullData, index: number, total: number): string => {
+    const notesSection = data.customer_notes ? `
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
+      </div>
+    ` : "";
+
+    return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
         <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 維修申請單 (${index + 1}/${total})</div>
@@ -186,20 +192,26 @@ const RmaMultiConfirmation = () => {
         <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${data.issue_description || "-"}</div>
       </div>
 
-      ${data.customer_notes ? `
-      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
-        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
-      </div>
-      ` : ""}
+      ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
         <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
       </div>
     </div>
   `;
+  };
 
-  const generateCoverPageHtml = (rmaDataList: RmaFullData[]) => `
+  const generateCoverPageHtml = (rmaDataList: RmaFullData[]): string => {
+    const tableRows = rmaDataList.map((rma, index) => `
+      <tr style="border-bottom: 1px solid #e0e0e0;">
+        <td style="padding: 10px 8px;">${index + 1}</td>
+        <td style="padding: 10px 8px; font-family: monospace; font-weight: 600; color: #0066cc;">${rma.rma_number}</td>
+        <td style="padding: 10px 8px;">${rma.product_model || "-"}</td>
+        <td style="padding: 10px 8px;">${rma.serial_number || "-"}</td>
+      </tr>
+    `).join("");
+
+    return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 40px; border-radius: 12px; margin-bottom: 32px; text-align: center;">
         <div style="color: white; font-size: 28px; font-weight: bold; margin-bottom: 12px;">RMA 批量申請確認單</div>
@@ -222,14 +234,7 @@ const RmaMultiConfirmation = () => {
           </tr>
         </thead>
         <tbody>
-          ${rmaDataList.map((rma, index) => `
-            <tr style="border-bottom: 1px solid #e0e0e0;">
-              <td style="padding: 10px 8px;">${index + 1}</td>
-              <td style="padding: 10px 8px; font-family: monospace; font-weight: 600; color: #0066cc;">${rma.rma_number}</td>
-              <td style="padding: 10px 8px;">${rma.product_model || "-"}</td>
-              <td style="padding: 10px 8px;">${rma.serial_number || "-"}</td>
-            </tr>
-          `).join("")}
+          ${tableRows}
         </tbody>
       </table>
 
@@ -238,6 +243,7 @@ const RmaMultiConfirmation = () => {
       </div>
     </div>
   `;
+  };
 
   const downloadBatchPdf = async () => {
     if (results.length === 0) return;
@@ -246,7 +252,12 @@ const RmaMultiConfirmation = () => {
     toast.info(`正在生成 ${results.length} 筆 RMA 的 PDF...`);
 
     try {
-      // Fetch all RMA details
+      // Dynamic imports to avoid TypeScript compiler issues
+      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+        import("jspdf"),
+        import("html2canvas")
+      ]);
+
       const rmaDataList: RmaFullData[] = [];
       for (const result of results) {
         const data = await fetchRmaDetails(result.rmaNumber);
@@ -260,7 +271,6 @@ const RmaMultiConfirmation = () => {
         return;
       }
 
-      // Create hidden container for rendering
       const container = document.createElement("div");
       container.style.cssText = "position: absolute; left: -9999px; top: 0;";
       document.body.appendChild(container);
@@ -269,7 +279,6 @@ const RmaMultiConfirmation = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // Generate cover page
       container.innerHTML = generateCoverPageHtml(rmaDataList);
       const coverCanvas = await html2canvas(container.firstElementChild as HTMLElement, {
         scale: 2,
@@ -282,7 +291,6 @@ const RmaMultiConfirmation = () => {
       const coverImgHeight = (coverCanvas.height * pdfWidth) / coverCanvas.width;
       pdf.addImage(coverImgData, "JPEG", 0, 0, coverImgWidth, Math.min(coverImgHeight, pdfHeight));
 
-      // Generate individual RMA pages
       for (let i = 0; i < rmaDataList.length; i++) {
         pdf.addPage();
         container.innerHTML = generateRmaPageHtml(rmaDataList[i], i, rmaDataList.length);
@@ -300,7 +308,6 @@ const RmaMultiConfirmation = () => {
         pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pdfHeight));
       }
 
-      // Cleanup
       document.body.removeChild(container);
 
       pdf.save(`RMA批量申請_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -322,12 +329,11 @@ const RmaMultiConfirmation = () => {
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
         <div className="rma-card animate-fade-in">
-          {/* Success Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
+            <h1 className="text-2xl font-bold text-foreground mb-2">
               成功送出 {results.length} 筆申請
             </h1>
             <p className="text-muted-foreground">
@@ -335,7 +341,6 @@ const RmaMultiConfirmation = () => {
             </p>
           </div>
 
-          {/* Results Table */}
           <div className="border border-border rounded-lg overflow-hidden mb-6">
             <ScrollArea className="max-h-[400px]">
               <Table>
@@ -377,7 +382,6 @@ const RmaMultiConfirmation = () => {
             </ScrollArea>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap justify-center gap-3 print:hidden">
             <Button variant="outline" onClick={handlePrint} className="gap-2">
               <Printer className="w-4 h-4" />
@@ -401,12 +405,10 @@ const RmaMultiConfirmation = () => {
               返回首頁
             </Button>
           </div>
-
         </div>
       </main>
       <Footer />
 
-      {/* RMA Detail Dialog */}
       <RmaDetailDialog
         rmaNumber={selectedRma}
         open={dialogOpen}
