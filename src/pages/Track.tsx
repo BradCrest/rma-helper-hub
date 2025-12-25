@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, ArrowLeft, Globe, Loader2, Package, CheckCircle2, Clock, Truck, Wrench, XCircle } from "lucide-react";
+import { Search, ArrowLeft, Globe, Loader2, Package, CheckCircle2, Clock, Truck, Wrench, XCircle, AlertTriangle } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +48,7 @@ const statusLabels: Record<RmaStatus, string> = {
   shipped_back_new: "已寄出全新品",
   follow_up: "後續關懷",
   closed: "已結案",
+  unknown: "未知狀態",
 };
 
 const statusIcons: Record<RmaStatus, React.ReactNode> = {
@@ -66,6 +67,7 @@ const statusIcons: Record<RmaStatus, React.ReactNode> = {
   shipped_back_new: <Truck className="w-5 h-5" />,
   follow_up: <Clock className="w-5 h-5" />,
   closed: <CheckCircle2 className="w-5 h-5" />,
+  unknown: <AlertTriangle className="w-5 h-5" />,
 };
 
 const statusColors: Record<RmaStatus, string> = {
@@ -84,6 +86,7 @@ const statusColors: Record<RmaStatus, string> = {
   shipped_back_new: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  unknown: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
 };
 
 const Track = () => {

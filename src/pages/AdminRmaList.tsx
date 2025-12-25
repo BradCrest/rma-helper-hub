@@ -69,6 +69,7 @@ const statusLabels: Record<RmaStatus, string> = {
   shipped_back_new: "已寄出全新品",
   follow_up: "後續關懷",
   closed: "已結案",
+  unknown: "未知狀態",
 };
 
 const statusColors: Record<RmaStatus, string> = {
@@ -87,9 +88,10 @@ const statusColors: Record<RmaStatus, string> = {
   shipped_back_new: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  unknown: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
 };
 
-const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "shipped_back_refurbished", "shipped_back_original", "shipped_back_new", "follow_up", "closed"];
+const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "shipped_back_refurbished", "shipped_back_original", "shipped_back_new", "follow_up", "closed", "unknown"];
 
 // Status allowed days (null = no limit)
 const statusAllowedDays: Record<RmaStatus, number | null> = {
@@ -108,6 +110,7 @@ const statusAllowedDays: Record<RmaStatus, number | null> = {
   shipped_back_new: 7,
   follow_up: 14,
   closed: null,
+  unknown: null,
 };
 
 // Calculate days in current status

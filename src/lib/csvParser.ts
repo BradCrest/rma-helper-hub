@@ -1,5 +1,19 @@
 // CSV Parser utility for RMA data import
 
+// Information about a skipped record during parsing
+export interface SkippedRecord {
+  lineNumber: number;  // Line number in original CSV (1-indexed, including header)
+  reason: string;      // Reason why it was skipped
+  rawContent: string;  // First 100 chars of the raw line for reference
+}
+
+// Result of CSV parsing including diagnostics
+export interface ParseResult {
+  records: ParsedRmaRecord[];
+  skipped: SkippedRecord[];
+  totalLines: number;  // Total lines in CSV (excluding header)
+}
+
 export interface ParsedRmaRecord {
   // Core RMA fields
   rma_number: string;
@@ -265,21 +279,38 @@ function deriveWarrantyStatus(warrantyInfo: string | null): string | null {
   return null;
 }
 
-// Parse CSV content into structured records
-export function parseCSV(csvContent: string): ParsedRmaRecord[] {
+// Parse CSV content into structured records with detailed diagnostics
+export function parseCSVWithDiagnostics(csvContent: string): ParseResult {
   const lines = splitCSVLines(csvContent);
   const records: ParsedRmaRecord[] = [];
+  const skipped: SkippedRecord[] = [];
   
   // Skip header row (first 1 line only)
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
-    if (!line) continue;
+    
+    // Skip empty lines
+    if (!line) {
+      skipped.push({
+        lineNumber: i + 1,  // 1-indexed for user display
+        reason: '空白行',
+        rawContent: '',
+      });
+      continue;
+    }
     
     const columns = parseCSVLine(line);
     
-    // Skip if no RMA number (allow any format, not just RC prefix)
+    // Check if no RMA number
     const rmaNumber = cleanString(columns[0]);
-    if (!rmaNumber) continue;
+    if (!rmaNumber) {
+      skipped.push({
+        lineNumber: i + 1,
+        reason: '報修單號為空或無效 (NA)',
+        rawContent: line.substring(0, 100),
+      });
+      continue;
+    }
     
     const record: ParsedRmaRecord = {
       rma_number: rmaNumber,
@@ -339,7 +370,16 @@ export function parseCSV(csvContent: string): ParsedRmaRecord[] {
     records.push(record);
   }
   
-  return records;
+  return {
+    records,
+    skipped,
+    totalLines: lines.length - 1,  // Exclude header
+  };
+}
+
+// Legacy function for backward compatibility
+export function parseCSV(csvContent: string): ParsedRmaRecord[] {
+  return parseCSVWithDiagnostics(csvContent).records;
 }
 
 // Validate a parsed record
