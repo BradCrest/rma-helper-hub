@@ -78,11 +78,11 @@ const RmaMultiConfirmation = () => {
             <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">
-              成功提交 {results.length} 筆 RMA 申請
+          <h1 className="text-2xl font-bold text-foreground mb-2">
+              成功送出 {results.length} 筆申請
             </h1>
             <p className="text-muted-foreground">
-              每筆產品已產生獨立的 RMA 編號，請保存以下資訊
+              每筆申請已產生獨立的 RMA 編號，請保存以下資訊
             </p>
           </div>
 
@@ -144,12 +144,6 @@ const RmaMultiConfirmation = () => {
             </Button>
           </div>
 
-          {/* Info Note */}
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground text-center">
-              我們已發送確認郵件至您的電子信箱，請查收並保存 RMA 編號以便後續查詢維修進度。
-            </p>
-          </div>
         </div>
       </main>
       <Footer />
