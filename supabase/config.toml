@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.submit-outbound-shipping]
 verify_jwt = true
+
+[functions.log-login]
+verify_jwt = false

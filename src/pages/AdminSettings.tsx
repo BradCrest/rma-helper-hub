@@ -13,7 +13,8 @@ import {
   Clock,
   Check,
   X,
-  Crown
+  Crown,
+  History
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,17 +36,30 @@ interface PendingRegistration {
   status: string;
 }
 
+interface LoginLog {
+  id: string;
+  user_id: string;
+  email: string;
+  event_type: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
 const AdminSettings = () => {
   const { user, signOut, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([]);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPendingLoading, setIsPendingLoading] = useState(true);
+  const [isLogsLoading, setIsLogsLoading] = useState(true);
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
 
   const fetchAdmins = async () => {
     setIsLoading(true);
@@ -95,9 +109,28 @@ const AdminSettings = () => {
     }
   };
 
+  const fetchLoginLogs = async () => {
+    setIsLogsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("login_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setLoginLogs(data || []);
+    } catch (error: any) {
+      console.error("Error fetching login logs:", error);
+    } finally {
+      setIsLogsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchAdmins();
     fetchPendingRegistrations();
+    fetchLoginLogs();
   }, []);
 
   const handleAddAdmin = async (e: React.FormEvent) => {
@@ -250,6 +283,31 @@ const AdminSettings = () => {
       toast.error("拒絕失敗");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleDeleteLog = async (log: LoginLog) => {
+    if (!isSuperAdmin) {
+      toast.error("只有超級管理員可以刪除登入記錄");
+      return;
+    }
+
+    setDeletingLogId(log.id);
+    try {
+      const { error } = await supabase
+        .from('login_logs')
+        .delete()
+        .eq('id', log.id);
+
+      if (error) throw error;
+
+      toast.success("已刪除登入記錄");
+      fetchLoginLogs();
+    } catch (error: any) {
+      console.error("Error deleting login log:", error);
+      toast.error("刪除失敗");
+    } finally {
+      setDeletingLogId(null);
     }
   };
 
@@ -494,6 +552,88 @@ const AdminSettings = () => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Login Logs */}
+        <div className="rma-card mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <History className="w-5 h-5" />
+              登入記錄
+            </h2>
+            <button
+              onClick={fetchLoginLogs}
+              disabled={isLogsLoading}
+              className="rma-btn-secondary text-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLogsLoading ? "animate-spin" : ""}`} />
+              重新整理
+            </button>
+          </div>
+
+          {isLogsLoading ? (
+            <div className="text-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-muted-foreground mt-2">載入中...</p>
+            </div>
+          ) : loginLogs.length === 0 ? (
+            <div className="text-center py-12">
+              <History className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">尚無登入記錄</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">電子郵件</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">事件類型</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">時間</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">IP 地址</th>
+                    {isSuperAdmin && (
+                      <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">操作</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loginLogs.map((log) => (
+                    <tr key={log.id} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="py-3 px-4 text-sm text-foreground">{log.email}</td>
+                      <td className="py-3 px-4">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          log.event_type === 'login' 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : log.event_type === 'logout'
+                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        }`}>
+                          {log.event_type === 'login' ? '登入' : log.event_type === 'logout' ? '登出' : log.event_type}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(log.created_at)}</td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground">{log.ip_address || '-'}</td>
+                      {isSuperAdmin && (
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => handleDeleteLog(log)}
+                            disabled={deletingLogId === log.id}
+                            className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-1 rounded hover:bg-destructive/10 transition-colors"
+                            title="刪除記錄"
+                          >
+                            {deletingLogId === log.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
