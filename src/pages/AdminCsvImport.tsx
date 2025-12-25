@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { parseCSV, validateRecord, getParseStats, type ParsedRmaRecord } from "@/lib/csvParser";
@@ -67,6 +74,14 @@ const AdminCsvImport = () => {
   } | null>(null);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'complete'>('upload');
   const [showInvalidConfirm, setShowInvalidConfirm] = useState(false);
+  const [showInvalidList, setShowInvalidList] = useState(false);
+  
+  // Memoize invalid records for performance
+  const invalidRecords = useMemo(() => {
+    return parsedRecords
+      .map((record, index) => ({ record, index: index + 3, validation: validateRecord(record) }))
+      .filter(item => !item.validation.valid);
+  }, [parsedRecords]);
   
   // Refs for progress tracking
   const importedCountRef = useRef(0);
@@ -314,7 +329,8 @@ const AdminCsvImport = () => {
                     <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
                       <li>CSV 檔案必須使用 UTF-8 編碼</li>
                       <li>第一行為說明，第二行為欄位標題</li>
-                      <li>報修單號 (RMA Number) 為必填欄位</li>
+                      <li>報修單號和客戶姓名為必填欄位</li>
+                      <li>報修單號允許重複（經銷商可一次填寫多台 RMA）</li>
                       <li>重複的報修單號可選擇略過或更新</li>
                     </ul>
                   </AlertDescription>
@@ -346,9 +362,17 @@ const AdminCsvImport = () => {
                       <div className="text-2xl font-bold text-green-600">{parseStats.valid}</div>
                       <div className="text-sm text-muted-foreground">有效記錄</div>
                     </div>
-                    <div className="p-4 bg-red-500/10 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">{parseStats.invalid}</div>
-                      <div className="text-sm text-muted-foreground">無效記錄</div>
+                    <div 
+                      className={`p-4 bg-red-500/10 rounded-lg ${parseStats.invalid > 0 ? 'cursor-pointer hover:bg-red-500/20 transition-colors' : ''}`}
+                      onClick={() => parseStats.invalid > 0 && setShowInvalidList(true)}
+                      title={parseStats.invalid > 0 ? '點擊查看無效記錄列表' : undefined}
+                    >
+                      <div className={`text-2xl font-bold text-red-600 ${parseStats.invalid > 0 ? 'underline decoration-dotted' : ''}`}>
+                        {parseStats.invalid}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        無效記錄{parseStats.invalid > 0 && ' (點擊查看)'}
+                      </div>
                     </div>
                     <div className="p-4 bg-blue-500/10 rounded-lg">
                       <div className="text-2xl font-bold text-blue-600">
@@ -493,6 +517,57 @@ const AdminCsvImport = () => {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+
+              {/* Invalid records list dialog */}
+              <Dialog open={showInvalidList} onOpenChange={setShowInvalidList}>
+                <DialogContent className="max-w-4xl max-h-[80vh]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <XCircle className="w-5 h-5 text-red-600" />
+                      無效記錄列表 ({invalidRecords.length} 筆)
+                    </DialogTitle>
+                    <DialogDescription>
+                      以下記錄因缺少必要欄位而無法匯入
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="overflow-auto max-h-[60vh]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="sticky top-0 bg-background w-16">行號</TableHead>
+                          <TableHead className="sticky top-0 bg-background">報修單號</TableHead>
+                          <TableHead className="sticky top-0 bg-background">客戶姓名</TableHead>
+                          <TableHead className="sticky top-0 bg-background">無效原因</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invalidRecords.map((item) => (
+                          <TableRow key={item.index}>
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {item.index}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {item.record.rma_number || <span className="text-red-600 italic">無報修單號</span>}
+                            </TableCell>
+                            <TableCell>
+                              {item.record.customer_name || <span className="text-red-600 italic">無客戶姓名</span>}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {item.validation.errors.map((error, i) => (
+                                  <Badge key={i} variant="destructive" className="text-xs">
+                                    {error}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
