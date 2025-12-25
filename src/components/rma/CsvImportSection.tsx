@@ -11,7 +11,7 @@ import {
 } from "@/lib/rmaMultiCsvParser";
 
 interface CsvImportSectionProps {
-  onImport: (products: ProductEntry[]) => void;
+  onImport: (products: ProductEntry[], errors: { row: number; message: string }[]) => void;
 }
 
 const CsvImportSection = ({ onImport }: CsvImportSectionProps) => {
@@ -71,11 +71,15 @@ const CsvImportSection = ({ onImport }: CsvImportSectionProps) => {
 
       setParseResult(result);
 
-      if (result.success.length > 0) {
-        onImport(result.success);
-        toast.success(`成功解析 ${result.success.length} 筆產品資料`);
-      } else if (result.errors.length > 0) {
-        toast.error("檔案解析失敗，請檢查格式");
+      // Always call onImport with both success and errors
+      if (result.success.length > 0 || result.errors.length > 0) {
+        onImport(result.success, result.errors);
+        if (result.success.length > 0) {
+          toast.success(`成功解析 ${result.success.length} 筆產品資料`);
+        }
+        if (result.errors.length > 0 && result.success.length === 0) {
+          toast.error("檔案解析失敗，請檢查格式");
+        }
       }
     } catch (error) {
       console.error("Error processing file:", error);

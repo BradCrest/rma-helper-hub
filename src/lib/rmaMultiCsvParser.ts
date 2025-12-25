@@ -10,9 +10,14 @@ export interface ProductEntry {
   accessories: string[];
 }
 
+export interface ParseError {
+  row: number;
+  message: string;
+}
+
 export interface ParseResult {
   success: ProductEntry[];
-  errors: { row: number; message: string }[];
+  errors: ParseError[];
 }
 
 const VALID_ISSUE_TYPES = [
