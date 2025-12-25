@@ -8,13 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { parseCSV, validateRecord, getParseStats, type ParsedRmaRecord } from "@/lib/csvParser";
 import { ArrowLeft, Upload, FileText, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-
 type ImportMode = 'skip' | 'update';
 
 const statusLabels: Record<string, string> = {
@@ -57,6 +66,7 @@ const AdminCsvImport = () => {
     errors: { rma_number: string; error: string }[];
   } | null>(null);
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'complete'>('upload');
+  const [showInvalidConfirm, setShowInvalidConfirm] = useState(false);
   
   // Refs for progress tracking
   const importedCountRef = useRef(0);
@@ -142,8 +152,23 @@ const AdminCsvImport = () => {
     return () => clearInterval(intervalId);
   }, [isImporting, parsedRecords.length]);
 
+  const handleStartImport = () => {
+    if (parsedRecords.length === 0) return;
+    
+    // Check if there are invalid records
+    if (parseStats && parseStats.invalid > 0) {
+      setShowInvalidConfirm(true);
+      return;
+    }
+    
+    // No invalid records, proceed directly
+    handleImport();
+  };
+
   const handleImport = async () => {
     if (parsedRecords.length === 0) return;
+    
+    setShowInvalidConfirm(false);
     
     setStep('importing');
     setIsImporting(true);
@@ -417,10 +442,57 @@ const AdminCsvImport = () => {
                 <Button variant="outline" onClick={resetImport}>
                   取消
                 </Button>
-                <Button onClick={handleImport} disabled={parseStats.valid === 0}>
+                <Button onClick={handleStartImport} disabled={parseStats.valid === 0}>
                   開始匯入 ({parseStats.valid} 筆有效記錄)
                 </Button>
               </div>
+
+              {/* Invalid records confirmation dialog */}
+              <AlertDialog open={showInvalidConfirm} onOpenChange={setShowInvalidConfirm}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                      發現無效記錄
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-2">
+                      <p>
+                        共有 <span className="font-bold text-red-600">{parseStats.invalid}</span> 筆無效記錄無法匯入。
+                      </p>
+                      <p>
+                        是否繼續匯入其餘 <span className="font-bold text-green-600">{parseStats.valid}</span> 筆有效記錄？
+                      </p>
+                      <div className="mt-4 p-3 bg-muted rounded-lg max-h-40 overflow-auto">
+                        <p className="text-sm font-medium mb-2">無效記錄原因：</p>
+                        <ul className="text-sm space-y-1">
+                          {parsedRecords
+                            .filter(r => !validateRecord(r).valid)
+                            .slice(0, 10)
+                            .map((record, i) => {
+                              const validation = validateRecord(record);
+                              return (
+                                <li key={i} className="text-muted-foreground">
+                                  {record.rma_number || '(無報修單號)'}: {validation.errors.join(', ')}
+                                </li>
+                              );
+                            })}
+                          {parsedRecords.filter(r => !validateRecord(r).valid).length > 10 && (
+                            <li className="text-muted-foreground">
+                              ...還有 {parsedRecords.filter(r => !validateRecord(r).valid).length - 10} 筆無效記錄
+                            </li>
+                          )}
+                        </ul>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleImport}>
+                      繼續匯入有效記錄
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
 
