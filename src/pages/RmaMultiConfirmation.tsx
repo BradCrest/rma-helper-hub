@@ -15,6 +15,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import RmaDetailDialog from "@/components/rma/RmaDetailDialog";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface RmaResult {
   rmaNumber: string;
@@ -252,12 +254,6 @@ const RmaMultiConfirmation = () => {
     toast.info(`正在生成 ${results.length} 筆 RMA 的 PDF...`);
 
     try {
-      // Dynamic imports to avoid TypeScript compiler issues
-      const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
-        import("jspdf"),
-        import("html2canvas")
-      ]);
-
       const rmaDataList: RmaFullData[] = [];
       for (const result of results) {
         const data = await fetchRmaDetails(result.rmaNumber);
@@ -398,7 +394,7 @@ const RmaMultiConfirmation = () => {
               className="gap-2"
             >
               <FileText className="w-4 h-4" />
-              {generatingPdf ? "生成中..." : "下載全部 PDF"}
+              {generatingPdf ? "生成中..." : "下載合併 PDF"}
             </Button>
             <Button onClick={() => navigate("/")} className="gap-2">
               <Home className="w-4 h-4" />
