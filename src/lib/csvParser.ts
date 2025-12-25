@@ -317,12 +317,7 @@ export function validateRecord(record: ParsedRmaRecord): { valid: boolean; error
     errors.push('缺少客戶姓名');
   }
   
-  // 電話或手機有其一即可
-  if (!record.customer_phone && !record.mobile_phone) {
-    errors.push('缺少電話號碼（電話或手機至少填一項）');
-  }
-  
-  // Email 改為非必填，不再驗證
+  // 電話和 Email 均改為非必填，不再驗證
   
   return {
     valid: errors.length === 0,
