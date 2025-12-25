@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import RmaDetailDialog from "@/components/rma/RmaDetailDialog";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface RmaResult {
   rmaNumber: string;
@@ -145,6 +146,99 @@ const RmaMultiConfirmation = () => {
     });
   };
 
+  const generateRmaPageHtml = (data: RmaFullData, index: number, total: number) => `
+    <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
+      <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
+        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 維修申請單 (${index + 1}/${total})</div>
+        <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${data.rma_number}</div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; color: #666;">
+        <span>申請時間：${formatDate(data.created_at)}</span>
+        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 12px;">${getStatusLabel(data.status)}</span>
+      </div>
+
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">客戶資訊</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶姓名</div><div style="font-size: 14px; font-weight: 500;">${data.customer_name}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶類型</div><div style="font-size: 14px; font-weight: 500;">${data.customer_type || "一般客戶"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">電子郵件</div><div style="font-size: 14px; font-weight: 500;">${data.customer_email}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡電話</div><div style="font-size: 14px; font-weight: 500;">${data.customer_phone}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">手機號碼</div><div style="font-size: 14px; font-weight: 500;">${data.mobile_phone || "-"}</div></div>
+          <div style="grid-column: 1 / -1;"><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡地址</div><div style="font-size: 14px; font-weight: 500;">${data.customer_address || "-"}</div></div>
+        </div>
+      </div>
+
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">產品資訊</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品名稱</div><div style="font-size: 14px; font-weight: 500;">${data.product_name}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品型號</div><div style="font-size: 14px; font-weight: 500;">${data.product_model || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品序號</div><div style="font-size: 14px; font-weight: 500;">${data.serial_number || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">購買日期</div><div style="font-size: 14px; font-weight: 500;">${data.purchase_date || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">保固到期日</div><div style="font-size: 14px; font-weight: 500;">${data.warranty_date || "-"}</div></div>
+        </div>
+      </div>
+
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">問題描述</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${data.issue_description || "-"}</div>
+      </div>
+
+      ${data.customer_notes ? `
+      <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
+      </div>
+      ` : ""}
+
+      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
+        <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+      </div>
+    </div>
+  `;
+
+  const generateCoverPageHtml = (rmaDataList: RmaFullData[]) => `
+    <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
+      <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 40px; border-radius: 12px; margin-bottom: 32px; text-align: center;">
+        <div style="color: white; font-size: 28px; font-weight: bold; margin-bottom: 12px;">RMA 批量申請確認單</div>
+        <div style="color: rgba(255,255,255,0.9); font-size: 18px;">共 ${rmaDataList.length} 筆申請</div>
+      </div>
+      
+      <div style="margin-bottom: 24px; font-size: 14px; color: #666;">
+        生成日期：${new Date().toLocaleDateString("zh-TW")}
+      </div>
+
+      <div style="font-size: 18px; font-weight: 600; color: #0066cc; margin-bottom: 16px;">申請清單摘要</div>
+      
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="background: #f0f7ff;">
+            <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #0066cc; font-weight: 600;">#</th>
+            <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #0066cc; font-weight: 600;">RMA 編號</th>
+            <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #0066cc; font-weight: 600;">產品型號</th>
+            <th style="padding: 12px 8px; text-align: left; border-bottom: 2px solid #0066cc; font-weight: 600;">產品序號</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rmaDataList.map((rma, index) => `
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+              <td style="padding: 10px 8px;">${index + 1}</td>
+              <td style="padding: 10px 8px; font-family: monospace; font-weight: 600; color: #0066cc;">${rma.rma_number}</td>
+              <td style="padding: 10px 8px;">${rma.product_model || "-"}</td>
+              <td style="padding: 10px 8px;">${rma.serial_number || "-"}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+
+      <div style="margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
+        <p>此文件為 RMA 批量申請確認單，請妥善保存。</p>
+      </div>
+    </div>
+  `;
+
   const downloadBatchPdf = async () => {
     if (results.length === 0) return;
 
@@ -166,178 +260,48 @@ const RmaMultiConfirmation = () => {
         return;
       }
 
+      // Create hidden container for rendering
+      const container = document.createElement("div");
+      container.style.cssText = "position: absolute; left: -9999px; top: 0;";
+      document.body.appendChild(container);
+
       const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 15;
-      const contentWidth = pageWidth - margin * 2;
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      // Cover page
-      pdf.setFillColor(0, 102, 204);
-      pdf.rect(0, 0, pageWidth, 60, "F");
-      
-      pdf.setFontSize(24);
-      pdf.setTextColor(255, 255, 255);
-      pdf.text("RMA 批量申請確認單", pageWidth / 2, 30, { align: "center" });
-      
-      pdf.setFontSize(14);
-      pdf.text(`共 ${rmaDataList.length} 筆申請`, pageWidth / 2, 45, { align: "center" });
-
-      let y = 80;
-      pdf.setFontSize(12);
-      pdf.setTextColor(51, 51, 51);
-      pdf.text(`生成日期：${new Date().toLocaleDateString("zh-TW")}`, margin, y);
-      
-      y += 20;
-      
-      // Summary table on cover page
-      pdf.setFontSize(14);
-      pdf.setTextColor(0, 102, 204);
-      pdf.text("申請清單摘要", margin, y);
-      y += 10;
-
-      // Table header
-      pdf.setFillColor(240, 247, 255);
-      pdf.rect(margin, y - 5, contentWidth, 10, "F");
-      pdf.setFontSize(10);
-      pdf.setTextColor(51, 51, 51);
-      pdf.text("#", margin + 5, y + 2);
-      pdf.text("RMA 編號", margin + 20, y + 2);
-      pdf.text("產品型號", margin + 70, y + 2);
-      pdf.text("產品序號", margin + 120, y + 2);
-      y += 12;
-
-      rmaDataList.forEach((rma, index) => {
-        if (y > pageHeight - 30) {
-          pdf.addPage();
-          y = 30;
-        }
-        pdf.setFontSize(9);
-        pdf.text(String(index + 1), margin + 5, y);
-        pdf.text(rma.rma_number, margin + 20, y);
-        pdf.text(rma.product_model || "-", margin + 70, y);
-        pdf.text(rma.serial_number || "-", margin + 120, y);
-        y += 8;
+      // Generate cover page
+      container.innerHTML = generateCoverPageHtml(rmaDataList);
+      const coverCanvas = await html2canvas(container.firstElementChild as HTMLElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
       });
+      const coverImgData = coverCanvas.toDataURL("image/jpeg", 0.95);
+      const coverImgWidth = pdfWidth;
+      const coverImgHeight = (coverCanvas.height * pdfWidth) / coverCanvas.width;
+      pdf.addImage(coverImgData, "JPEG", 0, 0, coverImgWidth, Math.min(coverImgHeight, pdfHeight));
 
-      // Individual RMA pages
-      rmaDataList.forEach((rma, index) => {
+      // Generate individual RMA pages
+      for (let i = 0; i < rmaDataList.length; i++) {
         pdf.addPage();
-        let y = 20;
-
-        // Header
-        pdf.setFillColor(0, 102, 204);
-        pdf.rect(0, 0, pageWidth, 45, "F");
+        container.innerHTML = generateRmaPageHtml(rmaDataList[i], i, rmaDataList.length);
         
-        pdf.setFontSize(16);
-        pdf.setTextColor(255, 255, 255);
-        pdf.text(`RMA 維修申請單 (${index + 1}/${rmaDataList.length})`, pageWidth / 2, 18, { align: "center" });
+        const canvas = await html2canvas(container.firstElementChild as HTMLElement, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+        });
         
-        pdf.setFontSize(18);
-        pdf.text(rma.rma_number, pageWidth / 2, 32, { align: "center" });
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        const imgWidth = pdfWidth;
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, "JPEG", 0, 0, imgWidth, Math.min(imgHeight, pdfHeight));
+      }
 
-        y = 55;
-
-        // Meta info
-        pdf.setFontSize(10);
-        pdf.setTextColor(102, 102, 102);
-        pdf.text(`申請時間：${formatDate(rma.created_at)}`, margin, y);
-        pdf.text(`狀態：${getStatusLabel(rma.status)}`, pageWidth - margin, y, { align: "right" });
-        y += 12;
-
-        // Helper function for sections
-        const addSection = (title: string) => {
-          y += 5;
-          pdf.setFillColor(240, 247, 255);
-          pdf.roundedRect(margin, y - 4, contentWidth, 10, 2, 2, "F");
-          pdf.setFontSize(11);
-          pdf.setTextColor(0, 102, 204);
-          pdf.text(title, margin + 4, y + 3);
-          y += 14;
-        };
-
-        const addField = (label: string, value: string, x: number, width: number) => {
-          pdf.setFontSize(8);
-          pdf.setTextColor(136, 136, 136);
-          pdf.text(label, x, y);
-          y += 4;
-          pdf.setFontSize(10);
-          pdf.setTextColor(51, 51, 51);
-          const lines = pdf.splitTextToSize(value || "-", width - 4);
-          pdf.text(lines, x, y);
-          y += lines.length * 4 + 2;
-        };
-
-        const col1X = margin + 4;
-        const col2X = margin + contentWidth / 2 + 4;
-        const colWidth = contentWidth / 2 - 8;
-
-        // Customer Section
-        addSection("客戶資訊");
-        
-        const saveY1 = y;
-        addField("客戶姓名", rma.customer_name, col1X, colWidth);
-        const endY1 = y;
-        y = saveY1;
-        addField("客戶類型", rma.customer_type || "一般客戶", col2X, colWidth);
-        y = Math.max(y, endY1);
-
-        const saveY2 = y;
-        addField("電子郵件", rma.customer_email, col1X, colWidth);
-        const endY2 = y;
-        y = saveY2;
-        addField("聯絡電話", rma.customer_phone, col2X, colWidth);
-        y = Math.max(y, endY2);
-
-        const saveY3 = y;
-        addField("手機號碼", rma.mobile_phone || "-", col1X, colWidth);
-        y = saveY3;
-
-        addField("聯絡地址", rma.customer_address || "-", col1X, contentWidth - 8);
-
-        // Product Section
-        addSection("產品資訊");
-        
-        const saveY4 = y;
-        addField("產品名稱", rma.product_name, col1X, colWidth);
-        const endY4 = y;
-        y = saveY4;
-        addField("產品型號", rma.product_model || "-", col2X, colWidth);
-        y = Math.max(y, endY4);
-
-        const saveY5 = y;
-        addField("產品序號", rma.serial_number || "-", col1X, colWidth);
-        const endY5 = y;
-        y = saveY5;
-        addField("購買日期", rma.purchase_date || "-", col2X, colWidth);
-        y = Math.max(y, endY5);
-
-        addField("保固到期日", rma.warranty_date || "-", col1X, colWidth);
-
-        // Issue Description
-        addSection("問題描述");
-        pdf.setFontSize(9);
-        pdf.setTextColor(51, 51, 51);
-        const issueLines = pdf.splitTextToSize(rma.issue_description || "-", contentWidth - 8);
-        pdf.text(issueLines, col1X, y);
-        y += issueLines.length * 4 + 4;
-
-        // Customer Notes
-        if (rma.customer_notes) {
-          addSection("隨附物品 / 備註");
-          pdf.setFontSize(9);
-          pdf.setTextColor(51, 51, 51);
-          const noteLines = pdf.splitTextToSize(rma.customer_notes, contentWidth - 8);
-          pdf.text(noteLines, col1X, y);
-        }
-
-        // Footer
-        pdf.setDrawColor(200, 200, 200);
-        pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-        pdf.setFontSize(8);
-        pdf.setTextColor(136, 136, 136);
-        pdf.text("此文件為 RMA 維修申請確認單，請妥善保存。", pageWidth / 2, pageHeight - 12, { align: "center" });
-      });
+      // Cleanup
+      document.body.removeChild(container);
 
       pdf.save(`RMA批量申請_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success("PDF 下載成功");
