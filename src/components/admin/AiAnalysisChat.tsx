@@ -1,12 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, ChevronDown, ChevronUp, Loader2, Sparkles } from "lucide-react";
+import { Bot, Send, ChevronDown, ChevronUp, Loader2, Sparkles, Search, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  metadata?: SearchMetadata;
+}
+
+interface SearchMetadata {
+  searchMethod: "RAG" | "Traditional" | "Unknown";
+  recordCount: number;
+  avgSimilarity: number;
 }
 
 const EXAMPLE_PROMPTS = [
@@ -77,6 +85,7 @@ const AiAnalysisChat = () => {
       const decoder = new TextDecoder();
       let textBuffer = "";
       let streamDone = false;
+      let currentMetadata: SearchMetadata | undefined;
 
       // Add initial assistant message
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
@@ -103,6 +112,22 @@ const AiAnalysisChat = () => {
 
           try {
             const parsed = JSON.parse(jsonStr);
+            
+            // Check if this is metadata
+            if (parsed.metadata) {
+              currentMetadata = parsed.metadata as SearchMetadata;
+              // Update the assistant message with metadata
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                const lastIndex = newMessages.length - 1;
+                if (lastIndex >= 0 && newMessages[lastIndex].role === "assistant") {
+                  newMessages[lastIndex] = { ...newMessages[lastIndex], metadata: currentMetadata };
+                }
+                return newMessages;
+              });
+              continue;
+            }
+            
             const content = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (content) {
               assistantContent += content;
@@ -110,7 +135,7 @@ const AiAnalysisChat = () => {
                 const newMessages = [...prev];
                 const lastIndex = newMessages.length - 1;
                 if (lastIndex >= 0 && newMessages[lastIndex].role === "assistant") {
-                  newMessages[lastIndex] = { ...newMessages[lastIndex], content: assistantContent };
+                  newMessages[lastIndex] = { ...newMessages[lastIndex], content: assistantContent, metadata: currentMetadata };
                 }
                 return newMessages;
               });
@@ -235,6 +260,29 @@ const AiAnalysisChat = () => {
                         : "bg-muted text-foreground"
                     }`}
                   >
+                    {/* Search metadata display for assistant messages */}
+                    {msg.role === "assistant" && msg.metadata && (
+                      <div className="flex flex-wrap items-center gap-2 text-xs mb-2 pb-2 border-b border-border/50">
+                        <Badge 
+                          variant={msg.metadata.searchMethod === "RAG" ? "default" : "secondary"}
+                          className="flex items-center gap-1"
+                        >
+                          {msg.metadata.searchMethod === "RAG" ? (
+                            <><Search className="w-3 h-3" /> RAG 語意搜尋</>
+                          ) : (
+                            <><Database className="w-3 h-3" /> 傳統查詢</>
+                          )}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          找到 {msg.metadata.recordCount} 筆相關記錄
+                        </span>
+                        {msg.metadata.searchMethod === "RAG" && msg.metadata.avgSimilarity > 0 && (
+                          <span className="text-muted-foreground">
+                            • 平均相似度 {(msg.metadata.avgSimilarity * 100).toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="whitespace-pre-wrap text-sm">{msg.content}</div>
                   </div>
                 </div>

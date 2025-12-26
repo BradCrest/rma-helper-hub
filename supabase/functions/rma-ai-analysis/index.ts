@@ -90,8 +90,13 @@ serve(async (req) => {
         throw searchError;
       }
       
+      let recordCount = 0;
+      let avgSimilarity = 0;
+      
       if (relevantRecords && relevantRecords.length > 0) {
         console.log(`Found ${relevantRecords.length} relevant records via semantic search`);
+        recordCount = relevantRecords.length;
+        avgSimilarity = relevantRecords.reduce((sum: number, r: any) => sum + r.similarity, 0) / relevantRecords.length;
         
         // Format the relevant records for the AI
         contextData = relevantRecords.map((record: any, index: number) => {
@@ -106,8 +111,12 @@ serve(async (req) => {
           .order("created_at", { ascending: false })
           .limit(20);
         
+        recordCount = recentRmas?.length || 0;
         contextData = recentRmas ? JSON.stringify(recentRmas, null, 2) : "無資料";
       }
+      
+      // Store metadata for later
+      (globalThis as any).__searchMetadata = { searchMethod, recordCount, avgSimilarity };
     } else {
       // Fallback: Traditional approach (limited data dump)
       console.log("Using traditional approach (no embeddings available)...");
@@ -128,6 +137,13 @@ serve(async (req) => {
       };
 
       contextData = JSON.stringify(rmaData, null, 2);
+      
+      // Store metadata for later
+      (globalThis as any).__searchMetadata = { 
+        searchMethod, 
+        recordCount: rmaRequestsResult.data?.length || 0, 
+        avgSimilarity: 0 
+      };
     }
 
     console.log(`Search method: ${searchMethod}, Context length: ${contextData.length} chars`);
@@ -216,7 +232,32 @@ ${contextData}
 
     console.log("Streaming response from AI...");
 
-    return new Response(response.body, {
+    // Get search metadata
+    const searchMetadata = (globalThis as any).__searchMetadata || { 
+      searchMethod: "Unknown", 
+      recordCount: 0, 
+      avgSimilarity: 0 
+    };
+    delete (globalThis as any).__searchMetadata;
+    
+    // Create a transform stream to inject metadata at the beginning
+    const metadataEvent = `data: ${JSON.stringify({ metadata: searchMetadata })}\n\n`;
+    const encoder = new TextEncoder();
+    
+    const transformStream = new TransformStream({
+      start(controller) {
+        // Inject metadata event at the very beginning
+        controller.enqueue(encoder.encode(metadataEvent));
+      },
+      transform(chunk, controller) {
+        controller.enqueue(chunk);
+      }
+    });
+    
+    // Pipe the AI response through our transform stream
+    response.body?.pipeTo(transformStream.writable);
+
+    return new Response(transformStream.readable, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
