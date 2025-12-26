@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Database, RefreshCw, Play, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Database, RefreshCw, Play, CheckCircle, AlertCircle, Loader2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface EmbeddingStatus {
   total: number;
   embedded: number;
+  pending: number;
   percentage: number;
 }
 
@@ -14,6 +15,7 @@ const EmbeddingManager = () => {
   const [status, setStatus] = useState<EmbeddingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [processProgress, setProcessProgress] = useState<{ processed: number; total: number } | null>(null);
 
   const fetchStatus = async () => {
@@ -106,16 +108,54 @@ const EmbeddingManager = () => {
     }
   };
 
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      let hasMore = true;
+      while (hasMore) {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rma-embeddings`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ action: "sync", batch_size: 10 }),
+          }
+        );
+
+        if (!resp.ok) throw new Error("同步失敗");
+
+        const data = await resp.json();
+        hasMore = data.hasMore;
+
+        // Update status after each batch
+        await fetchStatus();
+
+        if (!hasMore) break;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      toast.success("向量同步完成！");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "同步失敗");
+    } finally {
+      setIsSyncing(false);
+      await fetchStatus();
+    }
+  };
+
   const getStatusColor = () => {
     if (!status) return "text-muted-foreground";
-    if (status.percentage === 100) return "text-green-600";
+    if (status.percentage === 100 && status.pending === 0) return "text-green-600";
     if (status.percentage > 50) return "text-yellow-600";
     return "text-orange-600";
   };
 
   const getStatusIcon = () => {
     if (!status) return <Database className="w-5 h-5" />;
-    if (status.percentage === 100) return <CheckCircle className="w-5 h-5 text-green-600" />;
+    if (status.percentage === 100 && status.pending === 0) return <CheckCircle className="w-5 h-5 text-green-600" />;
     if (status.percentage > 0) return <AlertCircle className="w-5 h-5 text-yellow-600" />;
     return <AlertCircle className="w-5 h-5 text-orange-600" />;
   };
@@ -157,7 +197,36 @@ const EmbeddingManager = () => {
           
           <Progress value={status.percentage} className="h-2" />
 
-          {status.percentage < 100 && (
+          {/* Pending sync indicator */}
+          {status.pending > 0 && (
+            <div className="flex items-center justify-between p-2 bg-yellow-50 dark:bg-yellow-950/30 rounded-md border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2 text-sm text-yellow-700 dark:text-yellow-400">
+                <AlertCircle className="w-4 h-4" />
+                <span>{status.pending} 筆記錄待同步</span>
+              </div>
+              <Button
+                onClick={handleSync}
+                disabled={isSyncing || isProcessing}
+                size="sm"
+                variant="outline"
+                className="border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-950"
+              >
+                {isSyncing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    同步中...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3 h-3 mr-1" />
+                    立即同步
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {status.percentage < 100 && status.pending === 0 && (
             <div className="pt-2">
               <Button
                 onClick={handleStartProcessing}
@@ -183,7 +252,7 @@ const EmbeddingManager = () => {
             </div>
           )}
 
-          {status.percentage === 100 && (
+          {status.percentage === 100 && status.pending === 0 && (
             <div className="pt-2 text-center">
               <p className="text-sm text-green-600 flex items-center justify-center gap-2">
                 <CheckCircle className="w-4 h-4" />

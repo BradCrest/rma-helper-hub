@@ -156,6 +156,7 @@ export type Database = {
           id: string
           metadata: Json | null
           rma_request_id: string
+          status: string
           updated_at: string
         }
         Insert: {
@@ -166,6 +167,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           rma_request_id: string
+          status?: string
           updated_at?: string
         }
         Update: {
@@ -176,6 +178,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           rma_request_id?: string
+          status?: string
           updated_at?: string
         }
         Relationships: [
