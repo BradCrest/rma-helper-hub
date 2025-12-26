@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.submit-rma]
 verify_jwt = false
+
+[functions.rma-ai-analysis]
+verify_jwt = true

@@ -3,6 +3,7 @@ import { LogOut, Package, ClipboardList, Settings, Home } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import AiAnalysisChat from "@/components/admin/AiAnalysisChat";
 
 const AdminDashboard = () => {
   const { user, signOut } = useAuth();
@@ -166,6 +167,9 @@ const AdminDashboard = () => {
             <p className="text-sm text-muted-foreground mt-1">本月總數</p>
           </div>
         </div>
+
+        {/* AI Analysis Chat */}
+        <AiAnalysisChat />
       </main>
     </div>
   );
