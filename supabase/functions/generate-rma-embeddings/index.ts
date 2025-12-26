@@ -274,13 +274,127 @@ serve(async (req) => {
       
       const { count: embeddedCount } = await supabase
         .from("rma_embeddings")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("status", "completed");
+      
+      const { count: pendingCount } = await supabase
+        .from("rma_embeddings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
       
       return new Response(
         JSON.stringify({ 
           total: totalCount || 0,
           embedded: embeddedCount || 0,
+          pending: pendingCount || 0,
           percentage: totalCount ? Math.round((embeddedCount || 0) / totalCount * 100) : 0,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (action === "sync") {
+      // Process all pending embeddings
+      console.log("Processing pending embeddings...");
+      
+      const { data: pendingRecords, error: pendingError } = await supabase
+        .from("rma_embeddings")
+        .select("rma_request_id")
+        .eq("status", "pending")
+        .limit(batch_size);
+      
+      if (pendingError) {
+        console.error("Error fetching pending records:", pendingError);
+        throw pendingError;
+      }
+      
+      if (!pendingRecords || pendingRecords.length === 0) {
+        return new Response(
+          JSON.stringify({ success: true, processed: 0, message: "沒有待同步的記錄" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      let processed = 0;
+      let errors = 0;
+      
+      for (const record of pendingRecords) {
+        try {
+          // Mark as processing
+          await supabase
+            .from("rma_embeddings")
+            .update({ status: "processing" })
+            .eq("rma_request_id", record.rma_request_id);
+          
+          // Fetch full RMA data
+          const { data: rma } = await supabase
+            .from("rma_requests")
+            .select("*")
+            .eq("id", record.rma_request_id)
+            .single();
+          
+          if (!rma) {
+            await supabase
+              .from("rma_embeddings")
+              .update({ status: "failed" })
+              .eq("rma_request_id", record.rma_request_id);
+            continue;
+          }
+          
+          // Fetch related data
+          const [repairResult, shippingResult, supplierResult] = await Promise.all([
+            supabase.from("rma_repair_details").select("*").eq("rma_request_id", record.rma_request_id).maybeSingle(),
+            supabase.from("rma_shipping").select("*").eq("rma_request_id", record.rma_request_id),
+            supabase.from("rma_supplier_repairs").select("*").eq("rma_request_id", record.rma_request_id).maybeSingle(),
+          ]);
+          
+          const content = rmaToText(rma, repairResult.data, shippingResult.data ?? undefined, supplierResult.data);
+          const embedding = await generateEmbedding(content, OPENAI_API_KEY);
+          
+          // Update embedding with completed status
+          await supabase
+            .from("rma_embeddings")
+            .update({
+              content,
+              embedding: `[${embedding.join(",")}]`,
+              status: "completed",
+              metadata: {
+                rma_number: rma.rma_number,
+                status: rma.status,
+                product_name: rma.product_name,
+                issue_type: rma.issue_type,
+                created_at: rma.created_at,
+              },
+            })
+            .eq("rma_request_id", record.rma_request_id);
+          
+          processed++;
+          
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (e) {
+          console.error(`Error processing RMA ${record.rma_request_id}:`, e);
+          await supabase
+            .from("rma_embeddings")
+            .update({ status: "failed" })
+            .eq("rma_request_id", record.rma_request_id);
+          errors++;
+        }
+      }
+      
+      // Get updated counts
+      const { count: remainingPending } = await supabase
+        .from("rma_embeddings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          processed, 
+          errors,
+          remainingPending: remainingPending || 0,
+          hasMore: (remainingPending || 0) > 0,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
