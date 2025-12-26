@@ -173,7 +173,7 @@ const AiAnalysisChat = () => {
   };
 
   return (
-    <div className="mt-8 rma-card">
+    <div className="rma-card">
       {/* Header - Always visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

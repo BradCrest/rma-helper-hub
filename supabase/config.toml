@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.rma-ai-analysis]
 verify_jwt = true
+
+[functions.generate-rma-embeddings]
+verify_jwt = true
+
+[functions.import-rma-csv]
+verify_jwt = true

@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AiAnalysisChat from "@/components/admin/AiAnalysisChat";
-
+import EmbeddingManager from "@/components/admin/EmbeddingManager";
 const AdminDashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -168,8 +168,13 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* AI Analysis Chat */}
-        <AiAnalysisChat />
+        {/* Embedding Manager & AI Analysis */}
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <EmbeddingManager />
+          <div className="lg:col-span-1">
+            <AiAnalysisChat />
+          </div>
+        </div>
       </main>
     </div>
   );
