@@ -6,6 +6,31 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Generate embedding using OpenAI API
+async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "text-embedding-3-small",
+      input: text,
+      dimensions: 1536,
+    }),
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("OpenAI Embedding API error:", error);
+    throw new Error(`Embedding API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return data.data[0].embedding;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,6 +47,8 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    
     if (!LOVABLE_API_KEY) {
       console.error("LOVABLE_API_KEY is not configured");
       return new Response(
@@ -30,52 +57,91 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with service role
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log("Fetching RMA data for analysis...");
+    let contextData: string;
+    let searchMethod: string;
 
-    // Fetch RMA data for analysis
-    const [
-      rmaRequestsResult,
-      repairDetailsResult,
-      shippingResult,
-      statusHistoryResult,
-      supplierRepairsResult,
-    ] = await Promise.all([
-      supabase.from("rma_requests").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("rma_repair_details").select("*").limit(500),
-      supabase.from("rma_shipping").select("*").limit(500),
-      supabase.from("rma_status_history").select("*").order("created_at", { ascending: false }).limit(500),
-      supabase.from("rma_supplier_repairs").select("*").limit(500),
-    ]);
+    // Check if we have embeddings and can use RAG
+    const { count: embeddingCount } = await supabase
+      .from("rma_embeddings")
+      .select("*", { count: "exact", head: true });
 
-    const rmaData = {
-      rma_requests: rmaRequestsResult.data || [],
-      repair_details: repairDetailsResult.data || [],
-      shipping: shippingResult.data || [],
-      status_history: statusHistoryResult.data || [],
-      supplier_repairs: supplierRepairsResult.data || [],
-      summary: {
-        total_requests: rmaRequestsResult.data?.length || 0,
-        total_repairs: repairDetailsResult.data?.length || 0,
-        total_shipments: shippingResult.data?.length || 0,
+    if (OPENAI_API_KEY && embeddingCount && embeddingCount > 0) {
+      // Use RAG: Semantic search for relevant data
+      console.log("Using RAG with semantic search...");
+      searchMethod = "RAG";
+      
+      // Generate embedding for the user's prompt
+      const promptEmbedding = await generateEmbedding(prompt, OPENAI_API_KEY);
+      
+      // Search for relevant RMA records
+      const { data: relevantRecords, error: searchError } = await supabase
+        .rpc("search_rma_embeddings", {
+          query_embedding: `[${promptEmbedding.join(",")}]`,
+          match_threshold: 0.3,
+          match_count: 20,
+        });
+      
+      if (searchError) {
+        console.error("Semantic search error:", searchError);
+        throw searchError;
       }
-    };
+      
+      if (relevantRecords && relevantRecords.length > 0) {
+        console.log(`Found ${relevantRecords.length} relevant records via semantic search`);
+        
+        // Format the relevant records for the AI
+        contextData = relevantRecords.map((record: any, index: number) => {
+          return `--- 相關記錄 ${index + 1} (相似度: ${(record.similarity * 100).toFixed(1)}%) ---\n${record.content}`;
+        }).join("\n\n");
+      } else {
+        console.log("No relevant records found, falling back to recent data");
+        // Fallback to recent records if no semantic matches
+        const { data: recentRmas } = await supabase
+          .from("rma_requests")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        
+        contextData = recentRmas ? JSON.stringify(recentRmas, null, 2) : "無資料";
+      }
+    } else {
+      // Fallback: Traditional approach (limited data dump)
+      console.log("Using traditional approach (no embeddings available)...");
+      searchMethod = "Traditional";
+      
+      const [rmaRequestsResult, repairDetailsResult] = await Promise.all([
+        supabase.from("rma_requests").select("*").order("created_at", { ascending: false }).limit(100),
+        supabase.from("rma_repair_details").select("*").limit(100),
+      ]);
 
-    console.log(`Fetched data: ${rmaData.summary.total_requests} requests, ${rmaData.summary.total_repairs} repairs`);
+      const rmaData = {
+        rma_requests: rmaRequestsResult.data || [],
+        repair_details: repairDetailsResult.data || [],
+        summary: {
+          total_requests: rmaRequestsResult.data?.length || 0,
+          total_repairs: repairDetailsResult.data?.length || 0,
+        }
+      };
+
+      contextData = JSON.stringify(rmaData, null, 2);
+    }
+
+    console.log(`Search method: ${searchMethod}, Context length: ${contextData.length} chars`);
 
     const systemPrompt = `你是一個專業的 RMA（Return Merchandise Authorization）資料分析助手。
 你的任務是根據提供的 RMA 資料回答用戶的問題並提供有價值的分析。
 
-資料結構說明：
-- rma_requests: RMA 申請記錄，包含客戶資訊、產品資訊、問題描述、狀態等
-- repair_details: 維修詳情，包含維修方式、成本等
-- shipping: 物流記錄，包含寄送方向、追蹤編號等
-- status_history: 狀態變更歷史
-- supplier_repairs: 供應商送修記錄
+${searchMethod === "RAG" ? `
+注意：以下資料是透過語意搜尋找到的「最相關」記錄。
+這些記錄是根據用戶問題的語意相似度篩選出來的，不是全部資料。
+如果用戶詢問的是統計數據（如總數、比例），請提醒他們這些數據僅基於相關記錄，不代表整體資料庫。
+` : `
+注意：以下資料是最近的 RMA 記錄（有數量限制），不是全部資料。
+`}
 
 狀態說明：
 - registered: 已登記
@@ -96,14 +162,14 @@ serve(async (req) => {
 
 回答時請：
 1. 使用繁體中文回答
-2. 提供具體的數據和統計
+2. 提供具體的數據和統計（基於提供的資料）
 3. 如果需要，提供視覺化的表格或列表
 4. 給出可行的建議
 5. 保持專業和簡潔`;
 
-    const userMessage = `以下是目前的 RMA 資料庫資料（JSON 格式）：
+    const userMessage = `以下是${searchMethod === "RAG" ? "透過語意搜尋找到的相關" : "最近的"} RMA 資料：
 
-${JSON.stringify(rmaData, null, 2)}
+${contextData}
 
 用戶的問題：${prompt}
 

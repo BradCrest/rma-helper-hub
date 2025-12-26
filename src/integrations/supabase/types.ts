@@ -147,6 +147,47 @@ export type Database = {
           },
         ]
       }
+      rma_embeddings: {
+        Row: {
+          content: string
+          content_type: string
+          created_at: string
+          embedding: string | null
+          id: string
+          metadata: Json | null
+          rma_request_id: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_type?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          rma_request_id: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_type?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+          rma_request_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_embeddings_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rma_repair_details: {
         Row: {
           actual_cost: number | null
@@ -475,6 +516,21 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      search_rma_embeddings: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          content_type: string
+          id: string
+          metadata: Json
+          rma_request_id: string
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "super_admin"
