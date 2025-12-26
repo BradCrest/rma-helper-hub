@@ -139,7 +139,7 @@ const getStatusDurationInfo = (status: RmaStatus, updatedAt: string): { elapsed:
 
 const AdminRmaList = () => {
 
-  const { user, signOut } = useAuth();
+  const { user, signOut, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -159,6 +159,9 @@ const AdminRmaList = () => {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [showClearAllDialog, setShowClearAllDialog] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [rmaToDelete, setRmaToDelete] = useState<RmaRequest | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const pageSize = 10;
 
   const fetchRmaList = async () => {
@@ -361,6 +364,45 @@ const AdminRmaList = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/admin");
+  };
+
+  const handleDeleteRma = async () => {
+    if (!rmaToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      // Delete related data in order (foreign key constraints)
+      const { error: feedbackErr } = await supabase.from("rma_customer_feedback").delete().eq("rma_request_id", rmaToDelete.id);
+      if (feedbackErr) throw new Error(`刪除 feedback 失敗：${feedbackErr.message}`);
+
+      const { error: contactsErr } = await supabase.from("rma_customer_contacts").delete().eq("rma_request_id", rmaToDelete.id);
+      if (contactsErr) throw new Error(`刪除 contacts 失敗：${contactsErr.message}`);
+
+      const { error: supplierErr } = await supabase.from("rma_supplier_repairs").delete().eq("rma_request_id", rmaToDelete.id);
+      if (supplierErr) throw new Error(`刪除 supplier_repairs 失敗：${supplierErr.message}`);
+
+      const { error: repairErr } = await supabase.from("rma_repair_details").delete().eq("rma_request_id", rmaToDelete.id);
+      if (repairErr) throw new Error(`刪除 repair_details 失敗：${repairErr.message}`);
+
+      const { error: shippingErr } = await supabase.from("rma_shipping").delete().eq("rma_request_id", rmaToDelete.id);
+      if (shippingErr) throw new Error(`刪除 shipping 失敗：${shippingErr.message}`);
+
+      const { error: historyErr } = await supabase.from("rma_status_history").delete().eq("rma_request_id", rmaToDelete.id);
+      if (historyErr) throw new Error(`刪除 status_history 失敗：${historyErr.message}`);
+
+      const { error: requestsErr } = await supabase.from("rma_requests").delete().eq("id", rmaToDelete.id);
+      if (requestsErr) throw new Error(`刪除 RMA 失敗：${requestsErr.message}`);
+
+      toast.success(`已刪除 RMA ${rmaToDelete.rma_number}`);
+      setShowDeleteDialog(false);
+      setRmaToDelete(null);
+      fetchRmaList();
+    } catch (error: any) {
+      console.error("Error deleting RMA:", error);
+      toast.error(error.message || "刪除 RMA 失敗");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleExportAllCsv = async (): Promise<boolean> => {
@@ -790,6 +832,51 @@ const AdminRmaList = () => {
           </AlertDialogContent>
         </AlertDialog>
 
+        {/* Delete Single RMA Confirmation Dialog (Super Admin only) */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                確認刪除 RMA
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>您確定要刪除以下 RMA 嗎？</p>
+                {rmaToDelete && (
+                  <div className="bg-muted p-3 rounded-md mt-2">
+                    <p><strong>RMA 編號：</strong>{rmaToDelete.rma_number}</p>
+                    <p><strong>客戶名稱：</strong>{rmaToDelete.customer_name}</p>
+                    <p><strong>產品型號：</strong>{rmaToDelete.product_model || "-"}</p>
+                  </div>
+                )}
+                <p className="text-destructive font-medium mt-4">
+                  ⚠️ 此操作將同時刪除所有相關資料（物流、狀態歷史等），刪除後無法復原！
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteRma}
+                disabled={isDeleting}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    刪除中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    確認刪除
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {/* Table */}
         <div className="rma-card overflow-hidden">
           <div className="overflow-x-auto">
@@ -865,12 +952,25 @@ const AdminRmaList = () => {
                       </td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(rma.created_at)}</td>
                       <td className="py-3 px-4">
-                        <button
-                          onClick={() => handleViewRma(rma)}
-                          className="text-primary hover:text-primary/80 transition-colors"
-                        >
-                          <Eye className="w-5 h-5" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewRma(rma)}
+                            className="text-primary hover:text-primary/80 transition-colors"
+                          >
+                            <Eye className="w-5 h-5" />
+                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              onClick={() => {
+                                setRmaToDelete(rma);
+                                setShowDeleteDialog(true);
+                              }}
+                              className="text-destructive hover:text-destructive/80 transition-colors"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                     );
