@@ -14,7 +14,8 @@ import {
   Check,
   X,
   Crown,
-  History
+  History,
+  Globe
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,6 +45,10 @@ interface LoginLog {
   ip_address: string | null;
   user_agent: string | null;
   created_at: string;
+  country: string | null;
+  country_code: string | null;
+  city: string | null;
+  region: string | null;
 }
 
 const AdminSettings = () => {
@@ -613,7 +618,20 @@ const AdminSettings = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{formatDate(log.created_at)}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{log.ip_address || '-'}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-mono text-muted-foreground">
+                            {log.ip_address || '-'}
+                          </span>
+                          {log.country && (
+                            <span className="inline-flex items-center gap-1 text-xs text-primary">
+                              <Globe className="w-3 h-3" />
+                              {log.country}
+                              {log.city && ` (${log.city})`}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       {isSuperAdmin && (
                         <td className="py-3 px-4 text-right">
                           <button

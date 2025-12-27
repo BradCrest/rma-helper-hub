@@ -16,29 +16,41 @@ export type Database = {
     Tables: {
       login_logs: {
         Row: {
+          city: string | null
+          country: string | null
+          country_code: string | null
           created_at: string
           email: string
           event_type: string
           id: string
           ip_address: string | null
+          region: string | null
           user_agent: string | null
           user_id: string
         }
         Insert: {
+          city?: string | null
+          country?: string | null
+          country_code?: string | null
           created_at?: string
           email: string
           event_type?: string
           id?: string
           ip_address?: string | null
+          region?: string | null
           user_agent?: string | null
           user_id: string
         }
         Update: {
+          city?: string | null
+          country?: string | null
+          country_code?: string | null
           created_at?: string
           email?: string
           event_type?: string
           id?: string
           ip_address?: string | null
+          region?: string | null
           user_agent?: string | null
           user_id?: string
         }
