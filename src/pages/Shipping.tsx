@@ -403,6 +403,18 @@ const Shipping = () => {
                     </p>
                   </div>
 
+                  {/* 後續步驟說明 */}
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <h3 className="font-semibold text-foreground mb-2">後續步驟</h3>
+                    <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                      <li>請將產品妥善包裝，附上此 RMA 編號</li>
+                      <li>寄送至指定維修中心地址，地址如下：新北市三重區重新路五段609巷16號6樓之14</li>
+                      <li>我們收到產品後會盡快處理並更新狀態</li>
+                      <li>您可以隨時使用 RMA 編號查詢維修進度</li>
+                      <li>因人力因素及維修中心無對外開放，無法支援親送，敬請見諒。</li>
+                    </ol>
+                  </div>
+
                   <div className="flex gap-3 justify-end pt-4">
                     <button
                       type="button"
