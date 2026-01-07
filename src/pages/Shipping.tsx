@@ -175,7 +175,8 @@ const Shipping = () => {
       resetModal();
     } catch (error) {
       console.error("Submit error:", error);
-      toast.error("提交失敗，請稍後再試");
+      const errorMessage = error instanceof Error ? error.message : "提交失敗，請稍後再試";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
