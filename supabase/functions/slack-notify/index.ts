@@ -20,16 +20,37 @@ interface SlackNotification {
 
 const statusLabels: Record<string, string> = {
   pending: "待收貨",
+  registered: "已登記",
   shipped: "已寄出",
   received: "已收貨",
   inspecting: "檢測中",
   contacting: "聯繫客戶中",
+  quote_confirmed: "報價確認",
+  paid: "已付款",
+  no_repair: "不維修",
   repairing: "維修中",
   waiting_parts: "等待零件",
   completed: "維修完成",
-  returning: "寄回中",
+  shipped_back: "寄回中",
+  shipped_back_refurbished: "寄回（整新機）",
+  shipped_back_original: "寄回（原機）",
+  shipped_back_new: "寄回（新品）",
+  follow_up: "追蹤中",
   closed: "已結案",
   cancelled: "已取消",
+  unknown: "未知",
+};
+
+// 格式化電話號碼，確保保留前導 0
+const formatPhone = (phone: string): string => {
+  if (!phone) return "未提供";
+  
+  // 如果是純數字且長度為 9-10 碼（台灣手機去掉 0），補回 0
+  if (/^\d{9,10}$/.test(phone) && !phone.startsWith('0')) {
+    return '0' + phone;
+  }
+  
+  return phone;
 };
 
 serve(async (req) => {
@@ -58,7 +79,7 @@ serve(async (req) => {
 ━━━━━━━━━━━━━━━━━━
 📋 編號：${notification.rma_number}
 👤 客戶：${notification.customer_name}
-📞 電話：${notification.customer_phone}
+📞 電話：${formatPhone(notification.customer_phone)}
 📱 型號：${notification.product_model || "未指定"}
 🔢 序號：${notification.serial_number || "未指定"}
 📊 狀態：${statusLabels[notification.status] || notification.status}
@@ -71,7 +92,7 @@ serve(async (req) => {
 ━━━━━━━━━━━━━━━━━━
 📋 編號：${notification.rma_number}
 👤 客戶：${notification.customer_name}
-📞 電話：${notification.customer_phone}
+📞 電話：${formatPhone(notification.customer_phone)}
 📱 型號：${notification.product_model || "未指定"}
 🔢 序號：${notification.serial_number || "未指定"}
 📊 狀態改變：${oldStatusLabel} ➜ ${newStatusLabel}
