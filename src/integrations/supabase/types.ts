@@ -274,6 +274,7 @@ export type Database = {
           product_name: string
           purchase_date: string | null
           received_date: string | null
+          repair_fee: number | null
           rma_number: string
           serial_number: string | null
           social_account: string | null
@@ -302,6 +303,7 @@ export type Database = {
           product_name: string
           purchase_date?: string | null
           received_date?: string | null
+          repair_fee?: number | null
           rma_number: string
           serial_number?: string | null
           social_account?: string | null
@@ -330,6 +332,7 @@ export type Database = {
           product_name?: string
           purchase_date?: string | null
           received_date?: string | null
+          repair_fee?: number | null
           rma_number?: string
           serial_number?: string | null
           social_account?: string | null
