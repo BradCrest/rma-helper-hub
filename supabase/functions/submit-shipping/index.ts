@@ -105,6 +105,44 @@ Deno.serve(async (req) => {
       // Don't fail the request, just log the error
     }
 
+    // Send Slack notification for status change
+    try {
+      const { data: fullRmaData } = await supabase
+        .from("rma_requests")
+        .select("*")
+        .eq("id", rma_request_id)
+        .single();
+
+      if (fullRmaData) {
+        const slackResponse = await fetch(`${supabaseUrl}/functions/v1/slack-notify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            type: "status_change",
+            rma_number: fullRmaData.rma_number,
+            customer_name: fullRmaData.customer_name,
+            customer_phone: fullRmaData.customer_phone,
+            product_model: fullRmaData.product_model,
+            serial_number: fullRmaData.serial_number,
+            status: "shipped",
+            old_status: rmaData.status,
+            issue_description: fullRmaData.issue_description,
+          }),
+        });
+
+        if (!slackResponse.ok) {
+          console.error("Failed to send Slack notification:", await slackResponse.text());
+        } else {
+          console.log("Slack notification sent for shipping submission");
+        }
+      }
+    } catch (slackError) {
+      console.error("Error sending Slack notification:", slackError);
+    }
+
     console.log(`Shipping info added for RMA: ${rmaData.rma_number}`);
 
     return new Response(
