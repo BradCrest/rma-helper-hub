@@ -32,3 +32,9 @@ verify_jwt = true
 
 [functions.import-rma-csv]
 verify_jwt = true
+
+[functions.slack-notify]
+verify_jwt = false
+
+[functions.update-rma-status]
+verify_jwt = false

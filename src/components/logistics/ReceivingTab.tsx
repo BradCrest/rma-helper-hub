@@ -179,12 +179,32 @@ const ReceivingTab = () => {
 
   const handleUpdateStatus = async (rmaId: string, newStatus: RmaStatus) => {
     try {
-      const { error } = await supabase
-        .from("rma_requests")
-        .update({ status: newStatus })
-        .eq("id", rmaId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("請先登入");
+        return;
+      }
 
-      if (error) throw error;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-rma-status`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            rma_id: rmaId,
+            new_status: newStatus,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "更新失敗");
+      }
 
       toast.success(`狀態已更新為：${getStatusLabel(newStatus)}`);
       fetchRmaList();

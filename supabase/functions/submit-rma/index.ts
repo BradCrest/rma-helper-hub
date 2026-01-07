@@ -123,6 +123,36 @@ serve(async (req) => {
       });
 
       console.log("Successfully created RMA:", data.rma_number);
+
+      // Send Slack notification for new RMA
+      try {
+        const slackResponse = await fetch(`${supabaseUrl}/functions/v1/slack-notify`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            type: "new_rma",
+            rma_number: data.rma_number,
+            customer_name: product.customer_name,
+            customer_phone: product.customer_phone,
+            product_model: product.product_model,
+            serial_number: product.serial_number,
+            status: "pending",
+            issue_description: product.issue_description,
+          }),
+        });
+
+        if (!slackResponse.ok) {
+          console.error("Failed to send Slack notification:", await slackResponse.text());
+        } else {
+          console.log("Slack notification sent for new RMA:", data.rma_number);
+        }
+      } catch (slackError) {
+        console.error("Error sending Slack notification:", slackError);
+        // Don't fail the request if Slack notification fails
+      }
     }
 
     // Return appropriate response
