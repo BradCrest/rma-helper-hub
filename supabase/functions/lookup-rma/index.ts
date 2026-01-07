@@ -80,15 +80,9 @@ serve(async (req) => {
     if (rmaNumber) {
       // Normalize input: remove spaces and convert to uppercase
       const normalizedInput = rmaNumber.trim().toUpperCase();
-      const inputWithoutDashes = normalizedInput.replace(/-/g, '');
       
-      // Search with pattern matching
-      if (normalizedInput.includes('-')) {
-        query = query.ilike('rma_number', `%${normalizedInput}%`);
-      } else {
-        // Handle format without dashes
-        query = query.ilike('rma_number', `%${normalizedInput.replace(/RMA/i, '').replace(/(\d{8})(\d{3})/, '$1-$2')}%`);
-      }
+      // Search with flexible pattern matching - just use ILIKE with the input
+      query = query.ilike('rma_number', `%${normalizedInput}%`);
 
       const { data, error } = await query;
 
@@ -100,9 +94,11 @@ serve(async (req) => {
         );
       }
 
-      // Filter results to find exact matches
+      // Filter results - remove dashes for comparison
+      const inputWithoutDashes = normalizedInput.replace(/-/g, '');
       const filtered = data?.filter(r => 
-        r.rma_number.replace(/-/g, '').toUpperCase().includes(inputWithoutDashes)
+        r.rma_number.replace(/-/g, '').toUpperCase().includes(inputWithoutDashes) ||
+        inputWithoutDashes.includes(r.rma_number.replace(/-/g, '').toUpperCase())
       ) || [];
 
       if (filtered.length === 0) {
