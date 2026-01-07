@@ -22,7 +22,9 @@ import {
   Trash2,
   AlertTriangle,
   MessageSquare,
-  Plus
+  Plus,
+  Pencil,
+  DollarSign
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -190,6 +192,14 @@ const AdminRmaList = () => {
   const [contactNotes, setContactNotes] = useState("");
   const [contactDate, setContactDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [editingContact, setEditingContact] = useState<CustomerContact | null>(null);
+  const [showDeleteContactDialog, setShowDeleteContactDialog] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<CustomerContact | null>(null);
+  const [isDeletingContact, setIsDeletingContact] = useState(false);
+
+  // Repair fee states
+  const [repairFee, setRepairFee] = useState<string>("");
+  const [isSavingFee, setIsSavingFee] = useState(false);
 
   const fetchRmaList = async () => {
     setIsLoading(true);
@@ -273,6 +283,9 @@ const AdminRmaList = () => {
     setContactMethod("");
     setContactNotes("");
     setContactDate(format(new Date(), "yyyy-MM-dd"));
+    setEditingContact(null);
+    // Load repair fee
+    setRepairFee(rma.repair_fee != null ? String(rma.repair_fee) : "");
     
     // Fetch shipping info (inbound & outbound), status history, and contacts for this RMA
     try {
@@ -322,16 +335,31 @@ const AdminRmaList = () => {
 
     setIsSavingContact(true);
     try {
-      const { error } = await supabase.from("rma_customer_contacts").insert({
-        rma_request_id: selectedRma.id,
-        contact_date: contactDate,
-        contact_method: contactMethod,
-        contact_notes: contactNotes || null,
-      });
+      if (editingContact) {
+        // Update existing contact
+        const { error } = await supabase
+          .from("rma_customer_contacts")
+          .update({
+            contact_date: contactDate,
+            contact_method: contactMethod,
+            contact_notes: contactNotes || null,
+          })
+          .eq("id", editingContact.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success("已更新聯繫記錄");
+      } else {
+        // Insert new contact
+        const { error } = await supabase.from("rma_customer_contacts").insert({
+          rma_request_id: selectedRma.id,
+          contact_date: contactDate,
+          contact_method: contactMethod,
+          contact_notes: contactNotes || null,
+        });
 
-      toast.success("已新增聯繫記錄");
+        if (error) throw error;
+        toast.success("已新增聯繫記錄");
+      }
       
       // Refresh contacts
       const { data } = await supabase
@@ -345,11 +373,77 @@ const AdminRmaList = () => {
       setContactMethod("");
       setContactNotes("");
       setContactDate(format(new Date(), "yyyy-MM-dd"));
+      setEditingContact(null);
     } catch (error) {
-      console.error("Error adding contact:", error);
-      toast.error("新增失敗");
+      console.error("Error saving contact:", error);
+      toast.error(editingContact ? "更新失敗" : "新增失敗");
     } finally {
       setIsSavingContact(false);
+    }
+  };
+
+  const handleEditContact = (contact: CustomerContact) => {
+    setEditingContact(contact);
+    setContactDate(contact.contact_date);
+    setContactMethod(contact.contact_method || "");
+    setContactNotes(contact.contact_notes || "");
+    setShowContactForm(true);
+  };
+
+  const handleDeleteContact = async () => {
+    if (!contactToDelete || !selectedRma) return;
+
+    setIsDeletingContact(true);
+    try {
+      const { error } = await supabase
+        .from("rma_customer_contacts")
+        .delete()
+        .eq("id", contactToDelete.id);
+
+      if (error) throw error;
+
+      toast.success("已刪除聯繫記錄");
+      
+      // Refresh contacts
+      const { data } = await supabase
+        .from("rma_customer_contacts")
+        .select("*")
+        .eq("rma_request_id", selectedRma.id)
+        .order("contact_date", { ascending: false });
+
+      setContacts(data || []);
+      setShowDeleteContactDialog(false);
+      setContactToDelete(null);
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      toast.error("刪除失敗");
+    } finally {
+      setIsDeletingContact(false);
+    }
+  };
+
+  const handleSaveRepairFee = async () => {
+    if (!selectedRma) return;
+
+    setIsSavingFee(true);
+    try {
+      const feeValue = repairFee.trim() === "" ? null : parseFloat(repairFee);
+      
+      const { error } = await supabase
+        .from("rma_requests")
+        .update({ repair_fee: feeValue })
+        .eq("id", selectedRma.id);
+
+      if (error) throw error;
+
+      toast.success("維修費用已儲存");
+      setSelectedRma({ ...selectedRma, repair_fee: feeValue });
+      fetchRmaList();
+    } catch (error) {
+      console.error("Error saving repair fee:", error);
+      toast.error("儲存失敗");
+    } finally {
+      setIsSavingFee(false);
     }
   };
 
@@ -968,7 +1062,53 @@ const AdminRmaList = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Table */}
+        {/* Delete Contact Confirmation Dialog */}
+        <AlertDialog open={showDeleteContactDialog} onOpenChange={setShowDeleteContactDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                確認刪除聯繫記錄
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>您確定要刪除此聯繫記錄嗎？</p>
+                {contactToDelete && (
+                  <div className="bg-muted p-3 rounded-md mt-2">
+                    <p><strong>日期：</strong>{contactToDelete.contact_date}</p>
+                    <p><strong>方式：</strong>{getContactMethodLabel(contactToDelete.contact_method)}</p>
+                    {contactToDelete.contact_notes && (
+                      <p><strong>內容：</strong>{contactToDelete.contact_notes}</p>
+                    )}
+                  </div>
+                )}
+                <p className="text-destructive font-medium mt-4">
+                  ⚠️ 刪除後無法復原！
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingContact}>取消</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteContact}
+                disabled={isDeletingContact}
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              >
+                {isDeletingContact ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    刪除中...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    確認刪除
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         <div className="rma-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -1504,7 +1644,13 @@ const AdminRmaList = () => {
                     <p className="text-sm font-medium text-foreground">客戶聯繫記錄</p>
                   </div>
                   <button
-                    onClick={() => setShowContactForm(!showContactForm)}
+                    onClick={() => {
+                      setEditingContact(null);
+                      setContactDate(format(new Date(), "yyyy-MM-dd"));
+                      setContactMethod("");
+                      setContactNotes("");
+                      setShowContactForm(!showContactForm);
+                    }}
                     className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-colors"
                   >
                     <Plus className="w-3 h-3" />
@@ -1512,9 +1658,12 @@ const AdminRmaList = () => {
                   </button>
                 </div>
 
-                {/* Add Contact Form */}
+                {/* Add/Edit Contact Form */}
                 {showContactForm && (
                   <div className="bg-muted/50 rounded-lg p-4 mb-4 space-y-3">
+                    <div className="text-xs font-medium text-foreground mb-2">
+                      {editingContact ? "編輯聯繫記錄" : "新增聯繫記錄"}
+                    </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-muted-foreground mb-1 block">聯繫日期</label>
@@ -1558,6 +1707,7 @@ const AdminRmaList = () => {
                           setShowContactForm(false);
                           setContactMethod("");
                           setContactNotes("");
+                          setEditingContact(null);
                         }}
                         className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
@@ -1568,7 +1718,7 @@ const AdminRmaList = () => {
                         disabled={isSavingContact || !contactMethod}
                         className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
                       >
-                        {isSavingContact ? "儲存中..." : "儲存"}
+                        {isSavingContact ? "儲存中..." : editingContact ? "更新" : "儲存"}
                       </button>
                     </div>
                   </div>
@@ -1581,11 +1731,32 @@ const AdminRmaList = () => {
                   <div className="space-y-3">
                     {contacts.map((contact) => (
                       <div key={contact.id} className="bg-muted/30 rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-muted-foreground">{contact.contact_date}</span>
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {getContactMethodLabel(contact.contact_method)}
-                          </span>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{contact.contact_date}</span>
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                              {getContactMethodLabel(contact.contact_method)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditContact(contact)}
+                              className="p-1 text-muted-foreground hover:text-primary transition-colors"
+                              title="編輯"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setContactToDelete(contact);
+                                setShowDeleteContactDialog(true);
+                              }}
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              title="刪除"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                         {contact.contact_notes && (
                           <p className="text-sm text-foreground whitespace-pre-wrap">{contact.contact_notes}</p>
@@ -1594,6 +1765,35 @@ const AdminRmaList = () => {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Repair Fee Section */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">維修費用</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="text-sm text-muted-foreground">NT$</span>
+                    <input
+                      type="number"
+                      value={repairFee}
+                      onChange={(e) => setRepairFee(e.target.value)}
+                      placeholder="輸入費用金額"
+                      className="rma-input flex-1"
+                      min="0"
+                      step="1"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveRepairFee}
+                    disabled={isSavingFee}
+                    className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {isSavingFee ? "儲存中..." : "儲存"}
+                  </button>
+                </div>
               </div>
 
               {/* Status Update */}
