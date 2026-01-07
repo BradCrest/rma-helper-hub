@@ -20,8 +20,18 @@ import {
   Send,
   Upload,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare,
+  Plus
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -52,6 +62,15 @@ type RmaStatus = Database["public"]["Enums"]["rma_status"];
 type RmaRequest = Database["public"]["Tables"]["rma_requests"]["Row"];
 type RmaShipping = Database["public"]["Tables"]["rma_shipping"]["Row"];
 type RmaStatusHistory = Database["public"]["Tables"]["rma_status_history"]["Row"];
+
+interface CustomerContact {
+  id: string;
+  rma_request_id: string;
+  contact_date: string;
+  contact_method: string | null;
+  contact_notes: string | null;
+  created_at: string;
+}
 
 const statusLabels: Record<RmaStatus, string> = {
   registered: "已登記",
@@ -164,6 +183,14 @@ const AdminRmaList = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const pageSize = 10;
 
+  // Customer contact states
+  const [contacts, setContacts] = useState<CustomerContact[]>([]);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactMethod, setContactMethod] = useState("");
+  const [contactNotes, setContactNotes] = useState("");
+  const [contactDate, setContactDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [isSavingContact, setIsSavingContact] = useState(false);
+
   const fetchRmaList = async () => {
     setIsLoading(true);
     try {
@@ -242,9 +269,14 @@ const AdminRmaList = () => {
   const handleViewRma = async (rma: RmaRequest) => {
     setSelectedRma(rma);
     setOutboundForm({ carrier: "", tracking_number: "", notes: "", ship_type: "original" });
-    // Fetch shipping info (inbound & outbound) and status history for this RMA
+    setShowContactForm(false);
+    setContactMethod("");
+    setContactNotes("");
+    setContactDate(format(new Date(), "yyyy-MM-dd"));
+    
+    // Fetch shipping info (inbound & outbound), status history, and contacts for this RMA
     try {
-      const [inboundResult, outboundResult, historyResult] = await Promise.all([
+      const [inboundResult, outboundResult, historyResult, contactsResult] = await Promise.all([
         supabase
           .from("rma_shipping")
           .select("*")
@@ -261,18 +293,77 @@ const AdminRmaList = () => {
           .from("rma_status_history")
           .select("*")
           .eq("rma_request_id", rma.id)
-          .order("created_at", { ascending: false })
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("rma_customer_contacts")
+          .select("*")
+          .eq("rma_request_id", rma.id)
+          .order("contact_date", { ascending: false })
       ]);
       
       setSelectedRmaShipping(inboundResult.data);
       setOutboundShipping(outboundResult.data);
       setStatusHistory(historyResult.data || []);
+      setContacts(contactsResult.data || []);
     } catch (error) {
       console.error("Error fetching RMA details:", error);
       setSelectedRmaShipping(null);
       setOutboundShipping(null);
       setStatusHistory([]);
+      setContacts([]);
     }
+  };
+
+  const handleAddContact = async () => {
+    if (!selectedRma || !contactMethod) {
+      toast.error("請選擇聯繫方式");
+      return;
+    }
+
+    setIsSavingContact(true);
+    try {
+      const { error } = await supabase.from("rma_customer_contacts").insert({
+        rma_request_id: selectedRma.id,
+        contact_date: contactDate,
+        contact_method: contactMethod,
+        contact_notes: contactNotes || null,
+      });
+
+      if (error) throw error;
+
+      toast.success("已新增聯繫記錄");
+      
+      // Refresh contacts
+      const { data } = await supabase
+        .from("rma_customer_contacts")
+        .select("*")
+        .eq("rma_request_id", selectedRma.id)
+        .order("contact_date", { ascending: false });
+
+      setContacts(data || []);
+      setShowContactForm(false);
+      setContactMethod("");
+      setContactNotes("");
+      setContactDate(format(new Date(), "yyyy-MM-dd"));
+    } catch (error) {
+      console.error("Error adding contact:", error);
+      toast.error("新增失敗");
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
+  const getContactMethodLabel = (method: string | null) => {
+    const methodMap: Record<string, string> = {
+      phone: "電話",
+      sms: "簡訊",
+      line: "LINE",
+      email: "Email",
+      fb: "FB",
+      ig: "IG",
+      other: "其他",
+    };
+    return method ? methodMap[method] || method : "-";
   };
 
   const handleConfirmReceive = async () => {
@@ -1399,6 +1490,106 @@ const AdminRmaList = () => {
                             <p className="mt-1 text-sm text-muted-foreground">{history.notes}</p>
                           )}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Customer Contact Records */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">客戶聯繫記錄</p>
+                  </div>
+                  <button
+                    onClick={() => setShowContactForm(!showContactForm)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 rounded transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    新增記錄
+                  </button>
+                </div>
+
+                {/* Add Contact Form */}
+                {showContactForm && (
+                  <div className="bg-muted/50 rounded-lg p-4 mb-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">聯繫日期</label>
+                        <input
+                          type="date"
+                          value={contactDate}
+                          onChange={(e) => setContactDate(e.target.value)}
+                          className="rma-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground mb-1 block">聯繫方式 *</label>
+                        <Select value={contactMethod} onValueChange={setContactMethod}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="請選擇" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="phone">電話</SelectItem>
+                            <SelectItem value="sms">簡訊</SelectItem>
+                            <SelectItem value="line">LINE</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="fb">FB</SelectItem>
+                            <SelectItem value="ig">IG</SelectItem>
+                            <SelectItem value="other">其它</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">備註內容</label>
+                      <Textarea
+                        value={contactNotes}
+                        onChange={(e) => setContactNotes(e.target.value)}
+                        placeholder="記錄與客戶溝通的內容..."
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          setShowContactForm(false);
+                          setContactMethod("");
+                          setContactNotes("");
+                        }}
+                        className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleAddContact}
+                        disabled={isSavingContact || !contactMethod}
+                        className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                      >
+                        {isSavingContact ? "儲存中..." : "儲存"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contact History List */}
+                {contacts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">尚無聯繫記錄</p>
+                ) : (
+                  <div className="space-y-3">
+                    {contacts.map((contact) => (
+                      <div key={contact.id} className="bg-muted/30 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground">{contact.contact_date}</span>
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            {getContactMethodLabel(contact.contact_method)}
+                          </span>
+                        </div>
+                        {contact.contact_notes && (
+                          <p className="text-sm text-foreground whitespace-pre-wrap">{contact.contact_notes}</p>
+                        )}
                       </div>
                     ))}
                   </div>

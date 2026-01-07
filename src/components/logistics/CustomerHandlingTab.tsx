@@ -221,9 +221,11 @@ const CustomerHandlingTab = () => {
   const getContactMethodLabel = (method: string | null) => {
     const methodMap: Record<string, string> = {
       phone: "電話",
-      email: "Email",
-      line: "LINE",
       sms: "簡訊",
+      line: "LINE",
+      email: "Email",
+      fb: "FB",
+      ig: "IG",
       other: "其他",
     };
     return method ? methodMap[method] || method : "-";
