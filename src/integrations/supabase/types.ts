@@ -159,6 +159,54 @@ export type Database = {
           },
         ]
       }
+      rma_deletion_logs: {
+        Row: {
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deleted_at: string
+          deleted_by: string
+          deleted_by_email: string
+          id: string
+          product_model: string | null
+          product_name: string
+          rma_data: Json
+          rma_number: string
+          serial_number: string | null
+          status: string
+        }
+        Insert: {
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deleted_at?: string
+          deleted_by: string
+          deleted_by_email: string
+          id?: string
+          product_model?: string | null
+          product_name: string
+          rma_data: Json
+          rma_number: string
+          serial_number?: string | null
+          status: string
+        }
+        Update: {
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          deleted_at?: string
+          deleted_by?: string
+          deleted_by_email?: string
+          id?: string
+          product_model?: string | null
+          product_name?: string
+          rma_data?: Json
+          rma_number?: string
+          serial_number?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       rma_embeddings: {
         Row: {
           content: string
