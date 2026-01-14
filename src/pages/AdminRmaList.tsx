@@ -183,6 +183,7 @@ const AdminRmaList = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [rmaToDelete, setRmaToDelete] = useState<RmaRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const pageSize = 10;
 
   // Customer contact states
@@ -1106,32 +1107,55 @@ const AdminRmaList = () => {
         </AlertDialog>
 
         {/* Delete Single RMA Confirmation Dialog (Super Admin only) */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialog 
+          open={showDeleteDialog} 
+          onOpenChange={(open) => {
+            setShowDeleteDialog(open);
+            if (!open) {
+              setDeleteConfirmInput("");
+            }
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="w-5 h-5" />
                 確認刪除 RMA
               </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2">
-                <p>您確定要刪除以下 RMA 嗎？</p>
-                {rmaToDelete && (
-                  <div className="bg-muted p-3 rounded-md mt-2">
-                    <p><strong>RMA 編號：</strong>{rmaToDelete.rma_number}</p>
-                    <p><strong>客戶名稱：</strong>{rmaToDelete.customer_name}</p>
-                    <p><strong>產品型號：</strong>{rmaToDelete.product_model || "-"}</p>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2">
+                  <p>您確定要刪除以下 RMA 嗎？</p>
+                  {rmaToDelete && (
+                    <div className="bg-muted p-3 rounded-md mt-2">
+                      <p><strong>RMA 編號：</strong>{rmaToDelete.rma_number}</p>
+                      <p><strong>客戶名稱：</strong>{rmaToDelete.customer_name}</p>
+                      <p><strong>產品型號：</strong>{rmaToDelete.product_model || "-"}</p>
+                    </div>
+                  )}
+                  <p className="text-destructive font-medium mt-4">
+                    ⚠️ 此操作將同時刪除所有相關資料（物流、狀態歷史等），刪除後無法復原！
+                  </p>
+                  
+                  <div className="mt-4 space-y-2">
+                    <label className="text-sm font-medium text-foreground block">
+                      請輸入 RMA 編號 <span className="font-mono text-destructive">{rmaToDelete?.rma_number}</span> 以確認刪除：
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirmInput}
+                      onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                      placeholder="輸入 RMA 編號"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                    />
                   </div>
-                )}
-                <p className="text-destructive font-medium mt-4">
-                  ⚠️ 此操作將同時刪除所有相關資料（物流、狀態歷史等），刪除後無法復原！
-                </p>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleDeleteRma}
-                disabled={isDeleting}
+                disabled={isDeleting || deleteConfirmInput !== rmaToDelete?.rma_number}
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
               >
                 {isDeleting ? (
