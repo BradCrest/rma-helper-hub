@@ -201,6 +201,20 @@ const AdminRmaList = () => {
   const [repairFee, setRepairFee] = useState<string>("");
   const [isSavingFee, setIsSavingFee] = useState(false);
 
+  // Deletion logs states
+  interface DeletionLog {
+    id: string;
+    rma_number: string;
+    customer_name: string;
+    product_name: string;
+    product_model: string | null;
+    deleted_by_email: string;
+    deleted_at: string;
+  }
+  const [showDeletionLogs, setShowDeletionLogs] = useState(false);
+  const [deletionLogs, setDeletionLogs] = useState<DeletionLog[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
   const fetchRmaList = async () => {
     setIsLoading(true);
     try {
@@ -576,7 +590,29 @@ const AdminRmaList = () => {
     
     setIsDeleting(true);
     try {
-      // Delete related data in order (foreign key constraints)
+      // Get current user info for logging
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      // Step 1: Log the deletion first
+      const { error: logError } = await supabase
+        .from("rma_deletion_logs")
+        .insert({
+          rma_number: rmaToDelete.rma_number,
+          customer_name: rmaToDelete.customer_name,
+          customer_email: rmaToDelete.customer_email,
+          customer_phone: rmaToDelete.customer_phone,
+          product_name: rmaToDelete.product_name,
+          product_model: rmaToDelete.product_model,
+          serial_number: rmaToDelete.serial_number,
+          status: rmaToDelete.status,
+          deleted_by: currentUser?.id,
+          deleted_by_email: currentUser?.email || "未知",
+          rma_data: rmaToDelete,
+        });
+      
+      if (logError) throw new Error(`記錄刪除日誌失敗：${logError.message}`);
+
+      // Step 2: Delete related data in order (foreign key constraints)
       const { error: feedbackErr } = await supabase.from("rma_customer_feedback").delete().eq("rma_request_id", rmaToDelete.id);
       if (feedbackErr) throw new Error(`刪除 feedback 失敗：${feedbackErr.message}`);
 
@@ -595,6 +631,9 @@ const AdminRmaList = () => {
       const { error: historyErr } = await supabase.from("rma_status_history").delete().eq("rma_request_id", rmaToDelete.id);
       if (historyErr) throw new Error(`刪除 status_history 失敗：${historyErr.message}`);
 
+      const { error: embeddingsErr } = await supabase.from("rma_embeddings").delete().eq("rma_request_id", rmaToDelete.id);
+      if (embeddingsErr) throw new Error(`刪除 embeddings 失敗：${embeddingsErr.message}`);
+
       const { error: requestsErr } = await supabase.from("rma_requests").delete().eq("id", rmaToDelete.id);
       if (requestsErr) throw new Error(`刪除 RMA 失敗：${requestsErr.message}`);
 
@@ -607,6 +646,26 @@ const AdminRmaList = () => {
       toast.error(error.message || "刪除 RMA 失敗");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleOpenDeletionLogs = async () => {
+    setShowDeletionLogs(true);
+    setIsLoadingLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from("rma_deletion_logs")
+        .select("id, rma_number, customer_name, product_name, product_model, deleted_by_email, deleted_at")
+        .order("deleted_at", { ascending: false })
+        .limit(100);
+      
+      if (error) throw error;
+      setDeletionLogs(data || []);
+    } catch (error) {
+      console.error("Error fetching deletion logs:", error);
+      toast.error("載入刪除日誌失敗");
+    } finally {
+      setIsLoadingLogs(false);
     }
   };
 
@@ -983,6 +1042,15 @@ const AdminRmaList = () => {
               匯入 CSV
             </Link>
 
+            {/* Deletion Logs */}
+            <button
+              onClick={handleOpenDeletionLogs}
+              className="rma-btn-secondary"
+            >
+              <History className="w-4 h-4" />
+              RMA 刪除 LOG
+            </button>
+
             {/* Clear All Data */}
             <button
               onClick={() => setShowClearAllDialog(true)}
@@ -1081,6 +1149,69 @@ const AdminRmaList = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Deletion Logs Dialog */}
+        {showDeletionLogs && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-card rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  RMA 刪除記錄
+                </h2>
+                <button
+                  onClick={() => setShowDeletionLogs(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+                {isLoadingLogs ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    載入中...
+                  </div>
+                ) : deletionLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    目前沒有刪除記錄
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">RMA 編號</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">客戶名稱</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">產品</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">刪除者</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">刪除時間</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deletionLogs.map((log) => (
+                          <tr key={log.id} className="border-b border-border hover:bg-muted/50">
+                            <td className="py-2 px-3 font-mono text-foreground">{log.rma_number}</td>
+                            <td className="py-2 px-3 text-foreground">{log.customer_name}</td>
+                            <td className="py-2 px-3 text-foreground">
+                              {log.product_name}
+                              {log.product_model && <span className="text-muted-foreground"> ({log.product_model})</span>}
+                            </td>
+                            <td className="py-2 px-3 text-muted-foreground">{log.deleted_by_email}</td>
+                            <td className="py-2 px-3 text-muted-foreground">
+                              {format(new Date(log.deleted_at), "yyyy/MM/dd HH:mm", { locale: zhTW })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete Contact Confirmation Dialog */}
         <AlertDialog open={showDeleteContactDialog} onOpenChange={setShowDeleteContactDialog}>
@@ -1210,17 +1341,16 @@ const AdminRmaList = () => {
                           >
                             <Eye className="w-5 h-5" />
                           </button>
-                          {isSuperAdmin && (
-                            <button
-                              onClick={() => {
-                                setRmaToDelete(rma);
-                                setShowDeleteDialog(true);
-                              }}
-                              className="text-destructive hover:text-destructive/80 transition-colors"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => {
+                              setRmaToDelete(rma);
+                              setShowDeleteDialog(true);
+                            }}
+                            className="text-destructive hover:text-destructive/80 transition-colors"
+                            title="刪除此 RMA"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
                         </div>
                       </td>
                     </tr>
