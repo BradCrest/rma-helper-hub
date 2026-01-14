@@ -1052,59 +1052,63 @@ const AdminRmaList = () => {
               RMA 刪除 LOG
             </button>
 
-            {/* Clear All Data */}
-            <button
-              onClick={() => setShowClearAllDialog(true)}
-              className="rma-btn-secondary text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-              disabled={isLoading || totalCount === 0}
-            >
-              <Trash2 className="w-4 h-4" />
-              清除所有資料
-            </button>
+            {/* Clear All Data - Super Admin Only */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => setShowClearAllDialog(true)}
+                className="rma-btn-secondary text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                disabled={isLoading || totalCount === 0}
+              >
+                <Trash2 className="w-4 h-4" />
+                清除所有資料
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Clear All Data Confirmation Dialog */}
-        <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                <AlertTriangle className="w-5 h-5" />
-                確認清除所有資料
-              </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2">
-                <p>此操作將會：</p>
-                <ol className="list-decimal list-inside space-y-1 text-sm">
-                  <li><strong>先匯出</strong>所有 RMA 資料為 CSV 備份檔</li>
-                  <li><strong>再刪除</strong>資料庫中所有 RMA 相關資料</li>
-                </ol>
-                <p className="text-red-600 font-medium mt-4">
-                  ⚠️ 刪除後資料將無法復原，請確認已下載備份檔案！
-                </p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isClearingAll}>取消</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleClearAllData}
-                disabled={isClearingAll}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isClearingAll ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    處理中...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    匯出並清除
-                  </>
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Clear All Data Confirmation Dialog - Super Admin Only */}
+        {isSuperAdmin && (
+          <AlertDialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                  <AlertTriangle className="w-5 h-5" />
+                  確認清除所有資料
+                </AlertDialogTitle>
+                <AlertDialogDescription className="space-y-2">
+                  <p>此操作將會：</p>
+                  <ol className="list-decimal list-inside space-y-1 text-sm">
+                    <li><strong>先匯出</strong>所有 RMA 資料為 CSV 備份檔</li>
+                    <li><strong>再刪除</strong>資料庫中所有 RMA 相關資料</li>
+                  </ol>
+                  <p className="text-red-600 font-medium mt-4">
+                    ⚠️ 刪除後資料將無法復原，請確認已下載備份檔案！
+                  </p>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isClearingAll}>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearAllData}
+                  disabled={isClearingAll}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isClearingAll ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      處理中...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      匯出並清除
+                    </>
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         {/* Delete Single RMA Confirmation Dialog (Super Admin only) */}
         <AlertDialog 
