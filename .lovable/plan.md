@@ -1,65 +1,71 @@
 
 
-## 在首頁 Hero 區域右側新增收件地址資訊框
+## 首頁載入時顯示通知彈窗
 
-### 分析
+### 修改檔案：`src/pages/Index.tsx`
 
-從截圖可以看到，Hero 區域右側有一個帶邊框的空白區塊，需要在此放置收件地址資訊。
+在首頁元件中加入一個 `AlertDialog`，預設為開啟狀態（`defaultOpen`），顯示醒目的通知訊息，只有一個「確定」按鈕可關閉。
 
-### 修改內容
+### 具體實作
 
-**檔案：`src/pages/Index.tsx`（第 14-28 行）**
-
-將 Hero Section 的內容改為左右兩欄佈局：
-
-- **左欄**：保留現有的 Logo、標題、TabNavigation
-- **右欄**：新增帶邊框的地址資訊框，內容包含：
-  - 提醒文字：「為避免影響您的保修時程，請將產品正確寄至以下地址。」
-  - 中文地址：「本公司收件地址如下：242039 新北市新莊區化成路11巷86號1樓」
-  - 英文地址：「No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039」
+1. 引入 `AlertDialog` 相關元件和 `useState`
+2. 使用 `useState` 控制彈窗開關，初始值為 `true`
+3. 彈窗內容以醒目樣式（黃色/橘色警示背景 + 大字）呈現中英文通知
+4. 只有一個「確定」按鈕，點擊後關閉彈窗
 
 ```tsx
-<section className="py-8 md:py-12 border-b border-border bg-card">
-  <div className="container mx-auto px-4">
-    <div className="flex flex-col md:flex-row gap-8 items-start">
-      {/* 左欄 - 現有內容 */}
-      <div className="flex-1">
-        <div className="mb-4">
-          <img src={logo} alt="CREST Logo" className="h-12 md:h-16 w-auto" />
-        </div>
-        <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
-          CREST 產品申請報修系統
-        </h2>
-        <TabNavigation />
-      </div>
+// 新增 imports
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
-      {/* 右欄 - 收件地址資訊 */}
-      <div className="w-full md:w-[420px] border-2 border-foreground rounded-lg p-6">
-        <p className="text-sm text-foreground mb-4">
-          為避免影響您的保修時程，請將產品正確寄至以下地址。
-        </p>
-        <div className="space-y-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">本公司收件地址如下：</p>
-            <p className="text-sm text-foreground">
-              242039 新北市新莊區化成路11巷86號1樓
+// 在 Index 元件內
+const [showNotice, setShowNotice] = useState(true);
+
+// JSX 中加入
+<AlertDialog open={showNotice} onOpenChange={setShowNotice}>
+  <AlertDialogContent className="max-w-md">
+    <AlertDialogHeader>
+      <div className="flex justify-center mb-4">
+        <AlertTriangle className="h-12 w-12 text-amber-500" />
+      </div>
+      <AlertDialogTitle className="text-center text-xl">
+        重要通知 / Important Notice
+      </AlertDialogTitle>
+      <AlertDialogDescription asChild>
+        <div className="mt-4 space-y-4">
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+            <p className="text-base text-amber-900 font-medium">
+              因應相關資源及人力安排因素，目前暫不支援親送遞交維修件，敬請安排寄送，以免影響後續維修進度，謝謝您。
             </p>
           </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">英文地址：</p>
-            <p className="text-sm text-muted-foreground">
-              No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+            <p className="text-base text-blue-900 font-medium">
+              Due to manpower constraints, we are currently unable to accept in-person deliveries. Please arrange shipment via courier service instead. Thank you.
             </p>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter className="mt-4 sm:justify-center">
+      <AlertDialogAction className="px-8">確定</AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 ```
 
 ### 預期結果
 
-- 桌面版：左側顯示 Logo/標題/導航，右側顯示帶黑色邊框的地址框（與截圖一致）
-- 手機版：兩欄垂直堆疊，地址框顯示在導航按鈕下方
+- 使用者進入首頁時立即看到醒目的通知彈窗
+- 中文訊息以琥珀色底色呈現，英文訊息以藍色底色呈現
+- 頂部有三角警示圖示增加醒目度
+- 點擊「確定」按鈕後關閉彈窗，正常使用首頁
 
