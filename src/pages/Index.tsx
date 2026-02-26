@@ -1,12 +1,55 @@
+import { useState } from "react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import TabNavigation from "@/components/rma/TabNavigation";
 import RmaForm from "@/components/rma/RmaForm";
 import logo from "@/assets/logo.png";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
 const Index = () => {
+  const [showNotice, setShowNotice] = useState(true);
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <AlertDialog open={showNotice} onOpenChange={setShowNotice}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex justify-center mb-4">
+              <AlertTriangle className="h-12 w-12 text-amber-500" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              重要通知 / Important Notice
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="mt-4 space-y-4">
+                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+                  <p className="text-base text-amber-900 font-medium">
+                    因應相關資源及人力安排因素，目前暫不支援親送遞交維修件，敬請安排寄送，以免影響後續維修進度，謝謝您。
+                  </p>
+                </div>
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                  <p className="text-base text-blue-900 font-medium">
+                    Due to manpower constraints, we are currently unable to accept in-person deliveries. Please arrange shipment via courier service instead. Thank you.
+                  </p>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4 sm:justify-center">
+            <AlertDialogAction className="px-8">確定</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Header />
 
       <main className="flex-1">
