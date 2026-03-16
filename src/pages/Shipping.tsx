@@ -409,7 +409,7 @@ const Shipping = () => {
                     <h3 className="font-semibold text-foreground mb-2">後續步驟</h3>
                     <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                       <li>請將產品妥善包裝，附上此 RMA 編號</li>
-                      <li>寄送至指定維修中心地址，地址如下：新北市三重區重新路五段609巷16號6樓之14</li>
+                      <li>寄送至本公司收件地址：242039 新北市新莊區化成路11巷86號1樓（英文地址：No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039）</li>
                       <li>我們收到產品後會盡快處理並更新狀態</li>
                       <li>您可以隨時使用 RMA 編號查詢維修進度</li>
                       <li>因人力因素及維修中心無對外開放，無法支援親送，敬請見諒。</li>
