@@ -157,7 +157,7 @@ const Admin = () => {
           {/* Title */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              RMA 管理系統
+              CREST Product Warranty Service Application System
             </h1>
             <p className="text-muted-foreground">
               {isSignUp ? "建立管理員帳號" : "請輸入您的管理員帳號密碼"}

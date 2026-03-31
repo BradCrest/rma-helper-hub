@@ -63,7 +63,7 @@ const Index = () => {
                   <img src={logo} alt="CREST Logo" className="h-12 md:h-16 w-auto" />
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
-                  CREST 產品申請報修系統
+                  CREST 產品申請保固服務系統
                 </h2>
                 <TabNavigation />
               </div>
