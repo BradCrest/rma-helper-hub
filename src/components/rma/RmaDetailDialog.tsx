@@ -199,7 +199,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       <body>
         <div class="container">
           <div class="header">
-            <div class="logo-text">RMA 維修服務申請單</div>
+            <div class="logo-text">RMA 保固服務申請單</div>
             <div class="rma-number">${data.rma_number}</div>
             <div class="meta">
               申請時間：${formatDate(data.created_at)} ｜ 狀態：<span class="status-badge">${getStatusLabel(data.status)}</span>
