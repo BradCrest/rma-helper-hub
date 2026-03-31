@@ -420,7 +420,7 @@ const RmaForm = () => {
         <div className="mb-6">
           <h2 className="text-xl font-bold text-foreground">建立新的 RMA</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            請填寫以下資訊以建立維修申請
+            請填寫以下資訊以申請保固
           </p>
         </div>
 
