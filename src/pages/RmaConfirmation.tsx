@@ -223,7 +223,7 @@ const RmaConfirmation = () => {
               RMA 申請已成功提交
             </h1>
             <p className="text-muted-foreground">
-              請保留此頁面資訊以便查詢維修進度
+              請保留此頁面資訊以便查詢保固服務進度
             </p>
           </div>
 
