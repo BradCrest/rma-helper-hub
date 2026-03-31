@@ -334,7 +334,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
-        <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+        <p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p>
         <p>如有任何問題，請聯繫客服中心。</p>
       </div>
     </div>
