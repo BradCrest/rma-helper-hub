@@ -265,10 +265,10 @@ const Track = () => {
                 {/* Title */}
                 <div className="text-center mb-8">
                   <h1 className="text-2xl font-bold text-foreground mb-2">
-                    查詢維修進度狀態
+                    查詢保固服務進度狀態
                   </h1>
                   <p className="text-muted-foreground">
-                    請輸入您的相關資訊，查看您的維修進度
+                    請輸入您的相關資訊，查看您的保固服務進度
                   </p>
                 </div>
 

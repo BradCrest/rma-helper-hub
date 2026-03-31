@@ -150,7 +150,7 @@ const RmaMultiConfirmation = () => {
     return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 維修申請單 (${index + 1}/${total})</div>
+        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;"><div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 保固服務申請單 (${index + 1}/${total})</div></div>
         <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${data.rma_number}</div>
       </div>
       
@@ -190,7 +190,7 @@ const RmaMultiConfirmation = () => {
       ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
-        <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+        <p><p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p></p>
       </div>
     </div>
   `;

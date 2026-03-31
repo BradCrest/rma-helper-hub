@@ -199,7 +199,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       <body>
         <div class="container">
           <div class="header">
-            <div class="logo-text">RMA 維修服務申請單</div>
+            <div class="logo-text">RMA 保固服務申請單</div>
             <div class="rma-number">${data.rma_number}</div>
             <div class="meta">
               申請時間：${formatDate(data.created_at)} ｜ 狀態：<span class="status-badge">${getStatusLabel(data.status)}</span>
@@ -275,7 +275,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
           ` : ""}
 
           <div class="footer">
-            <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+            <p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p>
             <p>如有任何問題，請聯繫客服中心。</p>
           </div>
         </div>
@@ -294,7 +294,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 維修服務申請單</div>
+        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 保固服務申請單</div>
         <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${data.rma_number}</div>
       </div>
       
@@ -334,7 +334,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
-        <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+        <p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p>
         <p>如有任何問題，請聯繫客服中心。</p>
       </div>
     </div>

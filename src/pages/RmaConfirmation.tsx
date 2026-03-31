@@ -208,7 +208,7 @@ const RmaConfirmation = () => {
             onClick={() => navigate(`/track?rma=${rmaData.rma_number}`)}
             className="rma-btn-secondary flex items-center gap-2"
           >
-            查詢維修狀態
+            查詢保固服務狀態
           </button>
         </div>
 
@@ -223,7 +223,7 @@ const RmaConfirmation = () => {
               RMA 申請已成功提交
             </h1>
             <p className="text-muted-foreground">
-              請保留此頁面資訊以便查詢維修進度
+              請保留此頁面資訊以便查詢保固服務進度
             </p>
           </div>
 
@@ -340,8 +340,8 @@ const RmaConfirmation = () => {
               <li>請將產品妥善包裝，附上此 RMA 編號</li>
               <li>寄送至本公司收件地址：242039 新北市新莊區化成路11巷86號1樓（英文地址：No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039）</li>
               <li>我們收到產品後會盡快處理並更新狀態</li>
-              <li>您可以隨時使用 RMA 編號查詢維修進度</li>
-              <li>因人力因素及維修中心無對外開放，無法支援親送，敬請見諒。</li>
+              <li>您可以隨時使用 RMA 編號查詢保固服務進度</li>
+              <li>因人力因素及保固服務中心無對外開放，無法支援親送，敬請見諒。</li>
             </ol>
           </div>
         </div>

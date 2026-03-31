@@ -33,7 +33,7 @@ const Index = () => {
               <div className="mt-4 space-y-4">
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
                   <p className="text-base text-amber-900 font-medium">
-                    因應相關資源及人力安排因素，目前暫不支援親送遞交維修件，敬請安排寄送，以免影響後續維修進度，謝謝您。
+                    因應相關資源及人力安排因素，目前暫不支援親送遞交保固服務件，敬請安排寄送，以免影響後續保固服務進度，謝謝您。
                   </p>
                 </div>
                 <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
@@ -97,7 +97,7 @@ const Index = () => {
           <div className="container mx-auto px-4">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-foreground mb-2">
-                產品維修登記
+                產品保固服務登記
               </h3>
               <p className="text-muted-foreground">
                 請填寫以下資料送出您的RMA申請
