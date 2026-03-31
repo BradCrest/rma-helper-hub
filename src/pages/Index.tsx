@@ -97,7 +97,7 @@ const Index = () => {
           <div className="container mx-auto px-4">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-foreground mb-2">
-                產品維修登記
+                產品保固服務登記
               </h3>
               <p className="text-muted-foreground">
                 請填寫以下資料送出您的RMA申請

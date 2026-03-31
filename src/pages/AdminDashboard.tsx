@@ -129,7 +129,7 @@ const AdminDashboard = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">後勤管理</h3>
-                <p className="text-sm text-muted-foreground">收件處理、客戶聯繫、維修追蹤</p>
+                <p className="text-sm text-muted-foreground"><p className="text-sm text-muted-foreground">收件處理、客戶聯繫、保固服務追蹤</p></p>
               </div>
             </div>
           </Link>
