@@ -208,7 +208,7 @@ const RmaConfirmation = () => {
             onClick={() => navigate(`/track?rma=${rmaData.rma_number}`)}
             className="rma-btn-secondary flex items-center gap-2"
           >
-            查詢維修狀態
+            查詢保固服務狀態
           </button>
         </div>
 
