@@ -275,7 +275,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
           ` : ""}
 
           <div class="footer">
-            <p>此文件為 RMA 維修申請確認單，請妥善保存。</p>
+            <p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p>
             <p>如有任何問題，請聯繫客服中心。</p>
           </div>
         </div>
