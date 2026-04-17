@@ -726,6 +726,114 @@ const AdminSettings = () => {
           )}
         </div>
       </main>
+
+      {/* Reset Password Dialog */}
+      <Dialog 
+        open={!!resetPasswordAdmin} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetPasswordAdmin(null);
+            setNewPassword("");
+            setConfirmPassword("");
+            setShowPassword(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" />
+              重設管理員密碼
+            </DialogTitle>
+            <DialogDescription>
+              為 <span className="font-semibold text-foreground">{resetPasswordAdmin?.email}</span> 設定新密碼
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="rma-label">新密碼</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="至少 6 個字元"
+                  className="rma-input pr-10"
+                  disabled={isResettingPassword}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="rma-label">確認新密碼</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="再次輸入新密碼"
+                className="rma-input"
+                disabled={isResettingPassword}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleResetPassword();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                重設密碼後，請立即將新密碼安全地告知該管理員。建議對方登入後自行修改為個人化密碼。
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResetPasswordAdmin(null);
+                setNewPassword("");
+                setConfirmPassword("");
+                setShowPassword(false);
+              }}
+              className="rma-btn-secondary"
+              disabled={isResettingPassword}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={isResettingPassword || !newPassword || !confirmPassword}
+              className="rma-btn-primary disabled:opacity-50"
+            >
+              {isResettingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  重設中...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="w-4 h-4" />
+                  確認重設
+                </>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
