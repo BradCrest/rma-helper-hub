@@ -15,11 +15,15 @@ import {
   X,
   Crown,
   History,
-  Globe
+  Globe,
+  KeyRound,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 interface Admin {
   id: string;
@@ -65,6 +69,11 @@ const AdminSettings = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [resetPasswordAdmin, setResetPasswordAdmin] = useState<Admin | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const fetchAdmins = async () => {
     setIsLoading(true);
@@ -316,6 +325,56 @@ const AdminSettings = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetPasswordAdmin) return;
+
+    if (newPassword.length < 6) {
+      toast.error("密碼至少需要 6 個字元");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("兩次輸入的密碼不一致");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("請先登入");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('reset-admin-password', {
+        body: {
+          target_user_id: resetPasswordAdmin.user_id,
+          new_password: newPassword,
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success(`已重設 ${resetPasswordAdmin.email} 的密碼`);
+      setResetPasswordAdmin(null);
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error("重設密碼失敗：" + (error.message || "請稍後再試"));
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/admin");
@@ -541,19 +600,30 @@ const AdminSettings = () => {
                       </span>
                     )}
                   </div>
-                  {isSuperAdmin && admin.role !== 'super_admin' && (
-                    <button
-                      onClick={() => handleRemoveAdmin(admin)}
-                      disabled={deletingId === admin.id}
-                      className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                      title="移除管理員"
-                    >
-                      {deletingId === admin.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-5 h-5" />
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setResetPasswordAdmin(admin)}
+                        className="text-primary hover:text-primary/80 p-2 rounded-lg hover:bg-primary/10 transition-colors"
+                        title="重設密碼"
+                      >
+                        <KeyRound className="w-5 h-5" />
+                      </button>
+                      {admin.role !== 'super_admin' && (
+                        <button
+                          onClick={() => handleRemoveAdmin(admin)}
+                          disabled={deletingId === admin.id}
+                          className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+                          title="移除管理員"
+                        >
+                          {deletingId === admin.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -656,6 +726,114 @@ const AdminSettings = () => {
           )}
         </div>
       </main>
+
+      {/* Reset Password Dialog */}
+      <Dialog 
+        open={!!resetPasswordAdmin} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetPasswordAdmin(null);
+            setNewPassword("");
+            setConfirmPassword("");
+            setShowPassword(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" />
+              重設管理員密碼
+            </DialogTitle>
+            <DialogDescription>
+              為 <span className="font-semibold text-foreground">{resetPasswordAdmin?.email}</span> 設定新密碼
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="rma-label">新密碼</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="至少 6 個字元"
+                  className="rma-input pr-10"
+                  disabled={isResettingPassword}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="rma-label">確認新密碼</label>
+              <input
+                type={showPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="再次輸入新密碼"
+                className="rma-input"
+                disabled={isResettingPassword}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleResetPassword();
+                  }
+                }}
+              />
+            </div>
+
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                重設密碼後，請立即將新密碼安全地告知該管理員。建議對方登入後自行修改為個人化密碼。
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setResetPasswordAdmin(null);
+                setNewPassword("");
+                setConfirmPassword("");
+                setShowPassword(false);
+              }}
+              className="rma-btn-secondary"
+              disabled={isResettingPassword}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={isResettingPassword || !newPassword || !confirmPassword}
+              className="rma-btn-primary disabled:opacity-50"
+            >
+              {isResettingPassword ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  重設中...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="w-4 h-4" />
+                  確認重設
+                </>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
