@@ -15,7 +15,10 @@ import {
   X,
   Crown,
   History,
-  Globe
+  Globe,
+  KeyRound,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
