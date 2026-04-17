@@ -600,19 +600,30 @@ const AdminSettings = () => {
                       </span>
                     )}
                   </div>
-                  {isSuperAdmin && admin.role !== 'super_admin' && (
-                    <button
-                      onClick={() => handleRemoveAdmin(admin)}
-                      disabled={deletingId === admin.id}
-                      className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                      title="移除管理員"
-                    >
-                      {deletingId === admin.id ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-5 h-5" />
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setResetPasswordAdmin(admin)}
+                        className="text-primary hover:text-primary/80 p-2 rounded-lg hover:bg-primary/10 transition-colors"
+                        title="重設密碼"
+                      >
+                        <KeyRound className="w-5 h-5" />
+                      </button>
+                      {admin.role !== 'super_admin' && (
+                        <button
+                          onClick={() => handleRemoveAdmin(admin)}
+                          disabled={deletingId === admin.id}
+                          className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+                          title="移除管理員"
+                        >
+                          {deletingId === admin.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               ))}
