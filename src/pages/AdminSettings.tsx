@@ -69,6 +69,11 @@ const AdminSettings = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [resetPasswordAdmin, setResetPasswordAdmin] = useState<Admin | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const fetchAdmins = async () => {
     setIsLoading(true);
