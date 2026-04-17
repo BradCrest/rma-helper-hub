@@ -325,6 +325,56 @@ const AdminSettings = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetPasswordAdmin) return;
+
+    if (newPassword.length < 6) {
+      toast.error("密碼至少需要 6 個字元");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("兩次輸入的密碼不一致");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("請先登入");
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('reset-admin-password', {
+        body: {
+          target_user_id: resetPasswordAdmin.user_id,
+          new_password: newPassword,
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast.success(`已重設 ${resetPasswordAdmin.email} 的密碼`);
+      setResetPasswordAdmin(null);
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error("重設密碼失敗：" + (error.message || "請稍後再試"));
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/admin");
