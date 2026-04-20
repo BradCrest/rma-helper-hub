@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import EmailEmbeddingManager from "@/components/admin/EmailEmbeddingManager";
 import EmailKnowledgeChat from "@/components/admin/EmailKnowledgeChat";
+import KnowledgeFileUpload from "@/components/admin/KnowledgeFileUpload";
 
 type SourceType = "faq" | "template" | "email";
 
@@ -182,6 +183,9 @@ const AdminEmailKnowledge = () => {
             連接 Gmail（即將推出）
           </button>
         </div>
+
+        {/* File upload to knowledge base */}
+        <KnowledgeFileUpload onUploaded={fetchSources} />
 
         {/* Embedding & Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

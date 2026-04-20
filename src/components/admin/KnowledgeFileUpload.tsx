@@ -217,7 +217,7 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
               </div>
               <div className="shrink-0">
                 {it.status === "uploading" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                {it.status === "done" && <CheckCircle2 className="w-4 h-4 text-green-600" />}
+                {it.status === "done" && <CheckCircle2 className="w-4 h-4 text-primary" />}
                 {it.status === "error" && <AlertCircle className="w-4 h-4 text-destructive" />}
                 {it.status === "pending" && (
                   <button
