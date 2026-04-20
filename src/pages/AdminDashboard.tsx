@@ -134,6 +134,19 @@ const AdminDashboard = () => {
             </div>
           </Link>
 
+          {/* Email 知識庫 */}
+          <Link to="/admin/email-knowledge" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Mail className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">客戶 Email 知識庫</h3>
+                <p className="text-sm text-muted-foreground">FAQ、客服範本、AI 對話查詢</p>
+              </div>
+            </div>
+          </Link>
+
           {/* 系統設定 */}
           <Link to="/admin/settings" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
             <div className="flex items-center gap-4">
