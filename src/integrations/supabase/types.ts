@@ -84,6 +84,10 @@ export type Database = {
           content: string
           created_at: string
           created_by: string | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          file_type: string | null
           id: string
           metadata: Json
           source_type: string
@@ -94,6 +98,10 @@ export type Database = {
           content: string
           created_at?: string
           created_by?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
           metadata?: Json
           source_type: string
@@ -104,6 +112,10 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
           id?: string
           metadata?: Json
           source_type?: string
