@@ -75,6 +75,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/email-knowledge"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminEmailKnowledge />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
