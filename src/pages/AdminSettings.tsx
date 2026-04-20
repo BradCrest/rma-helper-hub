@@ -419,6 +419,9 @@ const AdminSettings = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* AI Model Settings (super admin only) */}
+        {isSuperAdmin && <AiModelSettings />}
+
         {/* Add Admin Form */}
         <div className="rma-card mb-6">
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
