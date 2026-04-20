@@ -139,14 +139,16 @@ Deno.serve(async (req) => {
     const fileName = file.name;
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
 
-    // Sanitize filename for storage key (Supabase Storage only allows ASCII-safe chars)
+    // Sanitize filename for storage key — Supabase Storage only accepts ASCII-safe chars.
+    // Strip ALL non-ASCII (CJK, etc.) and any unsafe chars; if nothing remains, fall back to "file".
     const baseName = fileName.replace(/\.[^.]+$/, "");
-    const safeBase = baseName
-      .normalize("NFKD")
-      .replace(/[^\w.\-]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "")
-      .slice(0, 80) || "file";
+    const safeBase =
+      baseName
+        .replace(/[^\x20-\x7E]+/g, "")        // remove non-ASCII
+        .replace(/[^a-zA-Z0-9.\-]+/g, "_")    // replace any remaining unsafe char
+        .replace(/_+/g, "_")
+        .replace(/^[._-]+|[._-]+$/g, "")
+        .slice(0, 80) || "file";
     const safeFileName = ext ? `${safeBase}.${ext}` : safeBase;
     const supportedText = ["md", "txt", "eml", "markdown"];
     const supportedDoc = ["pdf"];
