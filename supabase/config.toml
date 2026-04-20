@@ -47,3 +47,6 @@ verify_jwt = true
 
 [functions.update-ai-settings]
 verify_jwt = true
+
+[functions.upload-knowledge-file]
+verify_jwt = true

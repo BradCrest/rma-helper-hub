@@ -6,15 +6,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import EmailEmbeddingManager from "@/components/admin/EmailEmbeddingManager";
 import EmailKnowledgeChat from "@/components/admin/EmailKnowledgeChat";
+import KnowledgeFileUpload from "@/components/admin/KnowledgeFileUpload";
 
-type SourceType = "faq" | "template" | "email";
+type SourceType = "faq" | "template" | "email" | "document";
 
 interface KnowledgeSource {
   id: string;
   source_type: SourceType;
   title: string;
   content: string;
-  metadata: { language?: string; tag?: string; sender?: string };
+  metadata: { language?: string; tag?: string; sender?: string; chunk_index?: number; total_chunks?: number };
+  file_path?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
+  file_size?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,6 +28,7 @@ const SOURCE_LABELS: Record<SourceType, { label: string; icon: any; color: strin
   faq: { label: "FAQ", icon: FileText, color: "text-blue-600" },
   template: { label: "客服範本", icon: MessageSquare, color: "text-purple-600" },
   email: { label: "客戶 Email", icon: Mail, color: "text-orange-600" },
+  document: { label: "文件", icon: FileText, color: "text-emerald-600" },
 };
 
 const AdminEmailKnowledge = () => {
@@ -122,11 +128,28 @@ const AdminEmailKnowledge = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("確定要刪除此知識來源？嵌入向量也會一併刪除。")) return;
+    const target = sources.find((s) => s.id === id);
+    const isFileChunk = !!target?.file_path;
+    const siblings = isFileChunk ? sources.filter((s) => s.file_path === target!.file_path) : [];
+    const confirmMsg = isFileChunk && siblings.length > 1
+      ? `此項目來自檔案「${target!.file_name}」，共有 ${siblings.length} 段。確定要刪除整個檔案（含所有段落與儲存原檔）？`
+      : "確定要刪除此知識來源？嵌入向量也會一併刪除。";
+    if (!confirm(confirmMsg)) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from("email_knowledge_sources").delete().eq("id", id);
-      if (error) throw error;
+      if (isFileChunk && siblings.length > 1) {
+        // Delete all chunks sharing the same file_path + storage file
+        const ids = siblings.map((s) => s.id);
+        const { error } = await supabase.from("email_knowledge_sources").delete().in("id", ids);
+        if (error) throw error;
+        await supabase.storage.from("knowledge-files").remove([target!.file_path!]);
+      } else {
+        const { error } = await supabase.from("email_knowledge_sources").delete().eq("id", id);
+        if (error) throw error;
+        if (target?.file_path) {
+          await supabase.storage.from("knowledge-files").remove([target.file_path]);
+        }
+      }
       toast.success("已刪除");
       fetchSources();
     } catch (e: any) {
@@ -182,6 +205,9 @@ const AdminEmailKnowledge = () => {
             連接 Gmail（即將推出）
           </button>
         </div>
+
+        {/* File upload to knowledge base */}
+        <KnowledgeFileUpload onUploaded={fetchSources} />
 
         {/* Embedding & Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -287,7 +313,7 @@ const AdminEmailKnowledge = () => {
           {/* Filter */}
           <div className="px-4 pt-4 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">篩選：</span>
-            {(["all", "faq", "template", "email"] as const).map((f) => (
+            {(["all", "faq", "template", "email", "document"] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -331,6 +357,13 @@ const AdminEmailKnowledge = () => {
                             {s.metadata?.tag && (
                               <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                                 #{s.metadata.tag}
+                              </span>
+                            )}
+                            {s.file_name && (
+                              <span className="text-xs px-2 py-0.5 bg-muted rounded-full text-muted-foreground truncate max-w-[200px]" title={s.file_name}>
+                                📎 {s.file_name}
+                                {typeof s.metadata?.total_chunks === "number" && s.metadata.total_chunks > 1 &&
+                                  ` · ${(s.metadata.chunk_index ?? 0) + 1}/${s.metadata.total_chunks}`}
                               </span>
                             )}
                           </div>
