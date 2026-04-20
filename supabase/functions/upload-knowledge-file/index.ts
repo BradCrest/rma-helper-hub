@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
 
     // Upload to storage
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${fileName}`;
+    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
     const { error: uploadErr } = await admin.storage
       .from("knowledge-files")
       .upload(storagePath, bytes, {
