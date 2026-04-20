@@ -38,3 +38,12 @@ verify_jwt = false
 
 [functions.update-rma-status]
 verify_jwt = false
+
+[functions.generate-email-embeddings]
+verify_jwt = true
+
+[functions.email-knowledge-chat]
+verify_jwt = true
+
+[functions.update-ai-settings]
+verify_jwt = true
