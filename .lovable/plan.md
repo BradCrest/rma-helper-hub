@@ -1,86 +1,46 @@
 
 
-## 計畫：折衷做法 + 完整第一階段實作
+## 計畫：檔案上傳到知識庫
 
-採用您選擇的方案：在系統設定加上模型切換器，並完成 Email 知識庫核心。
+### 1. Storage Bucket
+新增 **私有 bucket `knowledge-files`**（僅 admin 可讀寫），存放原始檔案。
 
----
+### 2. 資料表調整
+擴充 `email_knowledge_sources`：
+- 新增 `source_type`：`'document'`（文件類）
+- 新增欄位：`file_path` (text, nullable)、`file_name`、`file_type`、`file_size`
+- `metadata` 額外存放：原始檔資訊、頁數、解析狀態
 
-### 1. 資料表新增
+### 3. 長文件自動分段（Chunking）
+產品說明書/MD 通常很長，超過 embedding 8K token 限制。新增邏輯：
+- 上傳後在 Edge Function 中解析 → 按段落切成 ~1500 字的 chunk
+- 每個 chunk 一筆 `email_embeddings`（共用同一個 `source_id`）
+- `email_embeddings.metadata` 記錄 `chunk_index`、`total_chunks`
 
-**`ai_settings`** — 全域 AI 模型設定（單列）
-- `id` (uuid, pk), `setting_key` (text, unique), `setting_value` (jsonb), `updated_at`, `updated_by`
-- 預設記錄：`{ key: 'slack_reply_model', value: 'google/gemini-2.5-pro' }`、`{ key: 'admin_chat_model', value: 'google/gemini-2.5-flash' }`
-- RLS：admin 讀、super_admin 改
+### 4. 新 Edge Function：`upload-knowledge-file`
+- 接收上傳的檔案 → 存到 storage `knowledge-files/{userId}/{uuid}-{filename}`
+- 依副檔名解析：
+  - **`.md` / `.txt` / `.eml`**：直接讀文字
+  - **`.pdf` / `.docx`**：用 [Mistral OCR](https://docs.mistral.ai/) 或 LlamaParse 透過 fetch 解析（或先支援純文字 + MD，PDF/DOCX 列為「即將支援」）
+- 切段 → 為每段建立 `email_knowledge_sources` + 觸發器自動排入 `pending`
+- 回傳處理結果
 
-**`email_knowledge_sources`** — 手動上傳的 FAQ / 客服範本 / 客戶 Email
-- `id`, `source_type` ('faq' | 'template' | 'email'), `title`, `content`, `metadata` (jsonb：寄件者、語言、tag), `created_by`, `created_at`, `updated_at`
-- RLS：僅 admin 可讀寫
+### 5. 修改 `generate-email-embeddings`
+維持不變（已支援批次處理 pending），上傳完按一次「立即生成」即可索引所有新 chunk。
 
-**`email_embeddings`** — pgvector 嵌入（沿用 RMA 嵌入架構）
-- `id`, `source_id` (fk → email_knowledge_sources), `content`, `embedding` (vector(1536)), `status` ('pending' | 'completed' | 'failed'), `metadata`, `created_at`, `updated_at`
-- HNSW index on embedding
-- 觸發器：`email_knowledge_sources` insert/update → 自動建立或標記 `pending`
-- RPC：`search_email_embeddings(query_embedding, match_threshold, match_count)`
+### 6. 前端：在 `AdminEmailKnowledge.tsx` 的「Gmail 自動同步」卡片下方新增上傳區
+- 拖放/點選上傳區（支援 `.md`、`.txt`、`.eml`、`.pdf`、`.docx`，單檔 ≤ 10MB）
+- 可一次選多個檔案
+- 上傳進度條 + 解析狀態
+- 上傳完成後自動 refresh 列表 + embedding 狀態
 
----
+### 7. 列表 UI 強化
+- 已上傳的檔案在列表中顯示：📎 圖示 + 檔名 + chunk 數量
+- 點擊可下載原始檔（用 signed URL）
+- 刪除時連同 storage 檔案、所有 chunks、embeddings 一併刪除
 
-### 2. Edge Functions
-
-| Function | 用途 | verify_jwt |
-|---|---|---|
-| `generate-email-embeddings` | 批次處理 pending 的 email_embeddings（OpenAI text-embedding-3-small） | true |
-| `email-knowledge-chat` | 後台 AI 對話框（streaming，使用 admin_chat_model 設定） | true |
-| `update-ai-settings` | super_admin 修改 ai_settings | true |
-
----
-
-### 3. 前端
-
-**新頁面 `/admin/email-knowledge`**
-- 上傳區：選擇類型（FAQ / 客服範本 / 客戶 Email）+ 標題 + 內容（textarea）+ 語言 tag
-- 列表：所有知識來源，可編輯、刪除
-- `EmailEmbeddingManager`：類似現有 `EmbeddingManager`，顯示 pending/completed 數量、批次生成按鈕
-- `EmailKnowledgeChat`：streaming AI 對話，從 email_embeddings RAG 取上下文
-
-**`AdminDashboard.tsx`**：新增「📧 客戶 Email 知識庫」卡片連到 `/admin/email-knowledge`
-
-**`AdminSettings.tsx`**：新增「AI 模型設定」區塊（僅 super_admin 可見）
-- Slack 客服回覆模型：下拉選單（Gemini 2.5 Pro / GPT-5 / GPT-5.2），預設 Gemini 2.5 Pro
-- 後台對話框模型：下拉選單（Gemini 2.5 Flash / Gemini 2.5 Pro / GPT-5 Mini），預設 Gemini 2.5 Flash
-- 儲存按鈕呼叫 `update-ai-settings`
-
-**`App.tsx`**：新增 `/admin/email-knowledge` 路由（ProtectedRoute requireAdmin）
-
----
-
-### 4. 第一階段範圍 vs 預留
-
-✅ **本次完成**
-- 所有資料表 + RLS + 觸發器 + RPC
-- 模型設定 UI（Settings 頁面）
-- Email 知識庫頁面（手動上傳 + 嵌入 + AI 對話框）
-- 三個 Edge Function
-
-⏸ **預留到第二階段**（需您之後提供 Google OAuth 與 Slack App 憑證）
-- Gmail OAuth 同步（在頁面上保留「連接 Gmail（即將推出）」按鈕）
-- Slack 私訊 Bot（Slack App 建立後再實作 `slack-events` function）
-
----
-
-### 5. 技術摘要
-
-| 項目 | 值 |
-|---|---|
-| 嵌入模型 | OpenAI `text-embedding-3-small` (1536 維) |
-| 後台對話預設模型 | `google/gemini-2.5-flash`（可切換） |
-| Slack 回覆預設模型 | `google/gemini-2.5-pro`（可切換到 GPT-5 / GPT-5.2） |
-| RAG 架構 | pgvector + HNSW（沿用 RMA 架構） |
-| 不需要額外 API key | LOVABLE_API_KEY、OPENAI_API_KEY 都已設定 |
-
-實作完成後，您即可：
-1. 在 `/admin/settings` 切換 AI 模型
-2. 在 `/admin/email-knowledge` 上傳 FAQ、客服回覆範本、過往客戶 Email
-3. 用 AI 對話框查詢「上次 X 客戶問 Y 我們怎麼回？」
-4. 等第二階段完成後，Slack 私訊就能自動套用設定的模型生成回覆
+### 範圍說明
+✅ 本次完成：MD/TXT/EML 全文上傳 + 自動切段 + 索引  
+🟡 PDF/DOCX：先放上傳 UI 並接受檔案，解析改用 Lovable AI Gemini 視覺模型讀取（不需額外 API key）— 第一階段先支援單頁 PDF、DOCX 用簡易文字抽取  
+⏸ 大型 PDF（>50 頁）多模態 OCR 留待第二階段
 
