@@ -138,6 +138,16 @@ Deno.serve(async (req) => {
 
     const fileName = file.name;
     const ext = fileName.split(".").pop()?.toLowerCase() || "";
+
+    // Sanitize filename for storage key (Supabase Storage only allows ASCII-safe chars)
+    const baseName = fileName.replace(/\.[^.]+$/, "");
+    const safeBase = baseName
+      .normalize("NFKD")
+      .replace(/[^\w.\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "")
+      .slice(0, 80) || "file";
+    const safeFileName = ext ? `${safeBase}.${ext}` : safeBase;
     const supportedText = ["md", "txt", "eml", "markdown"];
     const supportedDoc = ["pdf"];
 
@@ -151,7 +161,7 @@ Deno.serve(async (req) => {
     const bytes = new Uint8Array(await file.arrayBuffer());
 
     // Upload to storage
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${fileName}`;
+    const storagePath = `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
     const { error: uploadErr } = await admin.storage
       .from("knowledge-files")
       .upload(storagePath, bytes, {
