@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, Package, ClipboardList, Settings, Home } from "lucide-react";
+import { LogOut, Package, ClipboardList, Settings, Home, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -130,6 +130,19 @@ const AdminDashboard = () => {
               <div>
                 <h3 className="font-semibold text-foreground">後勤管理</h3>
                 <p className="text-sm text-muted-foreground"><p className="text-sm text-muted-foreground">收件處理、客戶聯繫、保固服務追蹤</p></p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Email 知識庫 */}
+          <Link to="/admin/email-knowledge" className="rma-card hover:shadow-lg transition-shadow cursor-pointer">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Mail className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">客戶 Email 知識庫</h3>
+                <p className="text-sm text-muted-foreground">FAQ、客服範本、AI 對話查詢</p>
               </div>
             </div>
           </Link>
