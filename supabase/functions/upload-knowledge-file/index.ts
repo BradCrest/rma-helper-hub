@@ -191,40 +191,36 @@ Deno.serve(async (req) => {
     const chunks = chunkText(textContent);
     const totalChunks = chunks.length;
 
-    // Insert one knowledge_source per chunk (sharing file_path so we can group/cleanup)
-    const inserted: string[] = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const baseTitle = fileName.replace(/\.[^.]+$/, "");
-      const title =
-        totalChunks === 1 ? `📎 ${baseTitle}` : `📎 ${baseTitle} (${i + 1}/${totalChunks})`;
+    // Batch insert all chunks at once (single round-trip, much faster)
+    const baseTitle = fileName.replace(/\.[^.]+$/, "");
+    const rows = chunks.map((chunk, i) => ({
+      source_type: "document",
+      title: totalChunks === 1 ? `📎 ${baseTitle}` : `📎 ${baseTitle} (${i + 1}/${totalChunks})`,
+      content: chunk,
+      file_path: storagePath,
+      file_name: fileName,
+      file_type: ext,
+      file_size: file.size,
+      metadata: {
+        language,
+        tag: tag || undefined,
+        chunk_index: i,
+        total_chunks: totalChunks,
+      },
+      created_by: user.id,
+    }));
 
-      const { data: src, error: srcErr } = await admin
-        .from("email_knowledge_sources")
-        .insert({
-          source_type: "document",
-          title,
-          content: chunk,
-          file_path: storagePath,
-          file_name: fileName,
-          file_type: ext,
-          file_size: file.size,
-          metadata: {
-            language,
-            tag: tag || undefined,
-            chunk_index: i,
-            total_chunks: totalChunks,
-          },
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-      if (srcErr) {
-        console.error("Insert source failed:", srcErr);
-        continue;
-      }
-      inserted.push(src.id);
+    const { data: insertedRows, error: insertErr } = await admin
+      .from("email_knowledge_sources")
+      .insert(rows)
+      .select("id");
+
+    if (insertErr) {
+      console.error("Batch insert failed:", insertErr);
+      await admin.storage.from("knowledge-files").remove([storagePath]);
+      throw new Error("資料庫寫入失敗：" + insertErr.message);
     }
+    const inserted = insertedRows?.map((r) => r.id) ?? [];
 
     return new Response(
       JSON.stringify({
