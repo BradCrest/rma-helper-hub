@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Upload, FileText, Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { Upload, FileText, Loader2, X, CheckCircle2, AlertCircle, RotateCw, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,6 +25,16 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const { pendingCount, errorCount, doneCount } = useMemo(() => {
+    let p = 0, e = 0, d = 0;
+    for (const it of items) {
+      if (it.status === "pending") p++;
+      else if (it.status === "error") e++;
+      else if (it.status === "done") d++;
+    }
+    return { pendingCount: p, errorCount: e, doneCount: d };
+  }, [items]);
+
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const newItems: UploadItem[] = [];
@@ -42,9 +52,17 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const retryFailed = () => {
+    setItems((prev) => prev.map((it) => (it.status === "error" ? { ...it, status: "pending", message: undefined } : it)));
+  };
+
+  const clearFailed = () => setItems((prev) => prev.filter((i) => i.status !== "error"));
+  const clearDone = () => setItems((prev) => prev.filter((i) => i.status !== "done"));
+  const clearAll = () => setItems([]);
+
   const uploadAll = async () => {
-    const pending = items.filter((i) => i.status === "pending");
-    if (pending.length === 0) {
+    const hasPending = items.some((i) => i.status === "pending");
+    if (!hasPending) {
       toast.error("沒有待上傳的檔案");
       return;
     }
@@ -105,11 +123,9 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
     setIsUploading(false);
 
     if (successCount > 0) {
-      toast.success(`成功上傳 ${successCount} 個檔案，共 ${totalChunks} 段內容已加入知識庫`);
-      // Auto-trigger embedding generation
+      toast.success(`已上傳 ${successCount} 個檔案，共 ${totalChunks} 段，已自動送進索引流程（請看右側索引狀態）`);
       try {
         await supabase.functions.invoke("generate-email-embeddings");
-        toast.success("已開始生成嵌入向量");
       } catch (e) {
         console.error("Auto-embed failed", e);
       }
@@ -117,7 +133,24 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
     }
   };
 
-  const clearDone = () => setItems((prev) => prev.filter((i) => i.status !== "done"));
+  const canUpload = !isUploading && pendingCount > 0;
+  const hint = isUploading
+    ? "上傳中..."
+    : pendingCount > 0
+    ? `${pendingCount} 個檔案待上傳`
+    : items.length === 0
+    ? "請先選擇檔案"
+    : errorCount > 0
+    ? `${errorCount} 個失敗，可重試`
+    : "全部檔案已完成";
+
+  const buttonLabel = isUploading
+    ? "上傳中..."
+    : pendingCount > 0
+    ? `開始上傳 (${pendingCount})`
+    : doneCount > 0 && errorCount === 0
+    ? "已完成"
+    : "開始上傳";
 
   return (
     <div className="rma-card p-4 space-y-3">
@@ -215,14 +248,15 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
                   </p>
                 </div>
               </div>
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-1">
                 {it.status === "uploading" && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
                 {it.status === "done" && <CheckCircle2 className="w-4 h-4 text-primary" />}
                 {it.status === "error" && <AlertCircle className="w-4 h-4 text-destructive" />}
-                {it.status === "pending" && (
+                {(it.status === "pending" || it.status === "error") && !isUploading && (
                   <button
                     onClick={() => removeItem(i)}
                     className="p-1 hover:bg-muted rounded text-muted-foreground"
+                    title="移除"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -233,19 +267,44 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2">
-        {items.some((i) => i.status === "done") && (
-          <button onClick={clearDone} className="rma-btn-secondary text-sm" disabled={isUploading}>
+      {/* Status summary */}
+      {items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          {pendingCount > 0 && <span>⏳ 待上傳 {pendingCount}</span>}
+          {doneCount > 0 && <span className="text-primary">✓ 完成 {doneCount}</span>}
+          {errorCount > 0 && <span className="text-destructive">✗ 失敗 {errorCount}</span>}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {errorCount > 0 && !isUploading && (
+          <button onClick={retryFailed} className="rma-btn-secondary text-sm">
+            <RotateCw className="w-4 h-4" /> 重試失敗 ({errorCount})
+          </button>
+        )}
+        {errorCount > 0 && !isUploading && (
+          <button onClick={clearFailed} className="rma-btn-secondary text-sm">
+            清除失敗
+          </button>
+        )}
+        {doneCount > 0 && !isUploading && (
+          <button onClick={clearDone} className="rma-btn-secondary text-sm">
             清除已完成
           </button>
         )}
+        {items.length > 0 && !isUploading && (
+          <button onClick={clearAll} className="rma-btn-secondary text-sm">
+            <Trash className="w-4 h-4" /> 全部清空
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground">{hint}</span>
         <button
           onClick={uploadAll}
-          disabled={isUploading || items.filter((i) => i.status === "pending").length === 0}
-          className="rma-btn-primary text-sm"
+          disabled={!canUpload}
+          className="rma-btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          上傳並建立索引
+          {buttonLabel}
         </button>
       </div>
     </div>
