@@ -359,6 +359,13 @@ const AdminEmailKnowledge = () => {
                                 #{s.metadata.tag}
                               </span>
                             )}
+                            {s.file_name && (
+                              <span className="text-xs px-2 py-0.5 bg-muted rounded-full text-muted-foreground truncate max-w-[200px]" title={s.file_name}>
+                                📎 {s.file_name}
+                                {typeof s.metadata?.total_chunks === "number" && s.metadata.total_chunks > 1 &&
+                                  ` · ${(s.metadata.chunk_index ?? 0) + 1}/${s.metadata.total_chunks}`}
+                              </span>
+                            )}
                           </div>
                           <p className="font-medium text-foreground truncate">{s.title}</p>
                           <p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">
