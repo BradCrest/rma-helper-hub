@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, Package, ClipboardList, Settings, Home } from "lucide-react";
+import { LogOut, Package, ClipboardList, Settings, Home, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
