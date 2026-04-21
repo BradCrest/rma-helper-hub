@@ -1,148 +1,202 @@
 
-### 目前結論
-「待排程續跑」目前幾乎沒有真正作用，原因不是 worker 壞掉，而是「排程」其實還沒綁上。
+### 計畫：修正「只跑一次、不會自動續跑」的背景索引
 
-目前讀到的狀態是：
+### 目前確認到的狀況
+目前不是索引完全壞掉，而是「第一輪會跑，後續接手機制不可靠」。
 
-- `email_embedding_jobs` 最近一次是 `manual`
-- 最後完成時間有更新，代表手動喚醒能跑
-- `email_embeddings` 目前仍有大量待處理：
-  - `pending: 13589`
-  - `processing: 0`
-  - `completed: 5598`
-- `cron.job` 查詢結果是空的
+從現況可看出：
 
-這代表現在的實際行為是：
+- `email_embedding_jobs` 最新狀態是：
+  - `status: idle`
+  - `trigger_source: manual`
+  - `last_processed_count: 60`
+- `email_embeddings` 仍有大量待處理：
+  - `completed: 5758`
+  - `pending: 13429`
+  - `failed: 1`
+- `ai_settings` 顯示排程已啟用
+- `cron.job` 也確實存在 `email-embedding-kickoff-every-minute`
 
+這代表：
 ```text
-手動按鈕 / 上傳 / 編輯
-→ kickoff function
-→ worker 跑一段
-→ job 回到 idle
-→ 因為沒有真正 cron 再喚醒
-→ 剩下的 pending 就停著
+手動喚醒
+→ worker 確實有跑一輪（而且一次跑了 60 筆）
+→ worker 結束後回到 idle
+→ 但真正的後續自動接手沒有穩定發生
 ```
 
-所以 UI 上顯示的「待排程續跑」只是狀態文案，不是代表系統真的已經有背景排程在持續跑。
+### 根本問題
+目前架構有兩個弱點：
+
+1. 背景續跑過度依賴每分鐘 cron  
+   只要 cron 觸發沒有成功打到 function、或打到了但沒有留下明確可見紀錄，整個 queue 就會停在 idle。
+
+2. UI 只看「排程已設定」，不是看「排程最近真的有執行」  
+   所以畫面會讓人以為背景會自動接手，但其實只是設定存在，不代表真的有續跑。
+
+另外，現在排程是用專案專屬 URL / key 建立的，這類資料不應只放在 migration 內當作永久真相來源，否則後續維護與驗證都不夠可靠。
 
 ---
 
-### 要修正的方向
+### 這次會怎麼修
 
-#### 1. 補上真正的背景排程
-建立真正的每分鐘排程，定時呼叫 `kickoff-email-embedding-job`。
-
-排程邏輯會是：
+## 1. 把「續跑」從只靠 cron，改成「worker 自己接力 + cron 保底」
+目前 manual kickoff 跑完一段就停。會改成：
 
 ```text
-pg_cron
-→ net.http_post(...)
-→ kickoff-email-embedding-job
-→ 若 job 沒在跑就啟動 worker
-→ 若 job 已在跑就略過
+手動喚醒 / 上傳 / 編輯
+→ kickoff
+→ worker 處理一輪
+→ 若 hasMore = true
+→ 立即再安排下一輪背景接力
+→ cron 每分鐘只做保底，不再是唯一續跑來源
 ```
 
-這樣即使：
-- 使用者關掉頁面
-- 沒有人手動按按鈕
-- 上一輪 worker 跑完後還有很多 pending
+實作方向：
+- `generate-email-embeddings` 處理完若仍有 `hasMore`
+- 不直接把「剩下的交給運氣」
+- 而是由後端再安全喚醒下一輪
+- 加入單次鏈式續跑上限與 stale protection，避免無限重入
 
-系統仍會在下一分鐘自動接手下一輪。
+這樣按一次「立即喚醒背景索引」後，系統就會持續往下吃 queue，不會只跑一輪。
 
 ---
 
-#### 2. 修正前端文案，避免誤導
-目前 `EmailEmbeddingManager.tsx` 在以下條件就顯示「待排程續跑」：
+## 2. 強化 `kickoff-email-embedding-job` 的狀態機
+目前 `kickoff` 只負責：
+- 看 job 有沒有 running
+- 沒有就啟動一次 worker
 
-- `pending > 0` 或 `processing > 0`
-- 但 `job.status` 不是 `running`
+會改成更完整的 dispatcher：
 
-這會讓人以為真的有 scheduler。
+- 明確區分：
+  - `manual`
+  - `upload`
+  - `update`
+  - `cron`
+  - `chain`
+- 若 worker 回傳 `hasMore: true`
+  - 將 job 標成「仍需續跑」
+  - 交由後端立即鏈式再喚醒，而不是只顯示文案
+- 若 job 已在跑
+  - 正常略過，不重複啟動第二個 worker
+- 若 heartbeat stale
+  - 安全接管並恢復續跑
 
-會改成更誠實的狀態判斷，例如：
+---
 
-- 有排程且待處理：`等待背景排程接手`
-- 沒排程但有待處理：`尚有待處理項目，目前未啟用自動排程`
-- 正在跑：`背景索引執行中`
+## 3. 補上「排程真的有沒有在跑」的健康資訊
+目前畫面只知道：
+- 排程設定有沒有存在
+
+但真正需要的是：
+- 最近一次 cron 何時觸發
+- 最近一次 cron 是否成功喚醒 worker
+- 現在是靠 manual 在跑，還是 cron 在保底
+
+會新增/補強監控資訊，例如：
+- `last_scheduler_ping_at`
+- `last_scheduler_result`
+- `last_trigger_source`
+- `next_action_hint`
+
+讓前端能顯示真正狀態，例如：
+
+- 背景索引執行中
+- 仍有待處理，系統正在自動接力
+- 排程已啟用，但最近未成功接手
+- 尚有待處理項目，需要重新喚醒
+
+---
+
+## 4. 修正 `EmailEmbeddingManager` 的文案與判斷邏輯
+目前「待排程續跑」這句太樂觀。
+
+會改成依據真實狀態顯示：
+- 有 pending，且最近 scheduler/chain 有活動：`背景索引會持續自動處理`
+- 有 pending，但長時間沒有任何 scheduler/chain heartbeat：`尚有待處理項目，自動續跑異常`
+- 只有 manual 跑過一次、沒有後續：`已完成目前批次，但後續自動接手未生效`
 - 全部完成：`所有知識來源已完成索引`
 
-也會把是否已啟用排程顯示在卡片裡。
+也會把：
+- 最近手動啟動時間
+- 最近排程接手時間
+- 最近鏈式續跑時間
+分開顯示，避免誤判。
 
 ---
 
-#### 3. 加入排程存在檢查
-在 `src/lib/email-embedding-job.ts` 與監控 UI 補一個「排程是否存在」的狀態來源。
+## 5. 重做排程建立方式，避免把專案 key 寫死在 migration
+目前排程 SQL 是把 function URL 與 bearer token 寫進 migration。這有兩個問題：
 
-做法可選其一：
+- 這是專案專屬值，不適合當通用 migration 長期保存
+- 後續排程是否仍有效，不容易重新校正
 
-- 由後端新增一個簡單狀態查詢 function 回傳 scheduler 狀態
-- 或把 scheduler 狀態寫入 `email_embedding_jobs` / `ai_settings`
-- 或在建立排程後固定寫入 `email_embedding_jobs.trigger_source` 的系統欄位外加顯示最近 cron 啟動時間
+會改成：
+- 保留 schema migration 只做結構變更
+- 專案專屬的 cron 綁定改成專案層級設定流程
+- 同時把 scheduler metadata 與實際 cron job 對齊更新
 
-目標是讓 UI 不只知道 job 狀態，也知道：
-- 背景排程是否已配置
-- 最近一次 cron 是否真的有喚醒成功
-
----
-
-#### 4. 保留現有手動/上傳喚醒
-目前以下入口仍然有價值，會保留：
-
-- 上傳檔案後自動 kickoff
-- 新增/編輯知識來源後自動 kickoff
-- 手動按「立即喚醒背景索引」
-
-它們會和 cron 並存：
-
-```text
-即時事件先喚醒
-+
-cron 每分鐘保底續跑
-```
-
-這樣新資料不必等太久，而大 backlog 也能自動慢慢消化。
+這樣之後若要重建排程、更新 key、驗證 job 是否存在，都更穩定。
 
 ---
 
-#### 5. 驗證流程
-完成後會確認這幾件事：
+## 6. 補上可觀測性，方便之後直接看出卡在哪
+會在背景流程中補更清楚的診斷紀錄：
 
-1. `cron.job` 裡真的出現排程
-2. 不開頁面時，`last_started_at / last_heartbeat_at / last_finished_at` 仍會持續更新
-3. `pending` 會隨時間下降
-4. UI 顯示不再誤導
-5. 若 job 已在跑，cron 不會重複啟動第二個 worker
+- worker 啟動來源
+- 每輪 processed / failed / remainingPending
+- 是否還有 hasMore
+- 是否成功安排下一輪接力
+- scheduler 最近一次是否成功呼叫 kickoff
+
+這樣下次若還有「只跑一次」問題，就能直接分辨是：
+- cron 沒打到
+- kickoff 沒接力
+- worker 回傳 hasMore 但沒續跑
+- queue 卡在 processing
+- 外部 embedding API 造成中斷
 
 ---
 
 ### 會修改的內容
+前端：
 - `src/components/admin/EmailEmbeddingManager.tsx`
 - `src/lib/email-embedding-job.ts`
-- 可能補一個狀態查詢用的 backend function 或共用狀態欄位
-- 後端排程設定：建立真正的 cron 呼叫 `kickoff-email-embedding-job`
 
----
+後端函式：
+- `supabase/functions/kickoff-email-embedding-job/index.ts`
+- `supabase/functions/generate-email-embeddings/index.ts`
 
-### 技術細節
-- 目前不是 worker 沒作用，而是缺少「下一輪誰來喚醒它」
-- `generate-email-embeddings` 本身已具備批次與續跑基礎，但目前續跑依賴外部再次觸發
-- 真正缺的是 scheduler，不是 embedding 邏輯
-- `pg_cron` 與 `pg_net` 已安裝，但尚未建立 `cron.schedule(...)`
-- 因為排程建立屬於專案特定 URL / key 設定，不應只停留在 migration；要實際建立 job
+後端設定：
+- 調整排程建立方式與 scheduler 狀態同步
+- 補 scheduler/chain 的健康狀態寫入來源
+
+必要時也會補一個小型狀態查詢入口，讓前端能看到「排程存在」以外的真實執行情況。
 
 ---
 
 ### 預期結果
-完成後流程會變成：
+完成後會變成：
 
 ```text
-上傳 / 編輯 / 手動喚醒
-→ kickoff 一次
-
-若還有 pending
-→ cron 每分鐘自動再喚醒一次
-→ worker 持續分批處理
-→ 直到 pending 清空
-
-前端只顯示真實狀態
+按一次「立即喚醒背景索引」
+→ worker 跑第一輪
+→ 若還有 pending
+→ 後端自動接力下一輪
+→ cron 每分鐘保底補位
+→ 就算使用者離開頁面，仍會持續往下處理
 ```
+
+UI 也會改成顯示真實狀態，而不是只有「看起來有排程」。
+
+---
+
+### 技術摘要
+- 目前問題不是第一輪沒跑，而是「跑完後沒有可靠的第二輪接手者」
+- 真正要補的是：
+  - 後端鏈式續跑
+  - cron 保底而非唯一依賴
+  - scheduler 健康狀態可視化
+  - 專案專屬 cron 綁定方式修正
+- 這樣才能讓「立即喚醒背景索引」變成真正會持續處理 backlog 的入口
