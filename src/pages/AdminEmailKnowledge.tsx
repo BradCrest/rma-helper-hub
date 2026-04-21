@@ -38,7 +38,6 @@ const AdminEmailKnowledge = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<SourceType | "all">("all");
 
-  // form state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formType, setFormType] = useState<SourceType>("faq");
@@ -49,6 +48,10 @@ const AdminEmailKnowledge = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [embeddingAutoStartSignal, setEmbeddingAutoStartSignal] = useState(0);
+
+  const triggerEmbeddingRefresh = () => {
+    setEmbeddingAutoStartSignal((value) => value + 1);
+  };
 
   const fetchSources = async () => {
     setIsLoading(true);
@@ -112,14 +115,15 @@ const AdminEmailKnowledge = () => {
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
-        toast.success("已更新知識來源");
+        toast.success("已更新知識來源，系統將自動續跑索引");
       } else {
         const { error } = await supabase.from("email_knowledge_sources").insert(payload);
         if (error) throw error;
-        toast.success("已新增知識來源");
+        toast.success("已新增知識來源，系統正在自動建立索引");
       }
       resetForm();
-      fetchSources();
+      await fetchSources();
+      triggerEmbeddingRefresh();
     } catch (e: any) {
       console.error(e);
       toast.error("儲存失敗：" + (e.message || "請稍後再試"));
@@ -139,7 +143,6 @@ const AdminEmailKnowledge = () => {
     setDeletingId(id);
     try {
       if (isFileChunk && siblings.length > 1) {
-        // Delete all chunks sharing the same file_path + storage file
         const ids = siblings.map((s) => s.id);
         const { error } = await supabase.from("email_knowledge_sources").delete().in("id", ids);
         if (error) throw error;
@@ -193,7 +196,6 @@ const AdminEmailKnowledge = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Gmail integration placeholder */}
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-3">
             <Mail className="w-5 h-5 text-muted-foreground" />
@@ -207,21 +209,18 @@ const AdminEmailKnowledge = () => {
           </button>
         </div>
 
-        {/* File upload to knowledge base */}
         <KnowledgeFileUpload
           onUploaded={async () => {
             await fetchSources();
-            setEmbeddingAutoStartSignal((value) => value + 1);
+            triggerEmbeddingRefresh();
           }}
         />
 
-        {/* Embedding & Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <EmailEmbeddingManager autoStartSignal={embeddingAutoStartSignal} />
           <EmailKnowledgeChat />
         </div>
 
-        {/* Add / Edit Form */}
         <div className="rma-card">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">知識來源管理</h2>
@@ -294,7 +293,8 @@ const AdminEmailKnowledge = () => {
                   onChange={(e) => setFormContent(e.target.value)}
                   placeholder={
                     formType === "faq"
-                      ? "Q: 客戶常見問題\nA: 標準回答..."
+                      ? "Q: 客戶常見問題
+A: 標準回答..."
                       : formType === "template"
                       ? "客服回覆範本內容..."
                       : "貼上完整 Email 內容（含寄件者、主旨、內文）"
@@ -316,7 +316,6 @@ const AdminEmailKnowledge = () => {
             </form>
           )}
 
-          {/* Filter */}
           <div className="px-4 pt-4 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">篩選：</span>
             {(["all", "faq", "template", "email", "document"] as const).map((f) => (
@@ -332,7 +331,6 @@ const AdminEmailKnowledge = () => {
             ))}
           </div>
 
-          {/* List */}
           <div className="p-4">
             {isLoading ? (
               <div className="text-center py-8">

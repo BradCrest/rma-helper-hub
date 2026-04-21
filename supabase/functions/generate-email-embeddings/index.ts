@@ -6,10 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const BATCH_LIMIT = 20;
+
+const jsonResponse = (payload: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const requestStartedAt = Date.now();
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -18,29 +28,62 @@ serve(async (req) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
 
     if (!openaiKey) {
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse({
+        ok: false,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        error: "OPENAI_API_KEY not configured",
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          errorType: "missing_api_key",
+        },
       });
     }
 
-    // Verify admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({
+        ok: false,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        error: "Unauthorized",
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          errorType: "unauthorized",
+        },
+      }, 401);
     }
+
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user } } = await userClient.auth.getUser();
+    const {
+      data: { user },
+    } = await userClient.auth.getUser();
+
     if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({
+        ok: false,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        error: "Unauthorized",
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          errorType: "unauthorized",
+        },
+      }, 401);
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
@@ -50,29 +93,68 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .in("role", ["admin", "super_admin"])
       .maybeSingle();
+
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({
+        ok: false,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        error: "Forbidden",
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          errorType: "forbidden",
+        },
+      }, 403);
     }
 
-    // Fetch pending embeddings
     const { data: pending, error: pendingErr } = await admin
       .from("email_embeddings")
       .select("id, source_id, content")
       .eq("status", "pending")
-      .limit(20);
+      .limit(BATCH_LIMIT);
 
-    if (pendingErr) throw pendingErr;
+    if (pendingErr) {
+      return jsonResponse({
+        ok: false,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        error: pendingErr.message,
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          errorType: "pending_query_failed",
+        },
+      });
+    }
+
     if (!pending || pending.length === 0) {
-      return new Response(JSON.stringify({ processed: 0, failed: 0, total: 0, remainingPending: 0, hasMore: false, message: "No pending embeddings" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return jsonResponse({
+        ok: true,
+        processed: 0,
+        failed: 0,
+        total: 0,
+        remainingPending: 0,
+        hasMore: false,
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          pendingFetched: 0,
+          failureCount: 0,
+          failedIds: [],
+        },
       });
     }
 
     let processed = 0;
     let failed = 0;
+    const failedIds: string[] = [];
 
     for (const item of pending) {
       try {
@@ -81,11 +163,11 @@ serve(async (req) => {
             .from("email_embeddings")
             .update({ status: "failed", updated_at: new Date().toISOString() })
             .eq("id", item.id);
-          failed++;
+          failed += 1;
+          failedIds.push(item.id);
           continue;
         }
 
-        // Call OpenAI embeddings API
         const embRes = await fetch("https://api.openai.com/v1/embeddings", {
           method: "POST",
           headers: {
@@ -105,7 +187,8 @@ serve(async (req) => {
             .from("email_embeddings")
             .update({ status: "failed", updated_at: new Date().toISOString() })
             .eq("id", item.id);
-          failed++;
+          failed += 1;
+          failedIds.push(item.id);
           continue;
         }
 
@@ -117,7 +200,8 @@ serve(async (req) => {
             .from("email_embeddings")
             .update({ status: "failed", updated_at: new Date().toISOString() })
             .eq("id", item.id);
-          failed++;
+          failed += 1;
+          failedIds.push(item.id);
           continue;
         }
 
@@ -129,26 +213,73 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq("id", item.id);
-        processed++;
-      } catch (e) {
-        console.error("Item error:", e);
-        failed++;
+        processed += 1;
+      } catch (error) {
+        console.error("Item error:", error);
+        await admin
+          .from("email_embeddings")
+          .update({ status: "failed", updated_at: new Date().toISOString() })
+          .eq("id", item.id);
+        failed += 1;
+        failedIds.push(item.id);
       }
     }
 
-    const { count: remainingPending } = await admin
+    const { count: remainingPending, error: remainingPendingError } = await admin
       .from("email_embeddings")
       .select("id", { count: "exact", head: true })
       .eq("status", "pending");
 
-    return new Response(JSON.stringify({ processed, failed, total: pending.length, remainingPending: remainingPending || 0, hasMore: (remainingPending || 0) > 0 }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (remainingPendingError) {
+      return jsonResponse({
+        ok: false,
+        processed,
+        failed,
+        total: pending.length,
+        remainingPending: 0,
+        hasMore: false,
+        error: remainingPendingError.message,
+        diagnostics: {
+          batchSize: BATCH_LIMIT,
+          durationMs: Date.now() - requestStartedAt,
+          pendingFetched: pending.length,
+          failureCount: failed,
+          failedIds: failedIds.slice(0, 10),
+          errorType: "remaining_count_failed",
+        },
+      });
+    }
+
+    return jsonResponse({
+      ok: true,
+      processed,
+      failed,
+      total: pending.length,
+      remainingPending: remainingPending || 0,
+      hasMore: (remainingPending || 0) > 0,
+      diagnostics: {
+        batchSize: BATCH_LIMIT,
+        durationMs: Date.now() - requestStartedAt,
+        pendingFetched: pending.length,
+        failureCount: failed,
+        failedIds: failedIds.slice(0, 10),
+      },
     });
-  } catch (e) {
-    console.error("generate-email-embeddings error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+  } catch (error) {
+    console.error("generate-email-embeddings error:", error);
+    return jsonResponse({
+      ok: false,
+      processed: 0,
+      failed: 0,
+      total: 0,
+      remainingPending: 0,
+      hasMore: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      diagnostics: {
+        batchSize: BATCH_LIMIT,
+        durationMs: Date.now() - requestStartedAt,
+        errorType: "unexpected_exception",
+      },
+    });
   }
 });
