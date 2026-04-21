@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from "react";
 import { Upload, FileText, Loader2, X, CheckCircle2, AlertCircle, RotateCw, Trash } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 
 interface UploadItem {
   file: File;
@@ -123,7 +124,17 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
     setIsUploading(false);
 
     if (successCount > 0) {
-      toast.success(`已上傳 ${successCount} 個檔案，共 ${totalChunks} 段，系統正在自動建立索引`);
+      let kickoffMessage = "檔案已加入知識庫，背景索引已排程";
+
+      try {
+        const kickoffResult = await kickoffEmailEmbeddingJob("upload", session.access_token);
+        kickoffMessage = kickoffResult.message;
+      } catch (error) {
+        console.error(error);
+        toast.error("檔案已上傳，但背景索引喚醒失敗，系統稍後仍會由排程自動續跑");
+      }
+
+      toast.success(`已上傳 ${successCount} 個檔案，共 ${totalChunks} 段；${kickoffMessage}`);
       onUploaded?.({ uploadedCount: successCount, chunkCount: totalChunks });
     }
   };
@@ -154,7 +165,7 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
         <div>
           <p className="font-medium text-foreground">上傳檔案到知識庫</p>
           <p className="text-xs text-muted-foreground">
-            支援 .md / .txt / .eml / .pdf — 單檔最大 10MB，自動切段並加入向量索引
+            支援 .md / .txt / .eml / .pdf — 單檔最大 10MB，自動切段並排入背景索引
           </p>
         </div>
       </div>
@@ -188,7 +199,6 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
         </div>
       </div>
 
-      {/* Drop zone */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -225,7 +235,6 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
         />
       </div>
 
-      {/* File list */}
       {items.length > 0 && (
         <div className="space-y-2">
           {items.map((it, i) => (
@@ -262,7 +271,6 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
         </div>
       )}
 
-      {/* Status summary */}
       {items.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           {pendingCount > 0 && <span>⏳ 待上傳 {pendingCount}</span>}
