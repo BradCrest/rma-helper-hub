@@ -6,9 +6,11 @@ import { Progress } from "@/components/ui/progress";
 import {
   fetchEmailEmbeddingCounts,
   fetchEmailEmbeddingJobStatus,
+  fetchEmailEmbeddingSchedulerStatus,
   kickoffEmailEmbeddingJob,
   type EmailEmbeddingCounts,
   type EmailEmbeddingJobStatus,
+  type EmailEmbeddingSchedulerStatus,
 } from "@/lib/email-embedding-job";
 
 interface EmailEmbeddingManagerProps {
@@ -29,6 +31,7 @@ const formatDateTime = (value: string | null) => {
 const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerProps) => {
   const [counts, setCounts] = useState<EmailEmbeddingCounts | null>(null);
   const [job, setJob] = useState<EmailEmbeddingJobStatus | null>(null);
+  const [scheduler, setScheduler] = useState<EmailEmbeddingSchedulerStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
 
@@ -36,13 +39,15 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
     if (!options?.silent) setIsLoading(true);
 
     try {
-      const [nextCounts, nextJob] = await Promise.all([
+      const [nextCounts, nextJob, nextScheduler] = await Promise.all([
         fetchEmailEmbeddingCounts(),
         fetchEmailEmbeddingJobStatus(),
+        fetchEmailEmbeddingSchedulerStatus(),
       ]);
       setCounts(nextCounts);
       setJob(nextJob);
-      return { counts: nextCounts, job: nextJob };
+      setScheduler(nextScheduler);
+      return { counts: nextCounts, job: nextJob, scheduler: nextScheduler };
     } catch (error) {
       console.error("email embedding dashboard error:", error);
       if (!options?.silent) toast.error("無法取得背景索引狀態");
@@ -95,17 +100,28 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
         : "背景索引正在啟動中";
     }
     if (counts.pending > 0 || counts.processing > 0) {
-      return `尚有 ${counts.pending} 筆待處理、${counts.processing} 筆處理中；排程會自動續跑`;
+      return scheduler?.enabled
+        ? `尚有 ${counts.pending} 筆待處理、${counts.processing} 筆處理中；背景排程會自動續跑`
+        : `尚有 ${counts.pending} 筆待處理、${counts.processing} 筆處理中；目前未啟用自動排程`;
     }
     if (counts.failed > 0) {
       return `目前有 ${counts.failed} 筆失敗，可稍後檢查錯誤後再重新喚醒背景索引`;
     }
     if (counts.total === 0) return "尚無知識來源，請先新增內容或上傳檔案";
     return "所有知識來源已完成索引";
-  }, [counts, job]);
+  }, [counts, job, scheduler]);
 
   const isBusy = isLoading || isTriggering;
   const hasPendingWork = (counts?.pending || 0) > 0 || (counts?.processing || 0) > 0;
+  const statusLabel = job?.status === "running"
+    ? "執行中"
+    : job?.status === "failed"
+      ? "失敗"
+      : hasPendingWork
+        ? scheduler?.enabled
+          ? "等待背景排程接手"
+          : "未啟用自動排程"
+        : "閒置";
 
   return (
     <div className="rma-card p-4 space-y-4">
@@ -162,7 +178,7 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-muted-foreground">背景工作狀態</span>
               <span className={statusTone}>
-                {job?.status === "running" ? "執行中" : job?.status === "failed" ? "失敗" : hasPendingWork ? "待排程續跑" : "閒置"}
+                {statusLabel}
               </span>
             </div>
             <p className="text-sm text-foreground">{statusMessage}</p>
@@ -171,6 +187,8 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
               <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2"><Clock3 className="h-3.5 w-3.5" /> 最近心跳：{formatDateTime(job?.last_heartbeat_at ?? null)}</div>
               <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2"><Clock3 className="h-3.5 w-3.5" /> 最近完成：{formatDateTime(job?.last_finished_at ?? null)}</div>
               <div className="rounded-md bg-background px-3 py-2 text-muted-foreground">觸發來源：{job?.trigger_source || "尚無紀錄"}</div>
+              <div className="rounded-md bg-background px-3 py-2 text-muted-foreground">自動排程：{scheduler?.enabled ? `已啟用（${scheduler.schedule || "每分鐘"}）` : "未啟用"}</div>
+              <div className="rounded-md bg-background px-3 py-2 text-muted-foreground">排程設定更新：{formatDateTime(scheduler?.updatedAt ?? null)}</div>
             </div>
             {job?.last_error && <p className="text-xs text-destructive">最近錯誤：{job.last_error}</p>}
           </div>

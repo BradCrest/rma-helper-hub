@@ -26,6 +26,13 @@ export interface EmailEmbeddingJobStatus {
   updated_at: string;
 }
 
+export interface EmailEmbeddingSchedulerStatus {
+  enabled: boolean;
+  schedule: string | null;
+  jobName: string | null;
+  updatedAt: string | null;
+}
+
 export interface KickoffEmailEmbeddingJobResult {
   ok: boolean;
   started: boolean;
@@ -81,6 +88,28 @@ export async function fetchEmailEmbeddingJobStatus(): Promise<EmailEmbeddingJobS
 
   if (error) throw error;
   return (data as EmailEmbeddingJobStatus | null) ?? null;
+}
+
+export async function fetchEmailEmbeddingSchedulerStatus(): Promise<EmailEmbeddingSchedulerStatus> {
+  const { data, error } = await supabase
+    .from("ai_settings")
+    .select("setting_value, updated_at")
+    .eq("setting_key", "email_embedding_scheduler")
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const settingValue = data?.setting_value;
+  const value = settingValue && typeof settingValue === "object" && !Array.isArray(settingValue)
+    ? settingValue as Record<string, unknown>
+    : null;
+
+  return {
+    enabled: value?.enabled === true,
+    schedule: typeof value?.schedule === "string" ? value.schedule : null,
+    jobName: typeof value?.jobName === "string" ? value.jobName : null,
+    updatedAt: data?.updated_at ?? null,
+  };
 }
 
 export async function kickoffEmailEmbeddingJob(
