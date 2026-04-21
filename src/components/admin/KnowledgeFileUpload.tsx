@@ -11,7 +11,7 @@ interface UploadItem {
 }
 
 interface Props {
-  onUploaded?: () => void;
+  onUploaded?: (result: { uploadedCount: number; chunkCount: number }) => void;
 }
 
 const ACCEPTED = ".md,.markdown,.txt,.eml,.pdf";
@@ -123,13 +123,8 @@ const KnowledgeFileUpload = ({ onUploaded }: Props) => {
     setIsUploading(false);
 
     if (successCount > 0) {
-      toast.success(`已上傳 ${successCount} 個檔案，共 ${totalChunks} 段，已自動送進索引流程（請看右側索引狀態）`);
-      try {
-        await supabase.functions.invoke("generate-email-embeddings");
-      } catch (e) {
-        console.error("Auto-embed failed", e);
-      }
-      onUploaded?.();
+      toast.success(`已上傳 ${successCount} 個檔案，共 ${totalChunks} 段，系統正在自動建立索引`);
+      onUploaded?.({ uploadedCount: successCount, chunkCount: totalChunks });
     }
   };
 
