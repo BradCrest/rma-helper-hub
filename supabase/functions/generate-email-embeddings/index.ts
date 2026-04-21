@@ -66,7 +66,7 @@ serve(async (req) => {
 
     if (pendingErr) throw pendingErr;
     if (!pending || pending.length === 0) {
-      return new Response(JSON.stringify({ processed: 0, message: "No pending embeddings" }), {
+      return new Response(JSON.stringify({ processed: 0, failed: 0, total: 0, remainingPending: 0, hasMore: false, message: "No pending embeddings" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -136,7 +136,12 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ processed, failed, total: pending.length }), {
+    const { count: remainingPending } = await admin
+      .from("email_embeddings")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+
+    return new Response(JSON.stringify({ processed, failed, total: pending.length, remainingPending: remainingPending || 0, hasMore: (remainingPending || 0) > 0 }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

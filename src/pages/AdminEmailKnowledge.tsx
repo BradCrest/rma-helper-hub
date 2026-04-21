@@ -48,6 +48,7 @@ const AdminEmailKnowledge = () => {
   const [formTag, setFormTag] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [embeddingAutoStartSignal, setEmbeddingAutoStartSignal] = useState(0);
 
   const fetchSources = async () => {
     setIsLoading(true);
@@ -207,11 +208,16 @@ const AdminEmailKnowledge = () => {
         </div>
 
         {/* File upload to knowledge base */}
-        <KnowledgeFileUpload onUploaded={fetchSources} />
+        <KnowledgeFileUpload
+          onUploaded={async () => {
+            await fetchSources();
+            setEmbeddingAutoStartSignal((value) => value + 1);
+          }}
+        />
 
         {/* Embedding & Chat */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <EmailEmbeddingManager />
+          <EmailEmbeddingManager autoStartSignal={embeddingAutoStartSignal} />
           <EmailKnowledgeChat />
         </div>
 
