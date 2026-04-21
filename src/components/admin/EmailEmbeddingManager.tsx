@@ -80,10 +80,10 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
   }, [fetchDashboard]);
 
   const statusTone = useMemo(() => {
-    if (job?.status === "failed") return "destructive";
-    if (job?.status === "running") return "primary";
-    if ((counts?.pending || 0) > 0 || (counts?.processing || 0) > 0) return "primary";
-    return "muted";
+    if (job?.status === "failed") return "text-destructive";
+    if (job?.status === "running") return "text-primary";
+    if ((counts?.pending || 0) > 0 || (counts?.processing || 0) > 0) return "text-primary";
+    return "text-muted-foreground";
   }, [counts?.pending, counts?.processing, job?.status]);
 
   const statusMessage = useMemo(() => {
@@ -131,13 +131,9 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
           </Button>
           <Button size="sm" onClick={handleKickoff} disabled={isBusy}>
             {isTriggering ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> 喚醒中...
-              </>
+              <><Loader2 className="h-4 w-4 animate-spin" /> 喚醒中...</>
             ) : (
-              <>
-                <Play className="h-4 w-4" /> 立即喚醒背景索引
-              </>
+              <><Play className="h-4 w-4" /> 立即喚醒背景索引</>
             )}
           </Button>
         </div>
@@ -148,9 +144,7 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">完成進度</span>
-              <span className="text-foreground">
-                {counts.completed} / {counts.total} ({counts.percentage}%)
-              </span>
+              <span className="text-foreground">{counts.completed} / {counts.total} ({counts.percentage}%)</span>
             </div>
             <Progress value={counts.percentage} className="h-2" />
           </div>
@@ -167,32 +161,18 @@ const EmailEmbeddingManager = ({ autoStartSignal = 0 }: EmailEmbeddingManagerPro
           <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="text-muted-foreground">背景工作狀態</span>
-              <span className={statusTone === "destructive" ? "text-destructive" : statusTone === "primary" ? "text-primary" : "text-muted-foreground"}>
-                {job?.status === "running"
-                  ? "執行中"
-                  : job?.status === "failed"
-                    ? "失敗"
-                    : hasPendingWork
-                      ? "待排程續跑"
-                      : "閒置"}
+              <span className={statusTone}>
+                {job?.status === "running" ? "執行中" : job?.status === "failed" ? "失敗" : hasPendingWork ? "待排程續跑" : "閒置"}
               </span>
             </div>
             <p className="text-sm text-foreground">{statusMessage}</p>
             <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2">
-                <Clock3 className="h-3.5 w-3.5" /> 最近啟動：{formatDateTime(job?.last_started_at ?? null)}
-              </div>
-              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2">
-                <Clock3 className="h-3.5 w-3.5" /> 最近心跳：{formatDateTime(job?.last_heartbeat_at ?? null)}
-              </div>
-              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2">
-                <Clock3 className="h-3.5 w-3.5" /> 最近完成：{formatDateTime(job?.last_finished_at ?? null)}
-              </div>
+              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2"><Clock3 className="h-3.5 w-3.5" /> 最近啟動：{formatDateTime(job?.last_started_at ?? null)}</div>
+              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2"><Clock3 className="h-3.5 w-3.5" /> 最近心跳：{formatDateTime(job?.last_heartbeat_at ?? null)}</div>
+              <div className="flex items-center gap-2 rounded-md bg-background px-3 py-2"><Clock3 className="h-3.5 w-3.5" /> 最近完成：{formatDateTime(job?.last_finished_at ?? null)}</div>
               <div className="rounded-md bg-background px-3 py-2 text-muted-foreground">觸發來源：{job?.trigger_source || "尚無紀錄"}</div>
             </div>
-            {job?.last_error && (
-              <p className="text-xs text-destructive">最近錯誤：{job.last_error}</p>
-            )}
+            {job?.last_error && <p className="text-xs text-destructive">最近錯誤：{job.last_error}</p>}
           </div>
         </>
       )}

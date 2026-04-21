@@ -94,10 +94,7 @@ export async function kickoffEmailEmbeddingJob(
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session) {
-      throw new Error("尚未登入");
-    }
-
+    if (!session) throw new Error("尚未登入");
     token = session.access_token;
   }
 
@@ -107,6 +104,7 @@ export async function kickoffEmailEmbeddingJob(
   });
 
   if (error) throw error;
+
   return (data as KickoffEmailEmbeddingJobResult) || {
     ok: true,
     started: false,
