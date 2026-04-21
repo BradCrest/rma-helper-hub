@@ -64,7 +64,11 @@ serve(async (req) => {
   try {
     const workerResponse = await fetch(`${supabaseUrl}/functions/v1/generate-email-embeddings`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
       body: JSON.stringify({ triggerSource, initiatedBy: userId ?? (isCronRequest ? "cron" : "service") }),
     });
 
