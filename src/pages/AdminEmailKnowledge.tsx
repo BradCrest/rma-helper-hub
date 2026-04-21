@@ -291,14 +291,14 @@ const AdminEmailKnowledge = () => {
                 <textarea
                   value={formContent}
                   onChange={(e) => setFormContent(e.target.value)}
-                  placeholder={
-                    formType === "faq"
-                      ? "Q: 客戶常見問題
-A: 標準回答..."
-                      : formType === "template"
-                      ? "客服回覆範本內容..."
-                      : "貼上完整 Email 內容（含寄件者、主旨、內文）"
-                  }
+                    placeholder={
+                      formType === "faq"
+                        ? `Q: 客戶常見問題
+A: 標準回答...`
+                        : formType === "template"
+                          ? "客服回覆範本內容..."
+                          : "貼上完整 Email 內容（含寄件者、主旨、內文）"
+                    }
                   className="rma-input w-full min-h-[200px] font-mono text-sm"
                   disabled={isSaving}
                   required
