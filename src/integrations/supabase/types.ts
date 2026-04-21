@@ -38,33 +38,87 @@ export type Database = {
         }
         Relationships: []
       }
+      email_embedding_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          job_type: string
+          last_error: string | null
+          last_failed_count: number
+          last_finished_at: string | null
+          last_heartbeat_at: string | null
+          last_processed_count: number
+          last_started_at: string | null
+          status: string
+          trigger_source: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_type: string
+          last_error?: string | null
+          last_failed_count?: number
+          last_finished_at?: string | null
+          last_heartbeat_at?: string | null
+          last_processed_count?: number
+          last_started_at?: string | null
+          status?: string
+          trigger_source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_type?: string
+          last_error?: string | null
+          last_failed_count?: number
+          last_finished_at?: string | null
+          last_heartbeat_at?: string | null
+          last_processed_count?: number
+          last_started_at?: string | null
+          status?: string
+          trigger_source?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_embeddings: {
         Row: {
+          attempt_count: number
           content: string
           created_at: string
           embedding: string | null
           id: string
+          last_error: string | null
           metadata: Json
+          processing_started_at: string | null
           source_id: string
           status: string
           updated_at: string
         }
         Insert: {
+          attempt_count?: number
           content: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json
+          processing_started_at?: string | null
           source_id: string
           status?: string
           updated_at?: string
         }
         Update: {
+          attempt_count?: number
           content?: string
           created_at?: string
           embedding?: string | null
           id?: string
+          last_error?: string | null
           metadata?: Json
+          processing_started_at?: string | null
           source_id?: string
           status?: string
           updated_at?: string

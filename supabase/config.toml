@@ -42,6 +42,9 @@ verify_jwt = false
 [functions.generate-email-embeddings]
 verify_jwt = true
 
+[functions.kickoff-email-embedding-job]
+verify_jwt = true
+
 [functions.email-knowledge-chat]
 verify_jwt = true
 
