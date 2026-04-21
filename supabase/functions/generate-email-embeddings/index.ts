@@ -112,7 +112,28 @@ serve(async (req) => {
 
     await admin.from("email_embedding_jobs").update({ status: "idle", trigger_source: triggerSource, last_heartbeat_at: nowIso(), last_finished_at: nowIso(), last_processed_count: processed, last_failed_count: failed, last_error: null, updated_at: nowIso() }).eq("job_type", JOB_TYPE);
 
-    return jsonResponse({ ok: true, processed, failed, total: pendingFetched, remainingPending, hasMore, diagnostics: { batchSize: BATCH_LIMIT, durationMs: Date.now() - requestStartedAt, pendingFetched, failureCount: failed, failedIds: failedIds.slice(0, 10) } });
+    // Self-chaining: if more work remains, fire-and-forget next kickoff so the worker
+    // keeps processing the queue without depending solely on the 1-min cron.
+    let chainScheduled = false;
+    if (hasMore) {
+      try {
+        // Don't await — let it run in the background after this response returns.
+        fetch(`${supabaseUrl}/functions/v1/kickoff-email-embedding-job`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: serviceKey,
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({ triggerSource: "chain" }),
+        }).catch((err) => console.error("[chain] kickoff failed:", err));
+        chainScheduled = true;
+      } catch (err) {
+        console.error("[chain] failed to schedule next kickoff:", err);
+      }
+    }
+
+    return jsonResponse({ ok: true, processed, failed, total: pendingFetched, remainingPending, hasMore, chainScheduled, diagnostics: { batchSize: BATCH_LIMIT, durationMs: Date.now() - requestStartedAt, pendingFetched, failureCount: failed, failedIds: failedIds.slice(0, 10), chainScheduled } });
   } catch (error) {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const message = extractMessage(error, "Unknown error");
