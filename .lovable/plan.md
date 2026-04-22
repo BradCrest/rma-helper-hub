@@ -1,202 +1,120 @@
 
-### 計畫：修正「只跑一次、不會自動續跑」的背景索引
 
-### 目前確認到的狀況
-目前不是索引完全壞掉，而是「第一輪會跑，後續接手機制不可靠」。
+## 我的判斷：方向對，做法可以更精簡
 
-從現況可看出：
+### Claude 建議的核心觀念是對的
+**API Key 絕對不能放在 Lovable 前端**，因為前端程式碼會被打包到瀏覽器，所有用戶都能看到。這點 Claude 說的 100% 正確。
 
-- `email_embedding_jobs` 最新狀態是：
-  - `status: idle`
-  - `trigger_source: manual`
-  - `last_processed_count: 60`
-- `email_embeddings` 仍有大量待處理：
-  - `completed: 5758`
-  - `pending: 13429`
-  - `failed: 1`
-- `ai_settings` 顯示排程已啟用
-- `cron.job` 也確實存在 `email-embedding-kickoff-every-minute`
-
-這代表：
-```text
-手動喚醒
-→ worker 確實有跑一輪（而且一次跑了 60 筆）
-→ worker 結束後回到 idle
-→ 但真正的後續自動接手沒有穩定發生
-```
-
-### 根本問題
-目前架構有兩個弱點：
-
-1. 背景續跑過度依賴每分鐘 cron  
-   只要 cron 觸發沒有成功打到 function、或打到了但沒有留下明確可見紀錄，整個 queue 就會停在 idle。
-
-2. UI 只看「排程已設定」，不是看「排程最近真的有執行」  
-   所以畫面會讓人以為背景會自動接手，但其實只是設定存在，不代表真的有續跑。
-
-另外，現在排程是用專案專屬 URL / key 建立的，這類資料不應只放在 migration 內當作永久真相來源，否則後續維護與驗證都不夠可靠。
-
----
-
-### 這次會怎麼修
-
-## 1. 把「續跑」從只靠 cron，改成「worker 自己接力 + cron 保底」
-目前 manual kickoff 跑完一段就停。會改成：
+### 但「另外架 FastAPI」是不必要的
+你的專案**已經有後端**——就是 Supabase Edge Functions（用 TypeScript / Deno 跑）。它扮演的角色和 Claude 推薦的 FastAPI 完全一樣：
 
 ```text
-手動喚醒 / 上傳 / 編輯
-→ kickoff
-→ worker 處理一輪
-→ 若 hasMore = true
-→ 立即再安排下一輪背景接力
-→ cron 每分鐘只做保底，不再是唯一續跑來源
+Lovable 前端 (React)
+    ↓ supabase.functions.invoke("draft-email-reply")
+Supabase Edge Function (已經存在的後端)
+    ↓ 從 ai_settings 讀模型 + 從 email_embeddings 找知識庫
+    ↓ 呼叫 Claude / Gemini / GPT-5 API
+回傳草稿給前端顯示
 ```
 
-實作方向：
-- `generate-email-embeddings` 處理完若仍有 `hasMore`
-- 不直接把「剩下的交給運氣」
-- 而是由後端再安全喚醒下一輪
-- 加入單次鏈式續跑上限與 stale protection，避免無限重入
+優點：
+- 不用另外租 server、設網域、處理 SSL
+- 不用維護兩套後端（Python + TypeScript）
+- 知識庫已經在 Supabase（pgvector + email_embeddings），不用搬資料
+- ANTHROPIC_API_KEY 可直接存 Supabase secret，前端拿不到
 
-這樣按一次「立即喚醒背景索引」後，系統就會持續往下吃 queue，不會只跑一輪。
-
----
-
-## 2. 強化 `kickoff-email-embedding-job` 的狀態機
-目前 `kickoff` 只負責：
-- 看 job 有沒有 running
-- 沒有就啟動一次 worker
-
-會改成更完整的 dispatcher：
-
-- 明確區分：
-  - `manual`
-  - `upload`
-  - `update`
-  - `cron`
-  - `chain`
-- 若 worker 回傳 `hasMore: true`
-  - 將 job 標成「仍需續跑」
-  - 交由後端立即鏈式再喚醒，而不是只顯示文案
-- 若 job 已在跑
-  - 正常略過，不重複啟動第二個 worker
-- 若 heartbeat stale
-  - 安全接管並恢復續跑
+唯一差異只是「語言」：你現有的後端是 TypeScript 不是 Python，但呼叫 Anthropic API 的邏輯一模一樣。
 
 ---
 
-## 3. 補上「排程真的有沒有在跑」的健康資訊
-目前畫面只知道：
-- 排程設定有沒有存在
+## 對應到 Claude 給的範例
 
-但真正需要的是：
-- 最近一次 cron 何時觸發
-- 最近一次 cron 是否成功喚醒 worker
-- 現在是靠 manual 在跑，還是 cron 在保底
+| Claude 的 FastAPI | 你的專案會用的 |
+|---|---|
+| `server.py` + FastAPI | `supabase/functions/draft-email-reply/index.ts` |
+| `@app.post("/api/reply")` | `serve(async (req) => ...)` |
+| 知識庫 MD 檔放後端 | 已存於 `email_embeddings`（pgvector） |
+| `generate_draft_with_claude()` | edge function 內 fetch Anthropic API |
+| 前端 `fetch("/api/reply")` | 前端 `supabase.functions.invoke("draft-email-reply")` |
+| 自己處理 CORS / Auth | Supabase 自動處理 + JWT 驗證 |
 
-會新增/補強監控資訊，例如：
-- `last_scheduler_ping_at`
-- `last_scheduler_result`
-- `last_trigger_source`
-- `next_action_hint`
-
-讓前端能顯示真正狀態，例如：
-
-- 背景索引執行中
-- 仍有待處理，系統正在自動接力
-- 排程已啟用，但最近未成功接手
-- 尚有待處理項目，需要重新喚醒
+結論：**Claude 推薦的架構在你這裡已經有了**，只差「新增一個 edge function + 加 ANTHROPIC_API_KEY」就能用 Claude 草擬回覆。
 
 ---
 
-## 4. 修正 `EmailEmbeddingManager` 的文案與判斷邏輯
-目前「待排程續跑」這句太樂觀。
+## 計畫：用既有 Edge Function 架構整合 Claude
 
-會改成依據真實狀態顯示：
-- 有 pending，且最近 scheduler/chain 有活動：`背景索引會持續自動處理`
-- 有 pending，但長時間沒有任何 scheduler/chain heartbeat：`尚有待處理項目，自動續跑異常`
-- 只有 manual 跑過一次、沒有後續：`已完成目前批次，但後續自動接手未生效`
-- 全部完成：`所有知識來源已完成索引`
+### 1. 加入 Anthropic API Key（後端密鑰，前端拿不到）
+透過 `add_secret` 請你提供：
+- `ANTHROPIC_API_KEY`（從 https://console.anthropic.com/settings/keys 取得）
 
-也會把：
-- 最近手動啟動時間
-- 最近排程接手時間
-- 最近鏈式續跑時間
-分開顯示，避免誤判。
+存在 Supabase secret，只有 edge function 能讀。
 
----
+### 2. 建立 `draft-email-reply` Edge Function
+新增 `supabase/functions/draft-email-reply/index.ts`：
+- JWT 驗證（只有登入的 admin 能呼叫）
+- 接收：客戶 Email 主旨 + 內文 + 寄件人（選填 RMA 編號）
+- 從 `ai_settings.slack_reply_model` 讀目前選的模型
+- 用 OpenAI embedding 把客戶 Email 轉向量 → 從 `email_embeddings` 找最相關 5~8 筆歷史回覆
+- 組 system prompt（含品牌語氣 + 知識庫片段）
+- 根據模型字串分流：
+  - `anthropic/*` → 呼叫 `https://api.anthropic.com/v1/messages`
+  - `google/*` / `openai/*` → 呼叫現有 Lovable AI Gateway
+- 回傳純文字草稿 JSON
 
-## 5. 重做排程建立方式，避免把專案 key 寫死在 migration
-目前排程 SQL 是把 function URL 與 bearer token 寫進 migration。這有兩個問題：
+### 3. 擴充 AI 模型白名單
+- `update-ai-settings/index.ts`：`ALLOWED_MODELS` 加入 `anthropic/claude-sonnet-4-5`、`anthropic/claude-opus-4-1`、`anthropic/claude-haiku-4-5`
+- `AiModelSettings.tsx`：在「Slack 客服回覆模型」下拉新增 Claude 選項，標註「使用 Anthropic 直連，需 ANTHROPIC_API_KEY」
 
-- 這是專案專屬值，不適合當通用 migration 長期保存
-- 後續排程是否仍有效，不容易重新校正
+### 4. 前端入口（Email 知識庫頁面）
+在 `/admin/email-knowledge` 頁面新增「草擬回覆信件」區塊：
+- 主旨輸入框
+- 內文輸入框（多行）
+- 寄件人 Email（選填）
+- 「產生草稿」按鈕
+- 草稿結果顯示區（可編輯、複製）
+- 顯示目前使用的模型名稱
 
-會改成：
-- 保留 schema migration 只做結構變更
-- 專案專屬的 cron 綁定改成專案層級設定流程
-- 同時把 scheduler metadata 與實際 cron job 對齊更新
-
-這樣之後若要重建排程、更新 key、驗證 job 是否存在，都更穩定。
-
----
-
-## 6. 補上可觀測性，方便之後直接看出卡在哪
-會在背景流程中補更清楚的診斷紀錄：
-
-- worker 啟動來源
-- 每輪 processed / failed / remainingPending
-- 是否還有 hasMore
-- 是否成功安排下一輪接力
-- scheduler 最近一次是否成功呼叫 kickoff
-
-這樣下次若還有「只跑一次」問題，就能直接分辨是：
-- cron 沒打到
-- kickoff 沒接力
-- worker 回傳 hasMore 但沒續跑
-- queue 卡在 processing
-- 外部 embedding API 造成中斷
-
----
-
-### 會修改的內容
-前端：
-- `src/components/admin/EmailEmbeddingManager.tsx`
-- `src/lib/email-embedding-job.ts`
-
-後端函式：
-- `supabase/functions/kickoff-email-embedding-job/index.ts`
-- `supabase/functions/generate-email-embeddings/index.ts`
-
-後端設定：
-- 調整排程建立方式與 scheduler 狀態同步
-- 補 scheduler/chain 的健康狀態寫入來源
-
-必要時也會補一個小型狀態查詢入口，讓前端能看到「排程存在」以外的真實執行情況。
-
----
-
-### 預期結果
-完成後會變成：
-
-```text
-按一次「立即喚醒背景索引」
-→ worker 跑第一輪
-→ 若還有 pending
-→ 後端自動接力下一輪
-→ cron 每分鐘保底補位
-→ 就算使用者離開頁面，仍會持續往下處理
+呼叫方式（純前端，無 API Key）：
+```ts
+const { data } = await supabase.functions.invoke("draft-email-reply", {
+  body: { subject, body, sender }
+});
 ```
 
-UI 也會改成顯示真實狀態，而不是只有「看起來有排程」。
+### 5. 可觀測性
+草稿產生紀錄寫入新表 `email_draft_logs`（選填），記錄：用了哪個模型、檢索到幾筆知識、產生時間，方便之後評估 Claude vs Gemini 的品質差異。
 
 ---
 
-### 技術摘要
-- 目前問題不是第一輪沒跑，而是「跑完後沒有可靠的第二輪接手者」
-- 真正要補的是：
-  - 後端鏈式續跑
-  - cron 保底而非唯一依賴
-  - scheduler 健康狀態可視化
-  - 專案專屬 cron 綁定方式修正
-- 這樣才能讓「立即喚醒背景索引」變成真正會持續處理 backlog 的入口
+## 為什麼這比 Claude 建議的 FastAPI 方案好
+
+| 項目 | FastAPI 自架 | Edge Function（推薦） |
+|---|---|---|
+| 額外伺服器 | 需要（Render / Railway / VPS） | 不需要 |
+| 部署 | 自己處理 | git push 自動部署 |
+| Auth | 自己接 Supabase JWT | 自動帶 Authorization |
+| 知識庫存取 | 跨服務查 Supabase | 同一個專案內 |
+| API Key 安全 | 存後端 env | 存 Supabase secret |
+| 維護成本 | 兩套（Python + TS） | 一套（TS） |
+| 月成本 | 額外 server 費用 | 含在現有方案 |
+
+唯一場景需要 FastAPI：**你已經有大量 Python 邏輯不想重寫**。但你的專案是 TypeScript-first，重寫一個薄薄的 fetch 包裝（約 80 行）比另外維護一台 Python server 划算太多。
+
+---
+
+## 需要你確認
+
+1. **是否同意用 Edge Function 整合 Claude？**（不用另架 FastAPI）
+2. **草擬回覆的入口要放哪裡？**
+   - A. `/admin/email-knowledge` 頁面新增區塊（推薦，知識庫旁邊）
+   - B. RMA 詳情對話框內（針對特定 RMA 草擬）
+   - C. 獨立新頁面 `/admin/draft-reply`
+   - D. 以上都要
+3. **Claude 模型預設選哪個？**
+   - `claude-sonnet-4-5`（推薦：品質/成本平衡）
+   - `claude-opus-4-1`（最強，貴）
+   - `claude-haiku-4-5`（最快，便宜）
+
+確認後我會切換到實作模式，先請你提供 `ANTHROPIC_API_KEY`，然後建置 edge function 和前端介面。
+
