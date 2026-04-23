@@ -44,6 +44,17 @@ interface RmaFullData {
   created_at: string;
 }
 
+// Escape HTML to prevent XSS when interpolating customer-submitted data into innerHTML
+const esc = (s?: string | number | null): string => {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 const RmaMultiConfirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -143,66 +154,64 @@ const RmaMultiConfirmation = () => {
     const notesSection = data.customer_notes ? `
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${esc(data.customer_notes)}</div>
       </div>
     ` : "";
 
     return `
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
-        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;"><div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 保固服務申請單 (${index + 1}/${total})</div></div>
-        <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${data.rma_number}</div>
+        <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 保固服務申請單 (${index + 1}/${total})</div>
+        <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${esc(data.rma_number)}</div>
       </div>
       
       <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; color: #666;">
-        <span>申請時間：${formatDate(data.created_at)}</span>
-        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 12px;">${getStatusLabel(data.status)}</span>
+        <span>申請時間：${esc(formatDate(data.created_at))}</span>
+        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 12px;">${esc(getStatusLabel(data.status))}</span>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">客戶資訊</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶姓名</div><div style="font-size: 14px; font-weight: 500;">${data.customer_name}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶類型</div><div style="font-size: 14px; font-weight: 500;">${data.customer_type || "一般客戶"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">電子郵件</div><div style="font-size: 14px; font-weight: 500;">${data.customer_email}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡電話</div><div style="font-size: 14px; font-weight: 500;">${data.customer_phone}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">手機號碼</div><div style="font-size: 14px; font-weight: 500;">${data.mobile_phone || "-"}</div></div>
-          <div style="grid-column: 1 / -1;"><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡地址</div><div style="font-size: 14px; font-weight: 500;">${data.customer_address || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶姓名</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_name)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶類型</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_type) || "一般客戶"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">電子郵件</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_email)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡電話</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_phone)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">手機號碼</div><div style="font-size: 14px; font-weight: 500;">${esc(data.mobile_phone) || "-"}</div></div>
+          <div style="grid-column: 1 / -1;"><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡地址</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_address) || "-"}</div></div>
         </div>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">產品資訊</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品名稱</div><div style="font-size: 14px; font-weight: 500;">${data.product_name}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品型號</div><div style="font-size: 14px; font-weight: 500;">${data.product_model || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品序號</div><div style="font-size: 14px; font-weight: 500;">${data.serial_number || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">購買日期</div><div style="font-size: 14px; font-weight: 500;">${data.purchase_date || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">保固到期日</div><div style="font-size: 14px; font-weight: 500;">${data.warranty_date || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品名稱</div><div style="font-size: 14px; font-weight: 500;">${esc(data.product_name)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品型號</div><div style="font-size: 14px; font-weight: 500;">${esc(data.product_model) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品序號</div><div style="font-size: 14px; font-weight: 500;">${esc(data.serial_number) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">購買日期</div><div style="font-size: 14px; font-weight: 500;">${esc(data.purchase_date) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">保固到期日</div><div style="font-size: 14px; font-weight: 500;">${esc(data.warranty_date) || "-"}</div></div>
         </div>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">問題描述</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${data.issue_description || "-"}</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${esc(data.issue_description) || "-"}</div>
       </div>
 
       ${notesSection}
 
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888;">
-        <p><p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p></p>
+        <p>此文件為 RMA 保固服務申請確認單，請妥善保存。</p>
       </div>
     </div>
   `;
   };
-
-  const generateCoverPageHtml = (rmaDataList: RmaFullData[]): string => {
     const tableRows = rmaDataList.map((rma, index) => `
       <tr style="border-bottom: 1px solid #e0e0e0;">
         <td style="padding: 10px 8px;">${index + 1}</td>
-        <td style="padding: 10px 8px; font-family: monospace; font-weight: 600; color: #0066cc;">${rma.rma_number}</td>
-        <td style="padding: 10px 8px;">${rma.product_model || "-"}</td>
-        <td style="padding: 10px 8px;">${rma.serial_number || "-"}</td>
+        <td style="padding: 10px 8px; font-family: monospace; font-weight: 600; color: #0066cc;">${esc(rma.rma_number)}</td>
+        <td style="padding: 10px 8px;">${esc(rma.product_model) || "-"}</td>
+        <td style="padding: 10px 8px;">${esc(rma.serial_number) || "-"}</td>
       </tr>
     `).join("");
 
