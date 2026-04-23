@@ -130,7 +130,7 @@ const RmaForm = () => {
       const photoUrls: string[] = [];
       for (const file of uploadedFiles) {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random()
+        const fileName = `rma/${Date.now()}-${Math.random()
           .toString(36)
           .substring(2)}.${fileExt}`;
 
@@ -229,7 +229,7 @@ const RmaForm = () => {
       const photoUrls: string[] = [];
       for (const file of uploadedFiles) {
         const fileExt = file.name.split(".").pop();
-        const fileName = `${Date.now()}-${Math.random()
+        const fileName = `rma/${Date.now()}-${Math.random()
           .toString(36)
           .substring(2)}.${fileExt}`;
 
