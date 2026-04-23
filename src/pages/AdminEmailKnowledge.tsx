@@ -50,8 +50,12 @@ const AdminEmailKnowledge = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [embeddingRefreshSignal, setEmbeddingRefreshSignal] = useState(0);
+  const recentUploadsRef = useRef<RecentKnowledgeUploadsHandle>(null);
 
-  const refreshEmbeddingMonitor = () => setEmbeddingRefreshSignal((value) => value + 1);
+  const refreshEmbeddingMonitor = () => {
+    setEmbeddingRefreshSignal((value) => value + 1);
+    recentUploadsRef.current?.refresh();
+  };
 
   const fetchSources = async () => {
     setIsLoading(true);
