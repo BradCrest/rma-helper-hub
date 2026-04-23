@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -14,7 +13,6 @@ Deno.serve(async (req) => {
   try {
     const { rma_request_id, carrier, tracking_number, photo_url } = await req.json();
 
-    // Validate required fields
     if (!rma_request_id || !carrier || !tracking_number) {
       return new Response(
         JSON.stringify({ error: "缺少必要欄位：rma_request_id, carrier, tracking_number" }),
@@ -22,7 +20,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate input lengths
+    if (typeof carrier !== "string" || typeof tracking_number !== "string" || typeof rma_request_id !== "string") {
+      return new Response(
+        JSON.stringify({ error: "欄位格式錯誤" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (carrier.length > 100) {
       return new Response(
         JSON.stringify({ error: "物流名稱過長" }),
@@ -37,12 +41,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create Supabase client with service role key to bypass RLS
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the RMA exists
+    // Verify the RMA exists and is in a state that accepts customer-submitted inbound shipping.
+    // Only newly registered RMAs (status='registered') can have inbound shipping submitted by the
+    // customer. This stops attackers from arbitrarily flipping any RMA to 'shipped' or overwriting
+    // shipping data on already-processed cases.
     const { data: rmaData, error: rmaError } = await supabase
       .from("rma_requests")
       .select("id, rma_number, status")
@@ -57,8 +63,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if already has inbound shipping info
-    const { data: existingShipping, error: existingError } = await supabase
+    if (rmaData.status !== "registered") {
+      console.warn(`Reject inbound shipping: RMA ${rmaData.rma_number} status is '${rmaData.status}', expected 'registered'`);
+      return new Response(
+        JSON.stringify({ error: "此 RMA 狀態不允許新增寄件資訊" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: existingShipping } = await supabase
       .from("rma_shipping")
       .select("id")
       .eq("rma_request_id", rma_request_id)
@@ -72,7 +85,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Insert shipping record
     const { data: shippingData, error: insertError } = await supabase
       .from("rma_shipping")
       .insert({
@@ -94,18 +106,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update RMA status to shipped (客戶已寄出)
     const { error: updateError } = await supabase
       .from("rma_requests")
       .update({ status: "shipped" })
       .eq("id", rma_request_id);
 
-    if (updateError) {
-      console.error("Update status error:", updateError);
-      // Don't fail the request, just log the error
-    }
+    if (updateError) console.error("Update status error:", updateError);
 
-    // Send Slack notification for status change
     try {
       const { data: fullRmaData } = await supabase
         .from("rma_requests")
@@ -135,8 +142,6 @@ Deno.serve(async (req) => {
 
         if (!slackResponse.ok) {
           console.error("Failed to send Slack notification:", await slackResponse.text());
-        } else {
-          console.log("Slack notification sent for shipping submission");
         }
       }
     } catch (slackError) {
@@ -146,10 +151,10 @@ Deno.serve(async (req) => {
     console.log(`Shipping info added for RMA: ${rmaData.rma_number}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: "寄件資訊已新增成功",
-        shipping: shippingData 
+        shipping: shippingData,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

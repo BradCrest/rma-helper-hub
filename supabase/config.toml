@@ -1,7 +1,5 @@
 project_id = "xrbvyfoewbwywrwocrpf"
 
-[functions.create-admin]
-verify_jwt = true
 
 [functions.list-admins]
 verify_jwt = true

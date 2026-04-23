@@ -32,34 +32,64 @@ function maskEmail(email: string): string {
 
 // Normalize phone number for flexible matching
 function normalizePhone(phone: string): string {
-  // Remove all non-digit characters
   let digits = phone.replace(/\D/g, '');
-  
-  // Remove Taiwan country code 886
-  if (digits.startsWith('886')) {
-    digits = digits.substring(3);
-  }
-  
-  // Remove leading 0
-  if (digits.startsWith('0')) {
-    digits = digits.substring(1);
-  }
-  
+  if (digits.startsWith('886')) digits = digits.substring(3);
+  if (digits.startsWith('0')) digits = digits.substring(1);
   return digits;
 }
 
+// Verify the request is from an authenticated admin.
+// Returns true only if the JWT belongs to a user with admin/super_admin role.
+async function isAdminCaller(req: Request, supabaseUrl: string, anonKey: string): Promise<boolean> {
+  try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return false;
+    const token = authHeader.slice(7).trim();
+    if (!token) return false;
+
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return false;
+
+    const { data: roleData, error: roleErr } = await userClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userData.user.id);
+    if (roleErr || !roleData) return false;
+
+    return roleData.some((r: { role: string }) => r.role === 'admin' || r.role === 'super_admin');
+  } catch (e) {
+    console.error('isAdminCaller error:', e);
+    return false;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '';
+
     const url = new URL(req.url);
     const rmaNumber = url.searchParams.get('rma_number');
     const customerName = url.searchParams.get('customer_name');
     const customerPhone = url.searchParams.get('customer_phone');
-    const includeFullDetails = url.searchParams.get('full_details') === 'true';
+    const requestedFullDetails = url.searchParams.get('full_details') === 'true';
+
+    // Only admins may receive full unmasked PII. Anonymous callers always get masked data.
+    const isAdmin = requestedFullDetails ? await isAdminCaller(req, supabaseUrl, anonKey) : false;
+    const includeFullDetails = requestedFullDetails && isAdmin;
+
+    if (requestedFullDetails && !isAdmin) {
+      console.warn('lookup-rma: full_details=true requested without admin auth — falling back to masked');
+    }
 
     if (!rmaNumber && (!customerName || !customerPhone)) {
       return new Response(
@@ -68,24 +98,15 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
     let query = supabaseAdmin.from('rma_requests').select('*');
 
     if (rmaNumber) {
-      // Normalize input: remove spaces and convert to uppercase
       const normalizedInput = rmaNumber.trim().toUpperCase();
-      
-      // Search with flexible pattern matching - just use ILIKE with the input
       query = query.ilike('rma_number', `%${normalizedInput}%`);
 
       const { data, error } = await query;
-
       if (error) {
         console.error('Database error:', error);
         return new Response(
@@ -94,9 +115,8 @@ serve(async (req) => {
         );
       }
 
-      // Filter results - remove dashes for comparison
       const inputWithoutDashes = normalizedInput.replace(/-/g, '');
-      const filtered = data?.filter(r => 
+      const filtered = data?.filter(r =>
         r.rma_number.replace(/-/g, '').toUpperCase().includes(inputWithoutDashes) ||
         inputWithoutDashes.includes(r.rma_number.replace(/-/g, '').toUpperCase())
       ) || [];
@@ -108,34 +128,24 @@ serve(async (req) => {
         );
       }
 
-      // Get status history for all found RMAs
       const rmaIds = filtered.map(r => r.id);
-      const { data: historyData, error: historyError } = await supabaseAdmin
+      const { data: historyData } = await supabaseAdmin
         .from('rma_status_history')
         .select('id, rma_request_id, status, created_at, notes')
         .in('rma_request_id', rmaIds)
         .order('created_at', { ascending: false });
 
-      if (historyError) {
-        console.error('History query error:', historyError);
-      }
-
-      // Group history by rma_request_id
       const historyByRmaId: Record<string, any[]> = {};
       (historyData || []).forEach(h => {
-        if (!historyByRmaId[h.rma_request_id]) {
-          historyByRmaId[h.rma_request_id] = [];
-        }
+        if (!historyByRmaId[h.rma_request_id]) historyByRmaId[h.rma_request_id] = [];
         historyByRmaId[h.rma_request_id].push({
           id: h.id,
           status: h.status,
           created_at: h.created_at,
           notes: h.notes,
-          // Exclude changed_by to protect admin identity
         });
       });
 
-      // Mask sensitive data unless full details requested (for confirmation page)
       const maskedResults = filtered.map(rma => ({
         id: rma.id,
         rma_number: rma.rma_number,
@@ -148,17 +158,15 @@ serve(async (req) => {
         purchase_date: rma.purchase_date,
         created_at: rma.created_at,
         updated_at: rma.updated_at,
-        // Masked customer info
         customer_name: includeFullDetails ? rma.customer_name : maskName(rma.customer_name),
         customer_phone: includeFullDetails ? rma.customer_phone : maskPhone(rma.customer_phone),
         customer_email: includeFullDetails ? rma.customer_email : maskEmail(rma.customer_email),
         customer_address: includeFullDetails ? rma.customer_address : null,
         photo_urls: includeFullDetails ? rma.photo_urls : null,
-        // Include status history
         status_history: historyByRmaId[rma.id] || [],
       }));
 
-      console.log(`Found ${maskedResults.length} RMA(s) for query: ${rmaNumber}`);
+      console.log(`Found ${maskedResults.length} RMA(s) for query: ${rmaNumber} (admin=${isAdmin})`);
 
       return new Response(
         JSON.stringify({ results: maskedResults }),
@@ -166,7 +174,6 @@ serve(async (req) => {
       );
 
     } else if (customerName && customerPhone) {
-      // Search by customer name and phone - fetch all matching names first
       const { data, error } = await supabaseAdmin
         .from('rma_requests')
         .select('*')
@@ -181,14 +188,10 @@ serve(async (req) => {
         );
       }
 
-      // Normalize the input phone for comparison
       const normalizedInputPhone = normalizePhone(customerPhone);
-      
-      // Filter results by normalized phone number
       const filteredData = (data || []).filter(rma => {
         const normalizedDbPhone = normalizePhone(rma.customer_phone || '');
-        // Check if either phone contains the other (flexible matching)
-        return normalizedDbPhone.includes(normalizedInputPhone) || 
+        return normalizedDbPhone.includes(normalizedInputPhone) ||
                normalizedInputPhone.includes(normalizedDbPhone);
       });
 
@@ -199,7 +202,6 @@ serve(async (req) => {
         );
       }
 
-      // Get status history
       const rmaIds = filteredData.map(r => r.id);
       const { data: historyData } = await supabaseAdmin
         .from('rma_status_history')
@@ -209,9 +211,7 @@ serve(async (req) => {
 
       const historyByRmaId: Record<string, any[]> = {};
       (historyData || []).forEach(h => {
-        if (!historyByRmaId[h.rma_request_id]) {
-          historyByRmaId[h.rma_request_id] = [];
-        }
+        if (!historyByRmaId[h.rma_request_id]) historyByRmaId[h.rma_request_id] = [];
         historyByRmaId[h.rma_request_id].push({
           id: h.id,
           status: h.status,
@@ -220,6 +220,8 @@ serve(async (req) => {
         });
       });
 
+      // Customer search by name+phone is intentionally always masked, regardless of admin flag,
+      // to prevent admins from accidentally exposing PII via customer-facing flows.
       const maskedResults = filteredData.map(rma => ({
         id: rma.id,
         rma_number: rma.rma_number,
@@ -238,7 +240,7 @@ serve(async (req) => {
         status_history: historyByRmaId[rma.id] || [],
       }));
 
-      console.log(`Found ${maskedResults.length} RMA(s) for customer: ${customerName}, phone: ${customerPhone} (normalized: ${normalizedInputPhone})`);
+      console.log(`Found ${maskedResults.length} RMA(s) for customer: ${customerName}`);
 
       return new Response(
         JSON.stringify({ results: maskedResults }),
