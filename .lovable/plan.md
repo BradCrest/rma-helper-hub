@@ -1,64 +1,88 @@
 
 
-## 計畫：知識來源管理加上分頁（每頁 20 筆）
+## 計畫：知識庫 AI 對話可編輯回答 + 一鍵存回知識庫
 
 ### 目的
-目前「知識來源管理」會把全部資料一次撈出來顯示，捲動很長且效能差。改成每頁 20 筆 + 跳頁控制。
+1. 把區塊標題 **「Email 知識庫 AI 對話」** 改為 **「知識庫 AI 對話」**
+2. AI 回答後你可以直接修改內容（修正錯誤），按一個按鈕把「問題 + 修正後的答案」寫回 `email_knowledge_sources`，下次 AI 回答時會引用你修正過的版本，逐步修正錯誤知識。
 
-### 改動內容
+### 改動內容（單一檔案：`src/components/admin/EmailKnowledgeChat.tsx`）
 
-#### 修改 `src/pages/AdminEmailKnowledge.tsx`
+#### 1. 標題與描述
+- 標題：「知識庫 AI 對話」
+- 副標題：「用自然語言查詢知識庫；可編輯回答並存回知識庫修正錯誤」
 
-**1. 新增分頁狀態**
-- `currentPage`（預設 1）
-- 常數 `PAGE_SIZE = 20`
+#### 2. 訊息資料結構擴充
+每則 assistant 訊息增加狀態：
+- `isEditing`：是否在編輯模式
+- `editedContent`：編輯中的暫存內容
+- `savedAsKnowledge`：是否已存回知識庫（避免重複存）
 
-**2. 計算分頁資料**
-- 套用篩選後（`filtered`）再切片：`paginated = filtered.slice((currentPage-1)*20, currentPage*20)`
-- `totalPages = Math.ceil(filtered.length / 20)`
-- 列表渲染改用 `paginated`
-
-**3. 篩選 / 新增 / 刪除時自動回到第 1 頁**
-- `setFilter` 包一層 handler → 同時 `setCurrentPage(1)`
-- 刪除最後一頁的最後一筆時，若當前頁超出範圍 → 自動退到上一頁
-
-**4. 分頁 UI（列表下方）**
-使用既有的 `@/components/ui/pagination` 元件：
-- 上一頁 / 下一頁按鈕
-- 頁碼顯示策略：總頁數 ≤ 7 全部顯示；> 7 則顯示「1 … 當前-1 當前 當前+1 … 末頁」搭配 `PaginationEllipsis`
-- 當前頁 `isActive`
-- 左側顯示「共 X 筆 · 第 Y / Z 頁」資訊文字
-- 第 1 頁時上一頁 disabled、最後一頁時下一頁 disabled
-
-**5. 樣式**
-- 分頁列置於列表下方，內距 `p-4 border-t border-border`
-- 無資料或單頁時不顯示分頁
-
-### UI 範例
+#### 3. 每則 AI 回答下方新增操作列
 ```text
-┌─ 知識來源管理 ────────────────────────[+ 新增知識]┐
-│ 篩選：[全部 (19420)] [FAQ] [範本] [Email] [文件] │
-├──────────────────────────────────────────────────┤
-│  📎 ...（最多 20 筆）                            │
-│  📎 ...                                          │
-│  ...                                             │
-├──────────────────────────────────────────────────┤
-│ 共 19420 筆 · 第 3 / 971 頁                      │
-│           [‹ 上一頁] [1] … [2] [3] [4] … [971] [下一頁 ›]│
+┌─ AI 回答氣泡 ────────────────────────────────────┐
+│ {AI 回答內容（編輯模式時變成 textarea）}         │
 └──────────────────────────────────────────────────┘
+   [✏️ 編輯] [💾 存為知識]              ← 預設狀態
+   
+   編輯模式時：
+   [✅ 完成編輯] [❌ 取消]   後變回上面那行
 ```
+- **僅在串流結束後顯示**（避免邊串流邊出現按鈕）
+- **空回答不顯示**
 
-### 需要修改的檔案
-- 修改：`src/pages/AdminEmailKnowledge.tsx`（唯一檔案）
+#### 4. 「✏️ 編輯」按鈕
+- 點擊把該則訊息切換成 `<Textarea>`，內容為當前文字
+- 即時更新 `editedContent`
+- 「✅ 完成編輯」把 `editedContent` 寫回 `messages[i].content`，退出編輯
+- 「❌ 取消」丟棄編輯，退出編輯
+
+#### 5. 「💾 存為知識」按鈕
+邏輯（仿 `DraftEmailReply` 的 `handleSaveAsKnowledge`）：
+- 找到該則 AI 訊息**之前最近的 user 訊息**作為「問題」
+- 組合內容：
+  ```
+  【使用者問題】
+  {user 問題}
+  
+  ---
+  
+  【AI 回答（已人工修正）】
+  {修正後的 AI 回答}
+  ```
+- 寫入 `email_knowledge_sources`：
+  - `source_type: 'email'`（沿用現有 tag 體系，知識庫管理頁顯示為「客戶 Email」）
+  - `title: 'AI 對話修正 - {問題前 60 字}'`
+  - `metadata`：
+    ```json
+    {
+      "language": "zh-TW",
+      "tag": "AI 對話修正",
+      "question": "...",
+      "model_used": "...",
+      "saved_from": "email_knowledge_chat",
+      "was_edited": true | false
+    }
+    ```
+  - `created_by: user?.id`
+- 成功後：toast「已加入知識庫，背景索引中…」、按鈕變灰並顯示「✅ 已存入知識庫」
+- 立刻呼叫 `kickoffEmailEmbeddingJob('manual')` 喚醒索引
+
+#### 6. UI 細節
+- 編輯模式 textarea：`min-h-[120px] w-full text-sm` 帶邊框
+- 操作列按鈕用小尺寸 ghost / outline 樣式，避免干擾對話
+- 修改後 `savedAsKnowledge` 自動重設為 `false`，可再次存（覆蓋學習）
+- 引入 `useAuth` 取得 `user?.id`、引入 `kickoffEmailEmbeddingJob`
 
 ### 不需要動的部分
-- 不改後端 / 資料庫 / edge function
-- 不改既有的篩選、編輯、刪除邏輯
-- `pagination.tsx` 元件已存在，直接使用
+- 不改後端 / edge function / 資料庫
+- 不改 trigger（insert 後 `mark_email_embedding_pending` 自動建立 pending embedding）
+- 不改知識庫管理頁（標籤已支援 `email`）
+- 不改 RAG 檢索邏輯（下次對話會自動引用新內容）
 
 ### 預期效果
-1. 列表只顯示當前頁 20 筆，捲動短、渲染快
-2. 切換篩選自動跳回第 1 頁，避免落在空白頁
-3. 刪除最後一筆時自動退頁，不會出現空畫面
-4. 大量資料（近 2 萬筆）也能輕鬆瀏覽
+1. 標題乾淨改為「知識庫 AI 對話」
+2. 發現 AI 回答有錯 → 直接編輯 → 存回知識庫 → 下次同類問題自動引用修正後版本
+3. 在知識庫管理頁可看到 `tag: "AI 對話修正"` 條目，方便日後審視 / 刪除錯誤學習
+4. 越用越聰明，符合「逐步修正錯誤知識」的目標
 
