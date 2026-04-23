@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import EmailEmbeddingManager from "@/components/admin/EmailEmbeddingManager";
 import EmailKnowledgeChat from "@/components/admin/EmailKnowledgeChat";
 import KnowledgeFileUpload from "@/components/admin/KnowledgeFileUpload";
+import RecentKnowledgeUploads, { RecentKnowledgeUploadsHandle } from "@/components/admin/RecentKnowledgeUploads";
 import DraftEmailReply from "@/components/admin/DraftEmailReply";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 
@@ -49,8 +50,12 @@ const AdminEmailKnowledge = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [embeddingRefreshSignal, setEmbeddingRefreshSignal] = useState(0);
+  const recentUploadsRef = useRef<RecentKnowledgeUploadsHandle>(null);
 
-  const refreshEmbeddingMonitor = () => setEmbeddingRefreshSignal((value) => value + 1);
+  const refreshEmbeddingMonitor = () => {
+    setEmbeddingRefreshSignal((value) => value + 1);
+    recentUploadsRef.current?.refresh();
+  };
 
   const fetchSources = async () => {
     setIsLoading(true);
@@ -157,7 +162,9 @@ const AdminEmailKnowledge = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30"><div className="flex items-center gap-3"><Mail className="w-5 h-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Gmail 自動同步</p><p className="text-sm text-muted-foreground">即將推出 — 第二階段將支援 Gmail OAuth 自動抓取信件</p></div></div><button disabled className="rma-btn-secondary opacity-50 cursor-not-allowed">連接 Gmail（即將推出）</button></div>
 
-        <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); }} />
+        <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); recentUploadsRef.current?.scrollIntoView(); }} />
+
+        <RecentKnowledgeUploads ref={recentUploadsRef} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><EmailEmbeddingManager autoStartSignal={embeddingRefreshSignal} /><EmailKnowledgeChat /></div>
 
