@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SLACK_MODEL_OPTIONS = [
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro（推薦・平衡）" },
-  { value: "openai/gpt-5", label: "GPT-5（最高品質・成本較高）" },
+  { value: "openai/gpt-5", label: "GPT-5（最高品質）" },
   { value: "openai/gpt-5.2", label: "GPT-5.2（最新・推理最強）" },
+  { value: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5（Anthropic 直連・推薦）" },
+  { value: "anthropic/claude-opus-4-1", label: "Claude Opus 4.1（Anthropic 直連・最強）" },
+  { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5（Anthropic 直連・最快）" },
 ];
 
 const ADMIN_CHAT_MODEL_OPTIONS = [
@@ -112,7 +115,7 @@ const AiModelSettings = () => {
             Slack 客服回覆模型
           </label>
           <p className="text-xs text-muted-foreground mb-2">
-            用於從 Slack 私訊接收客戶 Email 並產生回覆草稿
+            用於從客戶 Email 草擬回覆草稿（含「草擬回覆信件」功能）。Claude 模型走 Anthropic 直連，需設定 ANTHROPIC_API_KEY。
           </p>
           <div className="flex gap-2">
             <select
