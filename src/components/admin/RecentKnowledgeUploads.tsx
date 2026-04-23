@@ -103,10 +103,12 @@ const RecentKnowledgeUploads = forwardRef<RecentKnowledgeUploadsHandle>((_props,
       }
 
       // Group by file_path (file uploads share the same file_path across chunks).
-      // Manual entries (no file_path) are treated as their own group keyed by id.
+      // Manual / AI-saved entries (no file_path) are grouped per-source by saved_from + id.
       const groupMap = new Map<string, UploadGroup>();
       for (const s of sourceList) {
-        const key = s.file_path || `__manual__${s.id}`;
+        const savedFrom = s.metadata?.saved_from as string | undefined;
+        const tag = s.metadata?.tag as string | undefined;
+        const key = s.file_path || `__${savedFrom || "manual"}__${s.id}`;
         const stat = statusBySource.get(s.id) || { completed: 0, pending: 0, processing: 0, failed: 0, total: 0 };
         const existing = groupMap.get(key);
         if (existing) {
@@ -123,7 +125,7 @@ const RecentKnowledgeUploads = forwardRef<RecentKnowledgeUploadsHandle>((_props,
           groupMap.set(key, {
             source_id: s.id,
             file_path: s.file_path || "",
-            file_name: s.file_name || "（手動建立）",
+            file_name: resolveDisplayName(s),
             file_size: s.file_size,
             earliest_created_at: s.created_at,
             total_chunks: 1,
@@ -132,6 +134,8 @@ const RecentKnowledgeUploads = forwardRef<RecentKnowledgeUploadsHandle>((_props,
             pending: stat.pending,
             processing: stat.processing,
             failed: stat.failed,
+            saved_from: savedFrom,
+            tag,
           });
         }
       }
