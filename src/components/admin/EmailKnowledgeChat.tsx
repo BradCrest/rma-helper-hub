@@ -338,7 +338,7 @@ const EmailKnowledgeChat = () => {
                             <Pencil className="w-3 h-3" /> 編輯
                           </Button>
                           {msg.savedAsKnowledge ? (
-                            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-500">
+                            <span className="inline-flex items-center gap-1 text-xs text-primary">
                               <CheckCircle2 className="w-3 h-3" /> 已存入知識庫
                             </span>
                           ) : (
