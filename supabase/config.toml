@@ -53,3 +53,6 @@ verify_jwt = true
 
 [functions.upload-knowledge-file]
 verify_jwt = true
+
+[functions.draft-email-reply]
+verify_jwt = true

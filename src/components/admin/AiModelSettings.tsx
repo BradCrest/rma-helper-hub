@@ -5,8 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 
 const SLACK_MODEL_OPTIONS = [
   { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro（推薦・平衡）" },
-  { value: "openai/gpt-5", label: "GPT-5（最高品質・成本較高）" },
+  { value: "openai/gpt-5", label: "GPT-5（最高品質）" },
   { value: "openai/gpt-5.2", label: "GPT-5.2（最新・推理最強）" },
+  { value: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5（Anthropic 直連・推薦）" },
+  { value: "anthropic/claude-opus-4-1", label: "Claude Opus 4.1（Anthropic 直連・最強）" },
+  { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5（Anthropic 直連・最快）" },
 ];
 
 const ADMIN_CHAT_MODEL_OPTIONS = [
