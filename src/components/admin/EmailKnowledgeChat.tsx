@@ -1,13 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { Bot, Send, Loader2, Sparkles } from "lucide-react";
+import { Bot, Send, Loader2, Sparkles, Pencil, Save, Check, X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  isEditing?: boolean;
+  editedContent?: string;
+  savedAsKnowledge?: boolean;
+  wasEdited?: boolean;
+  saving?: boolean;
 }
 
 const EXAMPLE_PROMPTS = [
@@ -17,6 +24,7 @@ const EXAMPLE_PROMPTS = [
 ];
 
 const EmailKnowledgeChat = () => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -54,7 +62,7 @@ const EmailKnowledgeChat = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${sessionData.session.access_token}`,
           },
-          body: JSON.stringify({ messages: newMessages }),
+          body: JSON.stringify({ messages: newMessages.map(({ role, content }) => ({ role, content })) }),
         }
       );
 
@@ -138,6 +146,115 @@ const EmailKnowledgeChat = () => {
     }
   };
 
+  const startEdit = (index: number) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], isEditing: true, editedContent: next[index].content };
+      return next;
+    });
+  };
+
+  const cancelEdit = (index: number) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], isEditing: false, editedContent: undefined };
+      return next;
+    });
+  };
+
+  const updateEditContent = (index: number, value: string) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], editedContent: value };
+      return next;
+    });
+  };
+
+  const finishEdit = (index: number) => {
+    setMessages((prev) => {
+      const next = [...prev];
+      const newContent = next[index].editedContent ?? next[index].content;
+      const changed = newContent !== next[index].content;
+      next[index] = {
+        ...next[index],
+        content: newContent,
+        isEditing: false,
+        editedContent: undefined,
+        wasEdited: next[index].wasEdited || changed,
+        savedAsKnowledge: changed ? false : next[index].savedAsKnowledge,
+      };
+      return next;
+    });
+  };
+
+  const handleSaveAsKnowledge = async (index: number) => {
+    const assistantMsg = messages[index];
+    if (!assistantMsg || assistantMsg.role !== "assistant" || !assistantMsg.content.trim()) return;
+
+    // Find latest user message before this assistant message
+    let questionContent = "";
+    for (let i = index - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        questionContent = messages[i].content;
+        break;
+      }
+    }
+    if (!questionContent) {
+      toast.error("找不到對應的使用者問題");
+      return;
+    }
+
+    setMessages((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], saving: true };
+      return next;
+    });
+
+    try {
+      const trimmedQuestion = questionContent.replace(/\s+/g, " ").trim();
+      const titleSuffix = trimmedQuestion.length > 60 ? trimmedQuestion.slice(0, 60) + "…" : trimmedQuestion;
+      const title = `AI 對話修正 - ${titleSuffix}`;
+      const content = `【使用者問題】\n${questionContent}\n\n---\n\n【AI 回答（已人工修正）】\n${assistantMsg.content}`;
+
+      const { error } = await supabase.from("email_knowledge_sources").insert({
+        source_type: "email",
+        title,
+        content,
+        created_by: user?.id ?? null,
+        metadata: {
+          language: "zh-TW",
+          tag: "AI 對話修正",
+          question: questionContent,
+          saved_from: "email_knowledge_chat",
+          was_edited: !!assistantMsg.wasEdited,
+        },
+      });
+
+      if (error) throw error;
+
+      setMessages((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], saving: false, savedAsKnowledge: true };
+        return next;
+      });
+
+      toast.success("已加入知識庫，背景索引中…");
+
+      // Trigger embedding job, non-blocking
+      kickoffEmailEmbeddingJob("manual").catch((err) => {
+        console.error("kickoff embedding failed", err);
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error(e instanceof Error ? e.message : "存入知識庫失敗");
+      setMessages((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], saving: false };
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="rma-card">
       <div className="flex items-center gap-3 p-4 border-b border-border">
@@ -145,8 +262,8 @@ const EmailKnowledgeChat = () => {
           <Bot className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground">Email 知識庫 AI 對話</h3>
-          <p className="text-sm text-muted-foreground">用自然語言查詢過往客戶 Email 與 FAQ</p>
+          <h3 className="font-semibold text-foreground">知識庫 AI 對話</h3>
+          <p className="text-sm text-muted-foreground">用自然語言查詢知識庫；可編輯回答並存回知識庫修正錯誤</p>
         </div>
       </div>
 
@@ -171,18 +288,86 @@ const EmailKnowledgeChat = () => {
       )}
 
       {messages.length > 0 && (
-        <div className="max-h-96 overflow-y-auto p-4 space-y-4">
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[85%] rounded-lg px-4 py-2 whitespace-pre-wrap text-sm ${
-                  msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                }`}
-              >
-                {msg.content || (isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null)}
+        <div className="max-h-[32rem] overflow-y-auto p-4 space-y-4">
+          {messages.map((msg, i) => {
+            const isAssistant = msg.role === "assistant";
+            const isLastAssistant = isAssistant && i === messages.length - 1;
+            const streamingThis = isLastAssistant && isLoading;
+            const showActions =
+              isAssistant && !!msg.content.trim() && !streamingThis;
+
+            return (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[85%] flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                  <div
+                    className={`rounded-lg px-4 py-2 whitespace-pre-wrap text-sm w-full ${
+                      msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                    }`}
+                  >
+                    {msg.isEditing ? (
+                      <Textarea
+                        value={msg.editedContent ?? ""}
+                        onChange={(e) => updateEditContent(i, e.target.value)}
+                        className="min-h-[120px] w-full text-sm bg-background"
+                      />
+                    ) : (
+                      msg.content || (streamingThis ? <Loader2 className="w-4 h-4 animate-spin" /> : null)
+                    )}
+                  </div>
+
+                  {showActions && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {msg.isEditing ? (
+                        <>
+                          <Button size="sm" variant="default" onClick={() => finishEdit(i)} className="h-7 text-xs">
+                            <Check className="w-3 h-3" /> 完成編輯
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => cancelEdit(i)} className="h-7 text-xs">
+                            <X className="w-3 h-3" /> 取消
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => startEdit(i)}
+                            className="h-7 text-xs"
+                            disabled={msg.saving}
+                          >
+                            <Pencil className="w-3 h-3" /> 編輯
+                          </Button>
+                          {msg.savedAsKnowledge ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-primary">
+                              <CheckCircle2 className="w-3 h-3" /> 已存入知識庫
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSaveAsKnowledge(i)}
+                              className="h-7 text-xs"
+                              disabled={msg.saving}
+                            >
+                              {msg.saving ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Save className="w-3 h-3" />
+                              )}
+                              存為知識
+                            </Button>
+                          )}
+                          {msg.wasEdited && !msg.savedAsKnowledge && (
+                            <span className="text-xs text-muted-foreground">已修正未儲存</span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       )}
