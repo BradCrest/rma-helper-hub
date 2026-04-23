@@ -59,3 +59,6 @@ verify_jwt = true
 
 [functions.generate-knowledge-question]
 verify_jwt = true
+
+[functions.generate-practice-email]
+verify_jwt = true
