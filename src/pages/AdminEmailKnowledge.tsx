@@ -165,7 +165,37 @@ const AdminEmailKnowledge = () => {
   };
 
   const handleSignOut = async () => { await signOut(); navigate("/admin"); };
-  const filtered = filter === "all" ? sources : sources.filter((s) => s.source_type === filter);
+  const filtered = useMemo(
+    () => (filter === "all" ? sources : sources.filter((s) => s.source_type === filter)),
+    [filter, sources],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
+
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage],
+  );
+
+  const handleFilterChange = (f: SourceType | "all") => {
+    setFilter(f);
+    setCurrentPage(1);
+  };
+
+  const getPageNumbers = (): (number | "ellipsis")[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages: (number | "ellipsis")[] = [1];
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    if (start > 2) pages.push("ellipsis");
+    for (let i = start; i <= end; i++) pages.push(i);
+    if (end < totalPages - 1) pages.push("ellipsis");
+    pages.push(totalPages);
+    return pages;
+  };
 
   return (
     <div className="min-h-screen bg-background">
