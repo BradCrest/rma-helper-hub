@@ -62,6 +62,7 @@ const AdminEmailKnowledge = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [embeddingRefreshSignal, setEmbeddingRefreshSignal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [tagFilter, setTagFilter] = useState<string | "all">("all");
   const recentUploadsRef = useRef<RecentKnowledgeUploadsHandle>(null);
 
   const refreshEmbeddingMonitor = () => {
