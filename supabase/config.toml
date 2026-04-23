@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.draft-email-reply]
 verify_jwt = true
+
+[functions.generate-knowledge-question]
+verify_jwt = true
