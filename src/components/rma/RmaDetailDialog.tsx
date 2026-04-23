@@ -39,6 +39,17 @@ interface RmaDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Escape HTML to prevent XSS when interpolating customer-submitted data into innerHTML
+const esc = (s?: string | number | null): string => {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
