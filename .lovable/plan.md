@@ -1,137 +1,155 @@
-## 計畫：AI 自動產題 → 人工審題 → AI 回答 → 人工修正 → 存回知識庫
+
+
+## 計畫：草擬回覆信件加入「主動學習」功能
 
 ### 目的
+把「知識庫 AI 對話」的主動學習流程，搬一份到「草擬回覆信件」區塊，讓你不用等真的客戶來信，也能持續訓練 AI 寫客服回覆：
 
-在「知識庫 AI 對話」區塊新增**主動學習模式**：
-
-1. 點按鈕讓 AI 從現有知識庫挖出「值得補充」的問題
-2. 你檢視並修改題目
-3. 確認後 AI 用知識庫回答
-4. 你修正答案
-5. 一鍵存回 `email_knowledge_sources`，餵養下次的 RAG
-
-整個流程是「主動學習」，不用等客戶來信，你就能持續訓練模型。
+1. AI 自動產生一封模擬客戶來信
+2. 你檢視 / 修改題目
+3. 確認後 AI 用知識庫草擬回覆
+4. 你修正回覆
+5. 一鍵把「客戶來信 + 修正後的回覆」存回知識庫
 
 ### UI 流程
 
 ```text
-┌─ 知識庫 AI 對話 ─────────────────────────────────┐
-│                                                  │
-│  [💬 直接提問模式]  [✨ 主動學習模式 ←新]       │  ← 模式切換
-│                                                  │
-├─ 主動學習模式畫面 ──────────────────────────────┤
-│                                                  │
-│  [🎲 由 AI 產生練習題]                           │  ← 步驟 1
-│                                                  │
-│  ┌─ AI 產生的題目（可編輯）─────────────────┐  │
-│  │ 客戶詢問海外寄修運費誰負擔？              │  │  ← 步驟 2
-│  │ [編輯區可改題目文字]                       │  │
-│  └────────────────────────────────────────────┘  │
-│  [✅ 確認此題目，產生回答]  [🔄 重新出題]       │
-│                                                  │
-│  ┌─ AI 根據知識庫的回答（串流）──────────────┐  │
-│  │ 海外客戶寄修...                            │  │  ← 步驟 3 + 4
-│  │ [編輯] [💾 存為知識]                       │  │
-│  └────────────────────────────────────────────┘  │
-│                                                  │
-└──────────────────────────────────────────────────┘
+┌─ ✍️ 草擬回覆信件 ──────────────────────────────┐
+│                                                │
+│  [💬 手動模式]   [✨ 主動學習模式 ←新]         │  模式切換
+│                                                │
+├─ 主動學習模式 ─────────────────────────────────┤
+│                                                │
+│  [🎲 由 AI 產生模擬客戶來信]                    │  步驟 1
+│                                                │
+│  ┌─ AI 產生的客戶來信（可編輯）──────────────┐│
+│  │ 主旨：[可改]                               ││  步驟 2
+│  │ 內文：[textarea, 可改]                     ││
+│  │ 寄件人 / RMA 編號：[選填，可改]            ││
+│  └────────────────────────────────────────────┘│
+│  [✅ 確認，產生回覆草稿] [🔄 重新出題]         │
+│                                                │
+│  ┌─ AI 草擬的回覆（可編輯）──────────────────┐│
+│  │ {草稿內容}                                 ││  步驟 3 + 4
+│  │ 模型：xxx · 檢索 N 筆                      ││
+│  │ [✏️ 編輯] [📋 複製] [💾 存為知識]          ││
+│  └────────────────────────────────────────────┘│
+│  [➡️ 下一題]                                   │
+└────────────────────────────────────────────────┘
 ```
 
 ### 改動內容
 
-#### 1. 新增 Edge Function `supabase/functions/generate-knowledge-question/index.ts`
-
-**目的**：呼叫 Lovable AI 從知識庫採樣 3-5 篇文章，請 AI 產出一個「值得補充或測試」的客服情境問題（純文字、繁中、單一問題）。
+#### 1. 新增 Edge Function `supabase/functions/generate-practice-email/index.ts`
+**目的**：產生一封「模擬客戶來信」（含主旨 + 內文 + 模擬寄件人 + 可選 RMA 編號）
 
 **邏輯**：
-
-- 驗證 admin 身份（同 `email-knowledge-chat`）
-- 從 `email_knowledge_sources` 隨機取 5 筆 `title + content` 摘要
-- 系統提示：
-  > 你是 CREST 客服訓練助理。根據以下知識庫片段，產生「一個」實際可能發生的客戶來信情境問題（繁體中文、口語、20-60 字、不要解釋、不要編號），讓客服練習回覆。
-- 模型：沿用 `ai_settings` 的 `admin_chat_model`（預設 `google/gemini-2.5-flash`）
-- 非串流，回傳 `{ question: string }`
+- 驗證 admin（同 `generate-knowledge-question`）
+- 從 `email_knowledge_sources` 隨機取 5 筆作為情境靈感
+- 從 `rma_requests` 隨機取 1 筆作為可能的 RMA 上下文（取 `rma_number` + `product_name` + `customer_name`，可空）
+- 模型：沿用 `ai_settings.slack_reply_model`（與草擬回覆同模型，預設 `google/gemini-2.5-pro`）
+- 系統提示要求 AI 輸出**嚴格 JSON**：
+  ```json
+  {
+    "subject": "...",
+    "body": "...",
+    "sender": "customer@example.com",
+    "rmaNumber": "RC7E9001234"
+  }
+  ```
+- 用 `response_format: { type: "json_object" }`
 - 處理 429 / 402 錯誤
-- `supabase/config.toml` 加 `verify_jwt = false`（在程式內驗證 JWT）
+- `supabase/config.toml` 加 `verify_jwt = true`
 
-#### 2. 修改 `src/components/admin/EmailKnowledgeChat.tsx`
+#### 2. 修改 `src/components/admin/DraftEmailReply.tsx`
 
-**新增模式切換**：
+**模式切換**：
+- 區塊標題列下方加兩個 tab 按鈕：「💬 手動模式」/「✨ 主動學習模式」
+- 預設「手動模式」（保留現有所有行為）
+- 切換不清空既有狀態
 
-- 頂端兩顆 tab 按鈕：「💬 直接提問」/「✨ 主動學習」
-- 預設為「直接提問」（保持現有行為）
-
-**新增「主動學習」區塊狀態**：
-
+**主動學習區塊新增狀態**：
 ```typescript
 type LearningStage = "idle" | "generating_q" | "editing_q" | "answering" | "answered";
 const [stage, setStage] = useState<LearningStage>("idle");
-const [generatedQuestion, setGeneratedQuestion] = useState("");
-const [questionDraft, setQuestionDraft] = useState("");
-const [learningAnswer, setLearningAnswer] = useState("");
-const [answerDraft, setAnswerDraft] = useState("");
-const [isEditingAnswer, setIsEditingAnswer] = useState(false);
-const [savedToKnowledge, setSavedToKnowledge] = useState(false);
+const [practiceSubject, setPracticeSubject] = useState("");
+const [practiceBody, setPracticeBody] = useState("");
+const [practiceSender, setPracticeSender] = useState("");
+const [practiceRma, setPracticeRma] = useState("");
+const [practiceDraft, setPracticeDraft] = useState("");
+const [practiceModel, setPracticeModel] = useState("");
+const [practiceRagCount, setPracticeRagCount] = useState(0);
+const [practiceSaved, setPracticeSaved] = useState(false);
 ```
 
-**步驟 1：產生題目**
-
-- 「🎲 由 AI 產生練習題」按鈕 → `supabase.functions.invoke("generate-knowledge-question")`
-- 成功後 `stage = "editing_q"`、`questionDraft = data.question`
+**步驟 1：產生模擬來信**
+- 「🎲 由 AI 產生模擬客戶來信」→ `supabase.functions.invoke("generate-practice-email")`
+- 成功 → 把回傳 `subject/body/sender/rmaNumber` 寫入 practice 狀態，`stage = "editing_q"`
 
 **步驟 2：審題**
+- 4 個 input/textarea（主旨、寄件人、RMA、內文）皆可編輯
+- 「✅ 確認，產生回覆草稿」→ `stage = "answering"`，呼叫**現有的** `draft-email-reply` edge function（傳 practice 那組 subject/body/sender/rmaNumber），結果寫入 `practiceDraft`/`practiceModel`/`practiceRagCount`，`stage = "answered"`
+- 「🔄 重新出題」→ 回到步驟 1，清空 practice 狀態
 
-- `<Textarea>` 顯示題目，可即時編輯 `questionDraft`
-- 「✅ 確認此題目，產生回答」→ 進入 `stage = "answering"`，呼叫既有的 `email-knowledge-chat`（傳 `[{role:"user", content: questionDraft}]`），複用現有 SSE 串流邏輯把回答寫進 `learningAnswer`
-- 「🔄 重新出題」→ 重新呼叫 step 1
-
-**步驟 3 + 4：審答案**
-
-- 串流結束後 `stage = "answered"`，顯示回答 + 操作列：
-  - 「✏️ 編輯」→ 切換 `<Textarea>`，更新 `answerDraft`
-  - 「💾 存為知識」→ 同 `handleSaveAsKnowledge` 邏輯：
+**步驟 3 + 4：審回覆 + 存回知識庫**
+- 草稿 textarea 可編輯（即時更新 `practiceDraft`，重設 `practiceSaved`）
+- 「📋 複製」按鈕（同手動模式）
+- 「💾 存為知識」→ 仿現有 `handleSaveAsKnowledge` 邏輯：
+  ```
+  【客戶來信】
+  寄件人：xxx
+  主旨：xxx
+  RMA：xxx
+  
+  {practiceBody}
+  
+  ---
+  
+  【客服回覆（已人工修正）】
+  {practiceDraft}
+  ```
+  - `source_type: 'email'`
+  - `title: 'AI 主動學習回覆 - {主旨前 60 字 || 寄件人 || 日期}'`
+  - `metadata`：
+    ```json
+    {
+      "language": "zh-TW",
+      "tag": "AI 主動學習回覆",
+      "sender": "...",
+      "subject": "...",
+      "rma_number": "...",
+      "model_used": "...",
+      "saved_from": "draft_email_reply_learning",
+      "auto_generated_question": true
+    }
     ```
-    【練習題目】
-    {questionDraft}
-
-    ---
-
-    【知識庫回答（已人工修正）】
-    {learningAnswer}
-    ```
-    - `source_type: 'email'`
-    - `title: 'AI 主動學習 - {題目前 60 字}'`
-    - `metadata.tag: 'AI 主動學習'`、`saved_from: 'email_knowledge_chat_learning'`、`auto_generated_question: true`
-    - 觸發 `kickoffEmailEmbeddingJob('manual')`
-- 存完顯示「✅ 已存入知識庫」、提供「下一題」按鈕重置流程
+  - 觸發 `kickoffEmailEmbeddingJob('manual')`
+  - 顯示「✅ 已儲存」、出現「➡️ 下一題」按鈕，按下重置流程回到步驟 1
 
 **錯誤處理**：429 / 402 / 一般錯誤 → toast，不留半截 UI
 
 #### 3. （無需改動）
-
 - 不改資料庫 schema
-- 不改 `email-knowledge-chat` edge function
+- 不改 `draft-email-reply` edge function（直接複用）
 - 不改 `kickoff-email-embedding-job`
-- 不改 `EmbeddingManager` 列表
-- 既有「直接提問」模式完全保留
+- 不改 `EmbeddingManager` 列表（標籤已支援 `email`）
+- 既有「手動模式」完全保留
 
 ### 技術細節
-
-- **題目產生用非串流**（單句很短，沒必要 SSE）
-- **回答產生複用串流**（沿用既有 `email-knowledge-chat`，不用重寫 RAG）
-- **模式切換不清空對話**：主動學習狀態獨立保存，切回直接提問還在
-- **JWT 驗證**：edge function 內 `userClient.auth.getUser()` + 檢查 `user_roles`
-- **CORS**：沿用現有 headers
-- **模型選擇**：與 `email-knowledge-chat` 共用 `ai_settings.admin_chat_model` 設定
+- **模擬來信用非串流**（一次輸出 JSON，沒必要 SSE）
+- **回覆產生複用現有 `draft-email-reply`**（自動 RAG + Anthropic/Lovable AI 切換）
+- **JSON 解析容錯**：edge function 內 `JSON.parse` 失敗時回退用整段文字當 body
+- **模型選擇**：模擬來信跟著 `slack_reply_model` 設定（與真實草擬一致）
+- **CORS / JWT**：沿用現有 pattern
 
 ### 需要修改的檔案
-
-- 新增：`supabase/functions/generate-knowledge-question/index.ts`
-- 修改：`src/components/admin/EmailKnowledgeChat.tsx`（加模式切換 + 主動學習流程）
+- 新增：`supabase/functions/generate-practice-email/index.ts`
+- 修改：`supabase/config.toml`（加 `[functions.generate-practice-email] verify_jwt = true`）
+- 修改：`src/components/admin/DraftEmailReply.tsx`（加模式切換 + 主動學習流程）
 
 ### 預期效果
+1. 沒客戶來信也能產生擬真情境，持續訓練 AI 客服語氣
+2. 你掌握每封來信和回覆的最終版本
+3. 修正後立刻向量化，下次草擬時即引用
+4. 知識庫管理頁可用 `tag: "AI 主動學習回覆"` 篩選 / 審視
 
-1. 沒題目可問也能持續訓練 AI
-2. 你掌握每一道題目和答案的最終版本
-3. 修正後立即向量化，下次對話 / 草擬時即引用
-4. 知識庫管理頁可用 `tag: "AI 主動學習"` 篩選 / 審視
