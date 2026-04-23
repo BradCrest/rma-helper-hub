@@ -206,6 +206,8 @@ const RmaMultiConfirmation = () => {
     </div>
   `;
   };
+
+  const generateCoverPageHtml = (rmaDataList: RmaFullData[]): string => {
     const tableRows = rmaDataList.map((rma, index) => `
       <tr style="border-bottom: 1px solid #e0e0e0;">
         <td style="padding: 10px 8px;">${index + 1}</td>
