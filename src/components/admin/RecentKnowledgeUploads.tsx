@@ -256,7 +256,7 @@ const RecentKnowledgeUploads = forwardRef<RecentKnowledgeUploadsHandle>((_props,
                     <span className="text-muted-foreground">{pct}% ({g.completed}/{g.total})</span>
                     {g.completed > 0 && <span className="text-primary">✓ 完成 {g.completed}</span>}
                     {g.pending > 0 && <span className="text-muted-foreground">⏳ 待處理 {g.pending}</span>}
-                    {g.processing > 0 && <span className="text-blue-600">⚙️ 處理中 {g.processing}</span>}
+                    {g.processing > 0 && <span className="text-primary">⚙️ 處理中 {g.processing}</span>}
                     {g.failed > 0 && <span className="text-destructive">✗ 失敗 {g.failed}</span>}
                     {(hasIssue || (inProgress && !isReindexing)) && (
                       <button
