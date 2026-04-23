@@ -162,8 +162,9 @@ const AdminEmailKnowledge = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30"><div className="flex items-center gap-3"><Mail className="w-5 h-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Gmail 自動同步</p><p className="text-sm text-muted-foreground">即將推出 — 第二階段將支援 Gmail OAuth 自動抓取信件</p></div></div><button disabled className="rma-btn-secondary opacity-50 cursor-not-allowed">連接 Gmail（即將推出）</button></div>
 
-        <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); }} />
+        <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); recentUploadsRef.current?.scrollIntoView(); }} />
 
+        <RecentKnowledgeUploads ref={recentUploadsRef} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><EmailEmbeddingManager autoStartSignal={embeddingRefreshSignal} /><EmailKnowledgeChat /></div>
 
         <DraftEmailReply />
