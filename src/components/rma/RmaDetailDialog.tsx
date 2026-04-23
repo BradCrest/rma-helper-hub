@@ -211,9 +211,9 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
         <div class="container">
           <div class="header">
             <div class="logo-text">RMA 保固服務申請單</div>
-            <div class="rma-number">${data.rma_number}</div>
+            <div class="rma-number">${esc(data.rma_number)}</div>
             <div class="meta">
-              申請時間：${formatDate(data.created_at)} ｜ 狀態：<span class="status-badge">${getStatusLabel(data.status)}</span>
+              申請時間：${esc(formatDate(data.created_at))} ｜ 狀態：<span class="status-badge">${esc(getStatusLabel(data.status))}</span>
             </div>
           </div>
 
@@ -222,27 +222,27 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
             <div class="grid">
               <div class="item">
                 <div class="label">客戶姓名</div>
-                <div class="value">${data.customer_name}</div>
+                <div class="value">${esc(data.customer_name)}</div>
               </div>
               <div class="item">
                 <div class="label">客戶類型</div>
-                <div class="value">${data.customer_type || "一般客戶"}</div>
+                <div class="value">${esc(data.customer_type) || "一般客戶"}</div>
               </div>
               <div class="item">
                 <div class="label">電子郵件</div>
-                <div class="value">${data.customer_email}</div>
+                <div class="value">${esc(data.customer_email)}</div>
               </div>
               <div class="item">
                 <div class="label">聯絡電話</div>
-                <div class="value">${data.customer_phone}</div>
+                <div class="value">${esc(data.customer_phone)}</div>
               </div>
               <div class="item">
                 <div class="label">手機號碼</div>
-                <div class="value">${data.mobile_phone || "-"}</div>
+                <div class="value">${esc(data.mobile_phone) || "-"}</div>
               </div>
               <div class="item full-width">
                 <div class="label">聯絡地址</div>
-                <div class="value">${data.customer_address || "-"}</div>
+                <div class="value">${esc(data.customer_address) || "-"}</div>
               </div>
             </div>
           </div>
@@ -252,36 +252,36 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
             <div class="grid">
               <div class="item">
                 <div class="label">產品名稱</div>
-                <div class="value">${data.product_name}</div>
+                <div class="value">${esc(data.product_name)}</div>
               </div>
               <div class="item">
                 <div class="label">產品型號</div>
-                <div class="value">${data.product_model || "-"}</div>
+                <div class="value">${esc(data.product_model) || "-"}</div>
               </div>
               <div class="item">
                 <div class="label">產品序號</div>
-                <div class="value">${data.serial_number || "-"}</div>
+                <div class="value">${esc(data.serial_number) || "-"}</div>
               </div>
               <div class="item">
                 <div class="label">購買日期</div>
-                <div class="value">${data.purchase_date || "-"}</div>
+                <div class="value">${esc(data.purchase_date) || "-"}</div>
               </div>
               <div class="item">
                 <div class="label">保固到期日</div>
-                <div class="value">${data.warranty_date || "-"}</div>
+                <div class="value">${esc(data.warranty_date) || "-"}</div>
               </div>
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">問題描述</div>
-            <div class="description-box">${data.issue_description || "-"}</div>
+            <div class="description-box">${esc(data.issue_description) || "-"}</div>
           </div>
 
           ${data.customer_notes ? `
           <div class="section">
             <div class="section-title">隨附物品 / 備註</div>
-            <div class="description-box">${data.customer_notes}</div>
+            <div class="description-box">${esc(data.customer_notes)}</div>
           </div>
           ` : ""}
 
@@ -298,7 +298,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     const notesSection = data.customer_notes ? `
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">隨附物品 / 備註</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${data.customer_notes}</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap;">${esc(data.customer_notes)}</div>
       </div>
     ` : "";
 
@@ -306,40 +306,40 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     <div style="width: 794px; min-height: 1123px; padding: 40px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Microsoft JhengHei', 'PingFang SC', sans-serif; color: #333; background: white;">
       <div style="background: linear-gradient(135deg, #0066cc, #0052a3); padding: 24px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
         <div style="color: white; font-size: 20px; font-weight: 600; margin-bottom: 8px;">RMA 保固服務申請單</div>
-        <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${data.rma_number}</div>
+        <div style="color: white; font-size: 28px; font-weight: bold; font-family: monospace;">${esc(data.rma_number)}</div>
       </div>
       
       <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; color: #666;">
-        <span>申請時間：${formatDate(data.created_at)}</span>
-        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 12px;">${getStatusLabel(data.status)}</span>
+        <span>申請時間：${esc(formatDate(data.created_at))}</span>
+        <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 16px; font-size: 12px;">${esc(getStatusLabel(data.status))}</span>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">客戶資訊</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶姓名</div><div style="font-size: 14px; font-weight: 500;">${data.customer_name}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶類型</div><div style="font-size: 14px; font-weight: 500;">${data.customer_type || "一般客戶"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">電子郵件</div><div style="font-size: 14px; font-weight: 500;">${data.customer_email}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡電話</div><div style="font-size: 14px; font-weight: 500;">${data.customer_phone}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">手機號碼</div><div style="font-size: 14px; font-weight: 500;">${data.mobile_phone || "-"}</div></div>
-          <div style="grid-column: 1 / -1;"><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡地址</div><div style="font-size: 14px; font-weight: 500;">${data.customer_address || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶姓名</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_name)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">客戶類型</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_type) || "一般客戶"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">電子郵件</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_email)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡電話</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_phone)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">手機號碼</div><div style="font-size: 14px; font-weight: 500;">${esc(data.mobile_phone) || "-"}</div></div>
+          <div style="grid-column: 1 / -1;"><div style="font-size: 12px; color: #888; margin-bottom: 4px;">聯絡地址</div><div style="font-size: 14px; font-weight: 500;">${esc(data.customer_address) || "-"}</div></div>
         </div>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">產品資訊</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品名稱</div><div style="font-size: 14px; font-weight: 500;">${data.product_name}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品型號</div><div style="font-size: 14px; font-weight: 500;">${data.product_model || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品序號</div><div style="font-size: 14px; font-weight: 500;">${data.serial_number || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">購買日期</div><div style="font-size: 14px; font-weight: 500;">${data.purchase_date || "-"}</div></div>
-          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">保固到期日</div><div style="font-size: 14px; font-weight: 500;">${data.warranty_date || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品名稱</div><div style="font-size: 14px; font-weight: 500;">${esc(data.product_name)}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品型號</div><div style="font-size: 14px; font-weight: 500;">${esc(data.product_model) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">產品序號</div><div style="font-size: 14px; font-weight: 500;">${esc(data.serial_number) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">購買日期</div><div style="font-size: 14px; font-weight: 500;">${esc(data.purchase_date) || "-"}</div></div>
+          <div><div style="font-size: 12px; color: #888; margin-bottom: 4px;">保固到期日</div><div style="font-size: 14px; font-weight: 500;">${esc(data.warranty_date) || "-"}</div></div>
         </div>
       </div>
 
       <div style="background: #fafafa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 16px; font-weight: 600; color: #0066cc; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">問題描述</div>
-        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${data.issue_description || "-"}</div>
+        <div style="background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; font-size: 14px; white-space: pre-wrap; min-height: 60px;">${esc(data.issue_description) || "-"}</div>
       </div>
 
       ${notesSection}
