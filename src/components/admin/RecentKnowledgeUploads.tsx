@@ -16,7 +16,25 @@ interface UploadGroup {
   pending: number;
   processing: number;
   failed: number;
+  saved_from?: string;
+  tag?: string;
 }
+
+const SAVED_FROM_LABELS: Record<string, string> = {
+  email_knowledge_chat: "💬 知識庫 AI 對話（修正）",
+  email_knowledge_chat_learning: "✨ 知識庫 AI 對話（主動學習）",
+  draft_email_reply: "✍️ 草擬回覆信件（修正）",
+  draft_email_reply_learning: "✨ 草擬回覆信件（主動學習）",
+};
+
+const resolveDisplayName = (source: { file_name?: string | null; metadata?: any }) => {
+  if (source.file_name) return source.file_name;
+  const savedFrom = source.metadata?.saved_from;
+  if (savedFrom && SAVED_FROM_LABELS[savedFrom]) return SAVED_FROM_LABELS[savedFrom];
+  const tag = source.metadata?.tag;
+  if (tag) return `#${tag}`;
+  return "（手動建立）";
+};
 
 export interface RecentKnowledgeUploadsHandle {
   refresh: () => void;
