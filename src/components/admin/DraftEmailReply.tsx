@@ -205,9 +205,31 @@ const DraftEmailReply = () => {
             </div>
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                if (savedKnowledge) setSavedKnowledge(false);
+              }}
               className="w-full p-3 text-sm font-mono bg-background border-0 focus:outline-none min-h-[240px] resize-y"
             />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-muted/30 border-t border-border">
+              <p className="text-xs text-muted-foreground">
+                💡 修正後再儲存，AI 會學到你的用語
+              </p>
+              <button
+                onClick={handleSaveAsKnowledge}
+                disabled={isSavingKnowledge || savedKnowledge || !draft.trim() || !body.trim()}
+                className="rma-btn-secondary text-sm disabled:opacity-50 self-end sm:self-auto"
+              >
+                {isSavingKnowledge ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : savedKnowledge ? (
+                  <BookmarkCheck className="w-4 h-4 text-green-600" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                {isSavingKnowledge ? "儲存中..." : savedKnowledge ? "✅ 已儲存" : "💾 儲存為知識來源"}
+              </button>
+            </div>
           </div>
         )}
       </div>
