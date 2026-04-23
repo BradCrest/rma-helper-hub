@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import EmailEmbeddingManager from "@/components/admin/EmailEmbeddingManager";
 import EmailKnowledgeChat from "@/components/admin/EmailKnowledgeChat";
 import KnowledgeFileUpload from "@/components/admin/KnowledgeFileUpload";
+import DraftEmailReply from "@/components/admin/DraftEmailReply";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 
 type SourceType = "faq" | "template" | "email" | "document";
@@ -159,6 +160,8 @@ const AdminEmailKnowledge = () => {
         <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); }} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><EmailEmbeddingManager autoStartSignal={embeddingRefreshSignal} /><EmailKnowledgeChat /></div>
+
+        <DraftEmailReply />
 
         <div className="rma-card">
           <div className="flex items-center justify-between p-4 border-b border-border"><h2 className="text-lg font-semibold text-foreground">知識來源管理</h2>{!showForm && <button onClick={() => setShowForm(true)} className="rma-btn-primary text-sm"><Plus className="w-4 h-4" /> 新增知識</button>}</div>

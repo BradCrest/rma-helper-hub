@@ -115,7 +115,7 @@ const AiModelSettings = () => {
             Slack 客服回覆模型
           </label>
           <p className="text-xs text-muted-foreground mb-2">
-            用於從 Slack 私訊接收客戶 Email 並產生回覆草稿
+            用於從客戶 Email 草擬回覆草稿（含「草擬回覆信件」功能）。Claude 模型走 Anthropic 直連，需設定 ANTHROPIC_API_KEY。
           </p>
           <div className="flex gap-2">
             <select
