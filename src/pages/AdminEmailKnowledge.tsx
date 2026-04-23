@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import EmailEmbeddingManager from "@/components/admin/EmailEmbeddingManager";
 import EmailKnowledgeChat from "@/components/admin/EmailKnowledgeChat";
 import KnowledgeFileUpload from "@/components/admin/KnowledgeFileUpload";
+import RecentKnowledgeUploads, { RecentKnowledgeUploadsHandle } from "@/components/admin/RecentKnowledgeUploads";
 import DraftEmailReply from "@/components/admin/DraftEmailReply";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 
