@@ -133,7 +133,7 @@ const Shipping = () => {
       // Upload photo if exists
       if (photo) {
         const fileExt = photo.name.split(".").pop();
-        const fileName = `${foundRma.rma_number}-shipping-${Date.now()}.${fileExt}`;
+        const fileName = `rma/${foundRma.rma_number}-shipping-${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from("rma-photos")
