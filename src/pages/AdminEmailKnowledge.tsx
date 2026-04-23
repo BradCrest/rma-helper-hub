@@ -62,6 +62,7 @@ const AdminEmailKnowledge = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [embeddingRefreshSignal, setEmbeddingRefreshSignal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [tagFilter, setTagFilter] = useState<string | "all">("all");
   const recentUploadsRef = useRef<RecentKnowledgeUploadsHandle>(null);
 
   const refreshEmbeddingMonitor = () => {
@@ -166,9 +167,23 @@ const AdminEmailKnowledge = () => {
 
   const handleSignOut = async () => { await signOut(); navigate("/admin"); };
   const filtered = useMemo(
-    () => (filter === "all" ? sources : sources.filter((s) => s.source_type === filter)),
-    [filter, sources],
+    () => sources.filter((s) => {
+      if (filter !== "all" && s.source_type !== filter) return false;
+      if (tagFilter !== "all" && (s.metadata?.tag || "") !== tagFilter) return false;
+      return true;
+    }),
+    [filter, tagFilter, sources],
   );
+
+  const tagCounts = useMemo(() => {
+    const base = filter === "all" ? sources : sources.filter((s) => s.source_type === filter);
+    const map = new Map<string, number>();
+    for (const s of base) {
+      const t = s.metadata?.tag;
+      if (t && t.trim()) map.set(t, (map.get(t) || 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [sources, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   useEffect(() => {
@@ -182,6 +197,12 @@ const AdminEmailKnowledge = () => {
 
   const handleFilterChange = (f: SourceType | "all") => {
     setFilter(f);
+    setTagFilter("all");
+    setCurrentPage(1);
+  };
+
+  const handleTagFilterChange = (t: string | "all") => {
+    setTagFilter(t);
     setCurrentPage(1);
   };
 
@@ -217,7 +238,28 @@ const AdminEmailKnowledge = () => {
 
           {showForm && <form onSubmit={handleSave} className="p-4 space-y-3 bg-muted/20 border-b border-border"><div className="grid grid-cols-1 md:grid-cols-3 gap-3"><div><label className="block text-sm font-medium text-foreground mb-1">類型</label><select value={formType} onChange={(e) => setFormType(e.target.value as SourceType)} className="rma-input w-full" disabled={isSaving}><option value="faq">FAQ</option><option value="template">客服回覆範本</option><option value="email">客戶 Email</option></select></div><div><label className="block text-sm font-medium text-foreground mb-1">語言</label><select value={formLanguage} onChange={(e) => setFormLanguage(e.target.value)} className="rma-input w-full" disabled={isSaving}><option value="zh-TW">繁體中文</option><option value="zh-CN">簡體中文</option><option value="en">English</option><option value="ja">日本語</option><option value="other">其他</option></select></div><div><label className="block text-sm font-medium text-foreground mb-1">標籤（選填）</label><input type="text" value={formTag} onChange={(e) => setFormTag(e.target.value)} placeholder="例如：保固、運費、退貨" className="rma-input w-full" disabled={isSaving} /></div></div><div><label className="block text-sm font-medium text-foreground mb-1">標題</label><input type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="簡短描述此知識內容" className="rma-input w-full" disabled={isSaving} required /></div><div><label className="block text-sm font-medium text-foreground mb-1">內容</label><textarea value={formContent} onChange={(e) => setFormContent(e.target.value)} placeholder={formType === "faq" ? `Q: 客戶常見問題\nA: 標準回答...` : formType === "template" ? "客服回覆範本內容..." : "貼上完整 Email 內容（含寄件者、主旨、內文）"} className="rma-input w-full min-h-[200px] font-mono text-sm" disabled={isSaving} required /></div><div className="flex items-center justify-end gap-2"><button type="button" onClick={resetForm} className="rma-btn-secondary text-sm" disabled={isSaving}><X className="w-4 h-4" /> 取消</button><button type="submit" className="rma-btn-primary text-sm" disabled={isSaving}>{isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editingId ? "更新" : "新增"}</button></div></form>}
 
-          <div className="px-4 pt-4 flex flex-wrap items-center gap-2"><span className="text-sm text-muted-foreground">篩選：</span>{(["all", "faq", "template", "email", "document"] as const).map((f) => <button key={f} onClick={() => handleFilterChange(f)} className={`text-xs px-3 py-1 rounded-full transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"}`}>{f === "all" ? `全部 (${sources.length})` : SOURCE_LABELS[f].label}</button>)}</div>
+          <div className="px-4 pt-4 flex flex-wrap items-center gap-2"><span className="text-sm text-muted-foreground">篩選類型：</span>{(["all", "faq", "template", "email", "document"] as const).map((f) => <button key={f} onClick={() => handleFilterChange(f)} className={`text-xs px-3 py-1 rounded-full transition-colors ${filter === f ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"}`}>{f === "all" ? `全部 (${sources.length})` : SOURCE_LABELS[f].label}</button>)}</div>
+
+          {tagCounts.length > 0 && (
+            <div className="px-4 pt-2 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">篩選標籤：</span>
+              <button
+                onClick={() => handleTagFilterChange("all")}
+                className={`text-xs px-3 py-1 rounded-full transition-colors ${tagFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-foreground"}`}
+              >
+                全部標籤
+              </button>
+              {tagCounts.map(([tag, count]) => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagFilterChange(tag)}
+                  className={`text-xs px-3 py-1 rounded-full transition-colors ${tagFilter === tag ? "bg-primary text-primary-foreground" : "bg-primary/10 hover:bg-primary/20 text-primary"}`}
+                >
+                  #{tag} ({count})
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="p-4">{isLoading ? <div className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" /></div> : filtered.length === 0 ? <div className="text-center py-12 text-muted-foreground"><FileText className="w-10 h-10 mx-auto mb-2 opacity-50" /><p className="text-sm">尚無知識來源，點擊「新增知識」開始建立</p></div> : <div className="space-y-3">{paginated.map((s) => { const meta = SOURCE_LABELS[s.source_type]; const Icon = meta.icon; return <div key={s.id} className="border border-border rounded-lg p-3 hover:bg-muted/30 transition-colors"><div className="flex items-start justify-between gap-3"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><Icon className={`w-4 h-4 ${meta.color}`} /><span className={`text-xs font-medium ${meta.color}`}>{meta.label}</span>{s.metadata?.language && <span className="text-xs px-2 py-0.5 bg-muted rounded-full text-muted-foreground">{s.metadata.language}</span>}{s.metadata?.tag && <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">#{s.metadata.tag}</span>}{s.file_name && <span className="text-xs px-2 py-0.5 bg-muted rounded-full text-muted-foreground truncate max-w-[200px]" title={s.file_name}>📎 {s.file_name}{typeof s.metadata?.total_chunks === "number" && s.metadata.total_chunks > 1 && ` · ${(s.metadata.chunk_index ?? 0) + 1}/${s.metadata.total_chunks}`}</span>}</div><p className="font-medium text-foreground truncate">{s.title}</p><p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">{s.content}</p><p className="text-xs text-muted-foreground mt-2">更新於 {new Date(s.updated_at).toLocaleString("zh-TW")}</p></div><div className="flex items-center gap-1 shrink-0"><button onClick={() => handleEdit(s)} className="p-2 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground" title="編輯"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(s.id)} disabled={deletingId === s.id} className="p-2 hover:bg-destructive/10 rounded-md text-muted-foreground hover:text-destructive disabled:opacity-50" title="刪除">{deletingId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button></div></div></div>; })}</div>}</div>
 
