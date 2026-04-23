@@ -42,7 +42,7 @@ export interface RecentKnowledgeUploadsHandle {
 }
 
 const POLL_INTERVAL = 5000;
-const WINDOW_HOURS = 24;
+const WINDOW_HOURS = 1;
 
 const formatRelativeTime = (iso: string) => {
   const diff = Date.now() - new Date(iso).getTime();
