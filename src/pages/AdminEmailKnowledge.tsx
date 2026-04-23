@@ -167,9 +167,23 @@ const AdminEmailKnowledge = () => {
 
   const handleSignOut = async () => { await signOut(); navigate("/admin"); };
   const filtered = useMemo(
-    () => (filter === "all" ? sources : sources.filter((s) => s.source_type === filter)),
-    [filter, sources],
+    () => sources.filter((s) => {
+      if (filter !== "all" && s.source_type !== filter) return false;
+      if (tagFilter !== "all" && (s.metadata?.tag || "") !== tagFilter) return false;
+      return true;
+    }),
+    [filter, tagFilter, sources],
   );
+
+  const tagCounts = useMemo(() => {
+    const base = filter === "all" ? sources : sources.filter((s) => s.source_type === filter);
+    const map = new Map<string, number>();
+    for (const s of base) {
+      const t = s.metadata?.tag;
+      if (t && t.trim()) map.set(t, (map.get(t) || 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+  }, [sources, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   useEffect(() => {
@@ -183,6 +197,12 @@ const AdminEmailKnowledge = () => {
 
   const handleFilterChange = (f: SourceType | "all") => {
     setFilter(f);
+    setTagFilter("all");
+    setCurrentPage(1);
+  };
+
+  const handleTagFilterChange = (t: string | "all") => {
+    setTagFilter(t);
     setCurrentPage(1);
   };
 
