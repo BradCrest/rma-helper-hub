@@ -165,6 +165,7 @@ const AdminEmailKnowledge = () => {
         <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); recentUploadsRef.current?.scrollIntoView(); }} />
 
         <RecentKnowledgeUploads ref={recentUploadsRef} />
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"><EmailEmbeddingManager autoStartSignal={embeddingRefreshSignal} /><EmailKnowledgeChat /></div>
 
         <DraftEmailReply />
