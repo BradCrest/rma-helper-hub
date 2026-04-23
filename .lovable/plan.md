@@ -1,72 +1,69 @@
 
 
-## 計畫：在知識庫頁面顯示「最近上傳的檔案 + 索引狀態」
+## 計畫：把客戶來信 + 修正後草稿一鍵存入知識庫
 
 ### 目的
-解決「上傳完看不到反饋、不知道是否已索引」的疑慮。讓你一眼看到每份檔案被切成幾段、目前索引到哪。
+讓你在 `/admin/email-knowledge` 頁面草擬完回覆、人工修正內容後，按一個按鈕就能把「客戶來信 + 最終回覆」存進知識庫，自動觸發向量索引，下次 AI 草擬時就會引用，越用越聰明。
 
 ### 改動內容
 
-#### 1. 新增元件 `RecentKnowledgeUploads.tsx`
-位置：`src/components/admin/RecentKnowledgeUploads.tsx`
+#### 1. 修改 `src/components/admin/DraftEmailReply.tsx`
+在草稿區塊下方新增「💾 儲存為知識來源」按鈕，按下後：
 
-顯示最近 24 小時上傳的檔案，每筆顯示：
-- 檔名 + 上傳時間（相對時間，例如「2 分鐘前」）
-- 總段數 / 已索引 / 待處理 / 失敗（彩色 badge）
-- 進度列（已索引 / 總段數）
-- 若有待處理或失敗 → 顯示「重新索引這份」按鈕
+- 標題自動組成：`客戶Email - {主旨 || 寄件人 || 日期}`
+- 內容組成（純文字，方便日後 AI 檢索）：
+  ```
+  【客戶來信】
+  寄件人：xxx
+  主旨：xxx
+  
+  {客戶原文}
+  
+  ---
+  
+  【客服回覆（已人工修正）】
+  {修正後的草稿}
+  ```
+- `source_type = 'customer_email'`（新標籤，可在知識庫管理頁篩選）
+- `metadata` 存：`{ sender, subject, rma_number, model_used, saved_from: 'draft_email_reply' }`
+- 直接 `supabase.from('email_knowledge_sources').insert(...)` ← 觸發器會自動建立 pending embedding，背景排程會自動產生向量
 
-資料來源（單一查詢）：
-```sql
-SELECT s.id, s.file_name, s.file_size, s.created_at,
-  count(e.id) as total,
-  count(*) FILTER (WHERE e.status = 'completed') as completed,
-  count(*) FILTER (WHERE e.status = 'pending') as pending,
-  count(*) FILTER (WHERE e.status = 'failed') as failed
-FROM email_knowledge_sources s
-LEFT JOIN email_embeddings e ON e.source_id = s.id
-WHERE s.created_at > now() - interval '24 hours'
-GROUP BY s.id ORDER BY s.created_at DESC;
-```
+按下後：
+- 顯示 toast「已加入知識庫，背景索引中…」
+- 按鈕變灰並標示「✅ 已儲存」（避免重複按）
+- 可選：觸發 `kickoffEmailEmbeddingJob('manual')` 立即喚醒索引（不等 cron）
 
-每 5 秒輪詢一次，跑完自動轉綠勾 ✅。
+#### 2. 修改 `src/components/admin/EmbeddingManager.tsx` / 知識來源列表
+在 `source_type` 篩選/顯示加上 `customer_email` 對應中文標籤「客戶 Email」，使用不同顏色 badge（建議橙色）方便辨識。
 
-#### 2. 嵌入到 `AdminEmailKnowledge.tsx`
-位置：`KnowledgeFileUpload` 下方、`EmailEmbeddingManager` 上方。
-標題：**「最近上傳檔案的索引狀態」**
+#### 3. （可選）修改 `supabase/functions/draft-email-reply/index.ts`
+不需要改後端 — 因為儲存是直接從前端寫 `email_knowledge_sources`（admin RLS 允許），且 trigger 自動處理 embedding。
 
-#### 3. 上傳完成後自動捲動 + 刷新
-修改 `KnowledgeFileUpload.tsx`：上傳成功後
-- `scrollIntoView()` 到「最近上傳檔案」區塊
-- 觸發 `RecentKnowledgeUploads` 立即重新查詢一次
-
-### UI 樣式範例
+### UI 樣式
 ```text
-┌────────────────────────────────────────────────────────┐
-│ 📎 Diverout 操作方式說明_中文版_20260414.pdf  2 分鐘前 │
-│ 3.3 MB · 切成 2 段                                     │
-│ ▰▰▰▰▰▰▰▰▰▰  ✅ 已完成 (2/2)                          │
-├────────────────────────────────────────────────────────┤
-│ 📎 20241003_User_Manual_CREST_CRF_CN_V1.0.pdf  20 分鐘前│
-│ 3.7 MB · 切成 11 段                                    │
-│ ▰▰▰▰▰▰▰▰▰▰  ✅ 已完成 (11/11)                        │
-└────────────────────────────────────────────────────────┘
+┌─ 草稿產生後 ────────────────────────────────────┐
+│ 模型：claude-sonnet-4-5 · 檢索 5 筆參考  [複製] │
+├─────────────────────────────────────────────────┤
+│ [可編輯的草稿 textarea]                         │
+│                                                 │
+└─────────────────────────────────────────────────┘
+                              [💾 儲存為知識來源]  ← 新按鈕
+                              提示：修正後再儲存，AI 會學到你的用語
 ```
 
 ### 需要修改的檔案
-- 新增：`src/components/admin/RecentKnowledgeUploads.tsx`
-- 修改：`src/pages/AdminEmailKnowledge.tsx`（嵌入新元件）
-- 修改：`src/components/admin/KnowledgeFileUpload.tsx`（上傳成功後 scroll + 通知刷新）
+- 修改：`src/components/admin/DraftEmailReply.tsx`（加儲存按鈕 + 邏輯）
+- 修改：`src/components/admin/EmbeddingManager.tsx` 或來源列表元件（加 `customer_email` 標籤顯示）
 
 ### 不需要動的部分
-- 不改後端
-- 不改資料庫結構
+- 不改資料庫結構（`source_type` 是 text，可直接寫新值）
 - 不改 edge function
-- 不需要新 API key
+- 不改向量索引機制（trigger 自動處理）
+- 不需要新 secret
 
-### 預期結果
-1. 上傳檔案 → 自動捲到下方 → 看到新檔案出現
-2. 每 5 秒自動更新，能直接看到「pending → completed」變化
-3. 如果某段 failed，會出現「重新索引」按鈕直接點擊重跑
-4. 你問過的 19,303 vs 19,302 這種差 1 筆的疑惑，從此一目瞭然
+### 預期效果
+1. 修正完草稿 → 一鍵存進知識庫 → 自動切段 + 向量化
+2. 下次有類似客戶來信，AI 草擬時會直接參考你修正過的版本
+3. 知識庫管理頁可篩選「客戶 Email」分類，方便日後審視/刪除錯誤學習資料
+4. 越用越貼近你的客服語氣
 
