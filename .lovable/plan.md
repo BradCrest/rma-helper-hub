@@ -1,125 +1,140 @@
+## 目標
 
-## 「客戶來信」分頁規劃
-
-在 `後勤管理` → 把「客戶來信」放在「收件處理」**之前**，作為第一個分頁（最常用：每天先看信）。透過已連接的 Gmail Connector（`content@crestdiving.com`）讀取信件，並串接既有的 AI 草擬回覆功能。
-
----
-
-### 功能範圍（第一版）
-
-只做「**讀信 + AI 草擬回覆**」，不做「直接從系統寄出」（避免一開始就要處理 SPF/DKIM 與寄件人身份問題）。回覆方式維持「複製草稿 → 貼回 Gmail 寄出」。
-
-| 模組 | 功能 |
-|---|---|
-| 信件清單 | 讀取 INBOX 最近 50 封，顯示寄件人、主旨、收信時間、未讀標記、是否已回覆 |
-| 篩選/搜尋 | 全部 / 未讀 / 未回覆；關鍵字搜尋（用 Gmail `q=` 語法） |
-| 信件詳閱 | 右側面板顯示完整內文，自動偵測信中的 RMA 編號並連結到 RMA 詳情 |
-| AI 草擬回覆 | 一鍵帶入信件內容呼叫 `draft-email-reply`（複用既有 RAG）|
-| 回覆動作 | 複製草稿；標記為已讀/已處理；開啟 Gmail 網頁版回信 |
-| 知識庫沉澱 | 修正草稿後可「存為知識」（複用既有流程，tag = `客服回覆`）|
-
-第二版（之後再做）：直接從系統發送回覆、附件下載、多信箱切換。
+在「客戶來信」分頁的 AI 草稿下方新增「儲存到知識庫」功能，把客戶原信 + 編輯後的回覆寫入既有的 `email_knowledge_sources`，並觸發背景索引；同時改善信件清單的快取行為，避免每次切換分頁都重新拉取。
 
 ---
 
-### UI 設計
+## 一、新增「儲存到知識庫」功能
 
-採用左右雙欄（類似 Gmail / 客服收件匣），手機版自動疊成兩個全螢幕視圖。
+### UI（CustomerEmailTab.tsx，AI 草稿區塊下方）
+
+新增一個摺疊區塊「💾 存入知識庫」，包含：
+
+- **標題**（自動帶入信件主旨，可編輯）
+- **標籤**（選填輸入框，例如：保固、退貨）
+- **儲存內容預覽**（唯讀，顯示將寫入的格式，見下方）
+- **儲存按鈕**（寫入後顯示成功狀態 + 「在知識庫檢視」連結）
+
+只有在「AI 草稿已產生且非空」時，這個區塊才會出現（因為要存的是「來信 + 回覆」配對）。
+
+### 寫入格式
+
+把客戶原信和編輯後的草稿合併成一筆 `email` 類型的知識來源，內容格式：
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│ [📧 客戶來信] [📦 收件處理] [📞 客戶處理] [🏭 供應商] ...      │
-├─────────────────────────────────────────────────────────────────┤
-│ 📧 客戶來信  content@crestdiving.com  [● Connected]  [🔄 同步]│
-│ [🔍 搜尋...]  [全部 ▾] [未讀] [未回覆]   共 47 封 · 12 未讀   │
-├──────────────────────┬──────────────────────────────────────────┤
-│ ● Mary Chen          │ 主旨：請問我的 RMA 進度                  │
-│   請問我的 RMA 進度  │ 寄件人：mary@example.com                 │
-│   今天 14:32  [RMA]  │ 時間：2026-04-27 14:32                   │
-│ ─────────────────── │ [🔗 RC7E9001234 查看 RMA]                │
-│ ○ 王先生 (已回覆)    │ ─────────────────────────────────────── │
-│   防水殼漏水…        │ 您好，我於 3/15 寄出的潛水電腦…          │
-│   昨天 10:15         │ （完整內文）                             │
-│ ─────────────────── │                                          │
-│ ● John Lee           │ ─────────────────────────────────────── │
-│   發票補開需求       │ [✨ AI 草擬回覆]  [📋 複製到 Gmail]      │
-│   昨天 09:01         │ [✓ 標記已讀]  [↗ 在 Gmail 開啟]          │
-│ ...                  │                                          │
-│                      │ ┌─ AI 草稿（檢索 5 筆知識庫）──────┐    │
-│                      │ │ 您好 Mary，                       │    │
-│                      │ │ 您寄修的潛水電腦 RC7E900...        │    │
-│                      │ │ ...                                │    │
-│                      │ └────────────────────────────────────┘    │
-│                      │ [💾 修正後存為知識]                      │
-└──────────────────────┴──────────────────────────────────────────┘
+【客戶來信】
+寄件人：{name} <{email}>
+主旨：{subject}
+時間：{date}
+{RMA: xxx 若有偵測到}
+
+{原信純文字內容}
+
+---
+
+【客服回覆】
+{編輯後的草稿內容}
 ```
 
-UI 細節：
-- 左側清單寬度約 360px，未讀字體加粗、左邊有藍點；偵測到 RMA 編號的信件加 `[RMA]` chip
-- 已回覆的信件顯示淡灰 + ✓ 圖示（用 Gmail label `Answered/已回覆` 判斷，沒貼此標籤就視為未回覆）
-- 沿用既有 `rma-card`、`Button`、`Badge`、shadcn `Dialog` 等元件，與 ReceivingTab/CustomerHandlingTab 風格一致
-- 右上角顯示連線狀態 chip：綠色 `Connected` / 紅色 `Disconnected`（讀取失敗時提示重新連線）
+### 寫入邏輯
+
+直接呼叫 `supabase.from("email_knowledge_sources").insert(...)`（沿用 AdminEmailKnowledge.tsx 第 109-130 行的模式），payload：
+
+```ts
+{
+  source_type: "email",
+  title: 形如「客戶來信：{主旨}」,
+  content: 上述合併文字,
+  metadata: {
+    language: "zh-TW",
+    tag: 使用者輸入的標籤 || undefined,
+    sender: "{name} <{email}>",
+    gmail_message_id: detail.id,           // 用於去重檢查
+    rma_number: detectedRma || undefined,
+    saved_at: new Date().toISOString(),
+  },
+  created_by: user?.id,
+}
+```
+
+寫入成功後呼叫 `kickoffEmailEmbeddingJob("customer-email-save")` 觸發背景索引（與既有流程一致），並 toast 顯示結果。
+
+### 防重複
+
+寫入前先用 `gmail_message_id` 查一下：
+
+```ts
+supabase.from("email_knowledge_sources")
+  .select("id").eq("metadata->>gmail_message_id", detail.id).maybeSingle()
+```
+
+若已存在，按鈕改為「更新已儲存內容」走 `update` 路徑；若是新存，呈現「✓ 已存入知識庫」並停留在該狀態（含「在知識庫檢視」按鈕，連到 `/admin/email-knowledge`）。
+
+### 額外：選擇切換信件後重置
+
+切換到別封信時，重置「已存入」狀態。
 
 ---
 
-### 技術架構
+## 二、改善信件清單快取
 
-#### 新增 Edge Function
+### 現況問題
 
-| Function | 用途 | verify_jwt |
-|---|---|---|
-| `gmail-list-messages` | 列出收件匣（支援 `q`、`pageToken`、`maxResults`），回傳精簡欄位 | true |
-| `gmail-get-message` | 取得單封完整內容（含 plain text body 解碼） | true |
-| `gmail-modify-message` | 標記已讀 / 加上「已回覆」label | true |
+每次離開再回到 `/admin/logistics`、或切換到其他分頁再回來，`CustomerEmailTab` 都會 unmount → 重新 mount → 重新 `loadMessages()`。
 
-全部走 Gmail Connector Gateway（`https://connector-gateway.lovable.dev/google_mail/gmail/v1/...`），用 `LOVABLE_API_KEY` + `GOOGLE_MAIL_API_KEY` 兩個 header。每個 function 開頭驗證使用者必須是 admin / super_admin（沿用 `draft-email-reply` 的權限檢查模式）。
+### 解決方案：模組層級快取 + TTL
 
-#### 前端新增檔案
+在 `CustomerEmailTab.tsx` 檔案頂部建立 module-scope 快取（不需要 React Query，最小改動）：
 
-- `src/components/logistics/CustomerEmailTab.tsx` — 主分頁（信件清單 + 詳閱 + AI 草擬整合）
-- `src/lib/gmail-utils.ts` — 解析 RFC 2822 header、base64url decode、偵測 RMA 編號（重用既有 regex `/R[A-Z0-9]{10}/i`）
+```ts
+// 模組級快取：跨 mount 保留
+const emailListCache = new Map<string, { data: EmailListItem[]; ts: number }>();
+const emailDetailCache = new Map<string, EmailDetail>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
+```
 
-#### 修改檔案
+**清單快取行為：**
+- key = `${filter}|${search}` (即 query 字串)
+- mount 時若快取存在且未過期 → 直接顯示快取，不發 request
+- 使用者按「同步」按鈕 → 強制刷新並更新快取（這是唯一觸發網路請求的方式，當快取有效時）
+- 切換 filter/search 時，若該 key 有快取也直接用，否則 fetch
 
-- `src/pages/AdminLogistics.tsx` — 在 tabs 陣列**最前面**插入 `{ id: "email", label: "客戶來信", icon: Mail }`，並加 `<TabsContent value="email">`，預設 `activeTab` 改為 `"email"`
-- `supabase/config.toml` — 三個新 function 加 `verify_jwt = true`
+**信件內文快取：**
+- key = `messageId`
+- 已讀過的信件直接從快取顯示，不重打 `gmail-get-message`
+- 標記已讀的 modify call 仍照舊（只第一次跑）
 
-#### 串接既有功能
+### 視覺提示
 
-- AI 草擬：直接呼叫現有的 `supabase.functions.invoke("draft-email-reply", { body: { subject, body, sender, rmaNumber } })`
-- 存知識：複用 `email_knowledge_sources` insert + `kickoffEmailEmbeddingJob("manual")`
-- RMA 連結：偵測到 RMA 編號後用 `<Link to="/admin/rma">` 或開 `RmaDetailDialog`
-
-#### 「已回覆」判斷機制
-
-第一次使用時自動建立 Gmail label `已回覆`（呼叫 `POST /labels`，幂等處理）。使用者按下「複製到 Gmail」或「✓ 標記已處理」時，呼叫 `gmail-modify-message` 加上此 label 並移除 `UNREAD`。清單根據此 label 顯示「已回覆」徽章。
-
-#### 必要 OAuth scope 確認
-
-從 plan 中已知連線是 `gmail.readonly`。本規劃需要的額外 scope：
-- `gmail.modify` — 標記已讀、加 `已回覆` label
-- `gmail.labels` — 建立 `已回覆` label
-
-如果連線目前**沒有**這兩個 scope，第一次呼叫會收到 `403 insufficient authentication scopes`，前端會顯示「需要重新授權」按鈕，觸發 `reconnect` 流程要求加上 `gmail.modify` + `gmail.labels`。
+工具列加上「最後同步：X 分鐘前」小字，讓使用者知道資料是快取的，需要時可手動按「同步」。
 
 ---
 
-### 風險與注意事項
+## 技術細節
 
-1. **Gmail label 中文** — Gmail label name 支援中文，但內部 ID 仍是英數字（`Label_1234`），建立後要存下 ID 重複使用；建議 label 名稱改用 `RMA-Replied` 避免日後 label 名稱衝突。
-2. **HTML 信件處理** — 客戶來信可能是 HTML（不是純文字）。第一版只解 `text/plain` 部分；若信件只有 `text/html`，用簡單 regex 去 tag 後顯示（之後可換 DOMPurify）。
-3. **同步頻率** — 不做 webhook，按下「🔄 同步」或進入分頁才呼叫 API；避免 Gmail API quota 浪費。
-4. **連線顯示** — 進入分頁時呼叫 `verify_credentials` gateway endpoint，回 `verified` 才顯示綠色，其他狀態都顯示紅色 + 重連按鈕。
+**檔案異動：**
+- `src/components/logistics/CustomerEmailTab.tsx` — 新增儲存區塊 UI、寫入邏輯、模組層級快取
+- 不需要新的 edge function（直接用 supabase-js 寫表）
+- 不需要 DB migration（沿用 `email_knowledge_sources` 既有結構，metadata jsonb 自由擴充）
+
+**沿用既有功能：**
+- 寫入後背景索引：`kickoffEmailEmbeddingJob("customer-email-save")` (lib/email-embedding-job.ts)
+- 知識庫頁面已會自動顯示新增的 `email` 類型項目，含 metadata 標籤、語言過濾
+
+**不會破壞：**
+- 切換分頁回來看到舊資料是預期行為，按「同步」即可拉新
+- Gmail 第一次 mount 仍會 fetch（首次無快取）
+- 5 分鐘 TTL 過期後自動重抓
 
 ---
 
-### 實作順序（核准後執行）
+## 驗收
 
-1. 建立三個 edge function（list / get / modify）
-2. 新增 `CustomerEmailTab.tsx`，先做「列表 + 詳閱 + AI 草擬 + 複製」（不含 modify）
-3. 在 `AdminLogistics.tsx` 插入新分頁、調整預設 tab
-4. 驗證 scope；若不足，跑 reconnect 流程加上 `gmail.modify` + `gmail.labels`
-5. 加上「標記已回覆」label 流程與徽章顯示
-6. 整合「修正後存為知識」按鈕
-
-確認規劃後我就開始實作。
+1. 開一封客戶來信 → 按 ✨AI 草擬回覆 → 編輯草稿
+2. AI 草稿下方出現「💾 存入知識庫」區塊
+3. 輸入標籤（例如「保固詢問」）→ 按儲存
+4. Toast 顯示「已存入知識庫，背景索引已排程」
+5. 到 `/admin/email-knowledge` → 篩選「客戶 Email」→ 看到剛存入的記錄，內容包含原信 + 回覆
+6. 同一封信再按一次 → 變成「更新已儲存內容」
+7. 離開 `/admin/logistics` 切到別頁再回來 → 信件清單立即顯示（無 loading），標示「最後同步：X 分鐘前」
+8. 按「同步」→ 重新拉取最新信件
