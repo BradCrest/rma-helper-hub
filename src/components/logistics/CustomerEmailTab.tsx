@@ -325,15 +325,17 @@ const CustomerEmailTab = () => {
       const { name, email } = parseFromHeader(detail.from);
       const content = buildKnowledgeContent(detail, draft);
       const title = `客戶來信：${detail.subject || "(無主旨)"}`;
-      const metadata: Record<string, unknown> = {
+      const metadataObj: Record<string, string> = {
         language: "zh-TW",
         sender: `${name} <${email}>`,
         gmail_message_id: detail.id,
         gmail_thread_id: detail.threadId,
         saved_at: new Date().toISOString(),
       };
-      if (kbTag.trim()) metadata.tag = kbTag.trim();
-      if (detectedRma) metadata.rma_number = detectedRma;
+      if (kbTag.trim()) metadataObj.tag = kbTag.trim();
+      if (detectedRma) metadataObj.rma_number = detectedRma;
+      // Cast to Json — Supabase generated types treat metadata as Json
+      const metadata = metadataObj as unknown as never;
 
       if (kbExistingId) {
         const { error } = await supabase
@@ -345,13 +347,13 @@ const CustomerEmailTab = () => {
       } else {
         const { data, error } = await supabase
           .from("email_knowledge_sources")
-          .insert({
+          .insert([{
             source_type: "email",
             title,
             content,
             metadata,
             created_by: user?.id,
-          })
+          }])
           .select("id")
           .single();
         if (error) throw error;
