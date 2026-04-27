@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Mail, Search, RefreshCw, Sparkles, Copy, Check, ExternalLink,
-  Loader2, AlertCircle, Inbox,
+  Loader2, AlertCircle, Inbox, Save, BookOpen, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +16,7 @@ import {
   Tabs, TabsList, TabsTrigger,
 } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +40,13 @@ interface EmailDetail extends EmailListItem {
 }
 
 const RMA_REGEX = /R[A-Z0-9]{8,12}/gi;
+
+// ============================================================
+// Module-level cache: persists across component mount/unmount
+// ============================================================
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
+const emailListCache = new Map<string, { data: EmailListItem[]; ts: number }>();
+const emailDetailCache = new Map<string, EmailDetail>();
 
 function parseFromHeader(from: string): { name: string; email: string } {
   const match = from.match(/^(.*?)\s*<(.+?)>\s*$/);
@@ -76,12 +86,16 @@ function formatDate(internalDate: string, fallback: string): string {
 }
 
 const CustomerEmailTab = () => {
+  const { user } = useAuth();
+
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [messages, setMessages] = useState<EmailListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSyncTs, setLastSyncTs] = useState<number | null>(null);
+  const [syncTick, setSyncTick] = useState(0); // for re-rendering "X 分鐘前"
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmailDetail | null>(null);
@@ -91,6 +105,12 @@ const CustomerEmailTab = () => {
   const [draftLoading, setDraftLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // 知識庫儲存相關狀態
+  const [kbTag, setKbTag] = useState("");
+  const [kbSaving, setKbSaving] = useState(false);
+  const [kbExistingId, setKbExistingId] = useState<string | null>(null);
+  const [kbJustSaved, setKbJustSaved] = useState(false);
+
   const buildQuery = useCallback(() => {
     const parts: string[] = ["in:inbox"];
     if (filter === "unread") parts.push("is:unread");
@@ -98,16 +118,35 @@ const CustomerEmailTab = () => {
     return parts.join(" ");
   }, [filter, search]);
 
-  const loadMessages = useCallback(async () => {
+  const cacheKey = buildQuery();
+
+  const loadMessages = useCallback(async (forceRefresh = false) => {
+    const key = buildQuery();
+
+    // 嘗試讀取快取
+    if (!forceRefresh) {
+      const cached = emailListCache.get(key);
+      if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+        setMessages(cached.data);
+        setLastSyncTs(cached.ts);
+        setError(null);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     try {
       const { data, error } = await supabase.functions.invoke("gmail-list-messages", {
-        body: { q: buildQuery(), maxResults: 30 },
+        body: { q: key, maxResults: 30 },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setMessages(data?.messages ?? []);
+      const list: EmailListItem[] = data?.messages ?? [];
+      setMessages(list);
+      const now = Date.now();
+      emailListCache.set(key, { data: list, ts: now });
+      setLastSyncTs(now);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "讀取信件失敗";
       setError(msg);
@@ -117,14 +156,54 @@ const CustomerEmailTab = () => {
     }
   }, [buildQuery]);
 
+  // 切換 filter / search 或首次掛載時執行
   useEffect(() => {
-    loadMessages();
+    loadMessages(false);
   }, [loadMessages]);
 
+  // 每分鐘更新「最後同步：X 分鐘前」顯示
+  useEffect(() => {
+    const id = setInterval(() => setSyncTick((v) => v + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // 檢查目前選中的信件是否已存在於知識庫
+  const checkExistingKnowledge = useCallback(async (messageId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("email_knowledge_sources")
+        .select("id")
+        .eq("source_type", "email")
+        .filter("metadata->>gmail_message_id", "eq", messageId)
+        .maybeSingle();
+      if (error) {
+        console.warn("檢查知識庫失敗:", error);
+        return;
+      }
+      setKbExistingId(data?.id ?? null);
+    } catch (e) {
+      console.warn(e);
+    }
+  }, []);
+
   const loadDetail = useCallback(async (messageId: string) => {
+    // 重置知識庫狀態
+    setKbExistingId(null);
+    setKbJustSaved(false);
+    setKbTag("");
+    setDraft("");
+
+    // 先看快取
+    const cached = emailDetailCache.get(messageId);
+    if (cached) {
+      setDetail(cached);
+      setDetailLoading(false);
+      void checkExistingKnowledge(messageId);
+      return;
+    }
+
     setDetailLoading(true);
     setDetail(null);
-    setDraft("");
     try {
       const { data, error } = await supabase.functions.invoke("gmail-get-message", {
         body: { messageId },
@@ -132,37 +211,54 @@ const CustomerEmailTab = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setDetail(data);
+      emailDetailCache.set(messageId, data);
 
       // Auto mark as read if currently unread
       if (data?.unread) {
         await supabase.functions.invoke("gmail-modify-message", {
           body: { messageId, removeLabelIds: ["UNREAD"] },
         });
+        // 同步快取
+        emailDetailCache.set(messageId, { ...data, unread: false, labelIds: data.labelIds.filter((l: string) => l !== "UNREAD") });
         setMessages((prev) => prev.map((m) =>
           m.id === messageId
             ? { ...m, unread: false, labelIds: m.labelIds.filter((l) => l !== "UNREAD") }
             : m
         ));
+        // 同步信件列表快取
+        const cachedList = emailListCache.get(cacheKey);
+        if (cachedList) {
+          emailListCache.set(cacheKey, {
+            ts: cachedList.ts,
+            data: cachedList.data.map((m) =>
+              m.id === messageId
+                ? { ...m, unread: false, labelIds: m.labelIds.filter((l) => l !== "UNREAD") }
+                : m
+            ),
+          });
+        }
       }
+
+      void checkExistingKnowledge(messageId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "讀取信件內容失敗";
       toast.error(msg);
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [cacheKey, checkExistingKnowledge]);
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
     loadDetail(id);
   };
 
-  const detectedRma = (() => {
+  const detectedRma = useMemo(() => {
     if (!detail) return null;
     const haystack = `${detail.subject}\n${detail.textPlain || htmlToText(detail.textHtml)}`;
     const m = haystack.match(RMA_REGEX);
     return m?.[0] ?? null;
-  })();
+  }, [detail]);
 
   const handleAiDraft = async () => {
     if (!detail) return;
@@ -208,12 +304,96 @@ const CustomerEmailTab = () => {
     window.open(`https://mail.google.com/mail/u/0/#inbox/${detail.id}`, "_blank");
   };
 
+  // 組合「客戶來信 + 客服回覆」寫入內容
+  const buildKnowledgeContent = useCallback((d: EmailDetail, replyText: string): string => {
+    const bodyText = d.textPlain || htmlToText(d.textHtml) || d.snippet;
+    const lines: string[] = [
+      "【客戶來信】",
+      `寄件人：${d.from}`,
+      `主旨：${d.subject || "(無主旨)"}`,
+      `時間：${d.date}`,
+    ];
+    if (detectedRma) lines.push(`RMA：${detectedRma}`);
+    lines.push("", bodyText.trim(), "", "---", "", "【客服回覆】", replyText.trim());
+    return lines.join("\n");
+  }, [detectedRma]);
+
+  const handleSaveToKnowledge = async () => {
+    if (!detail || !draft.trim()) return;
+    setKbSaving(true);
+    try {
+      const { name, email } = parseFromHeader(detail.from);
+      const content = buildKnowledgeContent(detail, draft);
+      const title = `客戶來信：${detail.subject || "(無主旨)"}`;
+      const metadataObj: Record<string, string> = {
+        language: "zh-TW",
+        sender: `${name} <${email}>`,
+        gmail_message_id: detail.id,
+        gmail_thread_id: detail.threadId,
+        saved_at: new Date().toISOString(),
+      };
+      if (kbTag.trim()) metadataObj.tag = kbTag.trim();
+      if (detectedRma) metadataObj.rma_number = detectedRma;
+      // Cast to Json — Supabase generated types treat metadata as Json
+      const metadata = metadataObj as unknown as never;
+
+      if (kbExistingId) {
+        const { error } = await supabase
+          .from("email_knowledge_sources")
+          .update({ title, content, metadata })
+          .eq("id", kbExistingId);
+        if (error) throw error;
+        toast.success("已更新知識庫項目");
+      } else {
+        const { data, error } = await supabase
+          .from("email_knowledge_sources")
+          .insert([{
+            source_type: "email",
+            title,
+            content,
+            metadata,
+            created_by: user?.id,
+          }])
+          .select("id")
+          .single();
+        if (error) throw error;
+        setKbExistingId(data.id);
+        toast.success("已存入知識庫");
+      }
+
+      setKbJustSaved(true);
+
+      // 觸發背景索引（與既有上傳流程一致）
+      try {
+        const result = await kickoffEmailEmbeddingJob("customer-email-save");
+        toast.success(result.message);
+      } catch (e) {
+        console.error(e);
+        toast.error("已存入，但背景索引喚醒失敗，排程稍後仍會自動續跑");
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "儲存失敗";
+      toast.error(msg);
+    } finally {
+      setKbSaving(false);
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearch(searchInput);
   };
 
   const unreadCount = messages.filter((m) => m.unread).length;
+
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSyncTs) return null;
+    // syncTick 觸發重算
+    void syncTick;
+    const diff = Date.now() - lastSyncTs;
+    if (diff < 60_000) return "剛剛同步";
+    return `最後同步：${formatDistanceToNow(lastSyncTs, { locale: zhTW, addSuffix: false })}前`;
+  }, [lastSyncTs, syncTick]);
 
   return (
     <div className="space-y-4">
@@ -228,10 +408,20 @@ const CustomerEmailTab = () => {
               已連線
             </Badge>
           </div>
-          <Button onClick={loadMessages} disabled={loading} variant="outline" size="sm">
-            <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
-            同步
-          </Button>
+          <div className="flex items-center gap-3">
+            {lastSyncLabel && (
+              <span className="text-xs text-muted-foreground">{lastSyncLabel}</span>
+            )}
+            <Button
+              onClick={() => loadMessages(true)}
+              disabled={loading}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
+              同步
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -419,7 +609,11 @@ const CustomerEmailTab = () => {
                   </div>
                   <Textarea
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      // 編輯草稿後，「剛存」狀態失效（提示使用者可再次儲存以更新）
+                      if (kbJustSaved) setKbJustSaved(false);
+                    }}
                     placeholder={draftLoading ? "AI 正在撰寫草稿..." : ""}
                     className="min-h-[200px] font-mono text-sm"
                     readOnly={draftLoading}
@@ -427,6 +621,74 @@ const CustomerEmailTab = () => {
                   <p className="text-xs text-muted-foreground">
                     可直接編輯後複製貼回 Gmail 寄出
                   </p>
+                </div>
+              )}
+
+              {/* 存入知識庫區塊：草稿存在且非載入中才顯示 */}
+              {draft.trim() && !draftLoading && (
+                <div className="border-t border-border pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-medium">存入知識庫</Label>
+                    {kbExistingId && (
+                      <Badge variant="outline" className="text-xs">
+                        已存在於知識庫
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    把這封客戶來信和您編輯後的回覆一起寫入知識庫，AI 之後回覆類似問題時能參考。
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
+                    <div>
+                      <Label htmlFor="kb-tag" className="text-xs text-muted-foreground">
+                        標籤（選填）
+                      </Label>
+                      <Input
+                        id="kb-tag"
+                        value={kbTag}
+                        onChange={(e) => setKbTag(e.target.value)}
+                        placeholder="例如：保固、退貨、運費"
+                        className="h-9"
+                        disabled={kbSaving}
+                      />
+                    </div>
+                    <Button
+                      onClick={handleSaveToKnowledge}
+                      disabled={kbSaving}
+                      size="sm"
+                      className="h-9"
+                    >
+                      {kbSaving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : kbJustSaved ? (
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      {kbSaving
+                        ? "儲存中..."
+                        : kbJustSaved
+                        ? "已儲存"
+                        : kbExistingId
+                        ? "更新已儲存內容"
+                        : "存入知識庫"}
+                    </Button>
+                  </div>
+
+                  {kbJustSaved && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                      <span>已寫入並排程背景索引</span>
+                      <Link
+                        to="/admin/email-knowledge"
+                        className="text-primary hover:underline ml-1"
+                      >
+                        在知識庫檢視 →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
