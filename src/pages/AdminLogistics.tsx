@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { LogOut, Home, Package, Phone, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { LogOut, Home, Package, Phone, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
 import CustomerHandlingTab from "@/components/logistics/CustomerHandlingTab";
+import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 
 const AdminLogistics = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("receiving");
+  const [activeTab, setActiveTab] = useState("email");
 
   const handleSignOut = async () => {
     await signOut();
@@ -17,6 +18,7 @@ const AdminLogistics = () => {
   };
 
   const tabs = [
+    { id: "email", label: "客戶來信", icon: Mail },
     { id: "receiving", label: "收件處理", icon: Package },
     { id: "customer", label: "客戶處理", icon: Phone },
     { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
@@ -69,6 +71,10 @@ const AdminLogistics = () => {
               </TabsTrigger>
             ))}
           </TabsList>
+
+          <TabsContent value="email" className="mt-0">
+            <CustomerEmailTab />
+          </TabsContent>
 
           <TabsContent value="receiving" className="mt-0">
             <ReceivingTab />

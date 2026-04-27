@@ -60,3 +60,12 @@ verify_jwt = true
 
 [functions.generate-practice-email]
 verify_jwt = true
+
+[functions.gmail-list-messages]
+verify_jwt = true
+
+[functions.gmail-get-message]
+verify_jwt = true
+
+[functions.gmail-modify-message]
+verify_jwt = true
