@@ -492,6 +492,7 @@ export type Database = {
           social_account: string | null
           status: Database["public"]["Enums"]["rma_status"]
           updated_at: string
+          updated_by: string | null
           warranty_date: string | null
           warranty_status: string | null
         }
@@ -521,6 +522,7 @@ export type Database = {
           social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string
+          updated_by?: string | null
           warranty_date?: string | null
           warranty_status?: string | null
         }
@@ -550,6 +552,7 @@ export type Database = {
           social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string
+          updated_by?: string | null
           warranty_date?: string | null
           warranty_status?: string | null
         }
