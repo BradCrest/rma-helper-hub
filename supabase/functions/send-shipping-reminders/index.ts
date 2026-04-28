@@ -7,6 +7,10 @@ const corsHeaders = {
 
 const PUBLISHED_URL = "https://rma-helper-hub.lovable.app";
 const REMINDER_DELAY_HOURS = 48;
+// Only send automated reminders for RMAs created on/after this timestamp.
+// Historical RMAs (created before this) will NEVER receive automated reminders.
+// Manual admin-triggered sends (with rma_request_id in POST body) bypass this check.
+const REMINDER_ENABLED_AFTER = "2026-04-28T12:00:00Z";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -45,7 +49,8 @@ Deno.serve(async (req) => {
     } else {
       query = query
         .is("shipping_reminder_sent_at", null)
-        .lte("created_at", cutoffIso);
+        .lte("created_at", cutoffIso)
+        .gte("created_at", REMINDER_ENABLED_AFTER);
     }
 
     const { data: candidates, error: candErr } = await query.limit(100);
