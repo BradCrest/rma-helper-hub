@@ -231,7 +231,7 @@ const AdminRmaList = () => {
       // Apply search filter
       if (searchTerm.trim()) {
         query = query.or(
-          `rma_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%`
+          `rma_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,serial_number.ilike.%${searchTerm}%`
         );
       }
 
@@ -899,7 +899,7 @@ const AdminRmaList = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="搜尋 RMA 編號、客戶名稱、電話或郵件..."
+                placeholder="搜尋 RMA 編號、客戶名稱、電話、郵件或產品序號..."
                 className="rma-input pl-10"
                 value={searchTerm}
                 onChange={(e) => {
