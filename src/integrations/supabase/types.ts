@@ -489,6 +489,7 @@ export type Database = {
           repair_fee: number | null
           rma_number: string
           serial_number: string | null
+          shipping_reminder_sent_at: string | null
           social_account: string | null
           status: Database["public"]["Enums"]["rma_status"]
           updated_at: string
@@ -520,6 +521,7 @@ export type Database = {
           repair_fee?: number | null
           rma_number: string
           serial_number?: string | null
+          shipping_reminder_sent_at?: string | null
           social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string
@@ -551,6 +553,7 @@ export type Database = {
           repair_fee?: number | null
           rma_number?: string
           serial_number?: string | null
+          shipping_reminder_sent_at?: string | null
           social_account?: string | null
           status?: Database["public"]["Enums"]["rma_status"]
           updated_at?: string

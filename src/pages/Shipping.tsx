@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, ArrowLeft, Globe, X, Upload, Camera, Loader2, Check } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ interface RmaResult {
 }
 
 const Shipping = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [rmaNumber, setRmaNumber] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -47,23 +48,20 @@ const Shipping = () => {
     setPhotoPreview(null);
   };
 
-  const handleModalSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rmaNumber.trim()) {
+  const performSearch = async (rawRma: string) => {
+    const trimmed = rawRma.trim();
+    if (!trimmed) {
       toast.error("請輸入RMA號碼");
       return;
     }
 
     setIsSearching(true);
     try {
-      // Use the secure Edge Function to lookup RMA
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaNumber.trim())}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(trimmed)}`,
         {
           method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
         }
       );
 
@@ -75,8 +73,6 @@ const Shipping = () => {
       }
 
       const rma = result.results[0];
-
-      // Note: Shipping duplicate check will be done by the edge function
 
       setFoundRma({
         id: rma.id,
@@ -93,6 +89,30 @@ const Shipping = () => {
       setIsSearching(false);
     }
   };
+
+  const handleModalSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSearch(rmaNumber);
+  };
+
+  // Auto-open modal when arriving from email reminder link (?rma=...&autoopen=1)
+  useEffect(() => {
+    const rmaParam = searchParams.get("rma");
+    const autoOpen = searchParams.get("autoopen");
+    if (rmaParam) {
+      setRmaNumber(rmaParam);
+      if (autoOpen === "1") {
+        setShowModal(true);
+        performSearch(rmaParam);
+      }
+      // Clean URL params after consuming
+      const next = new URLSearchParams(searchParams);
+      next.delete("rma");
+      next.delete("autoopen");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

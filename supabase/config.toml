@@ -69,3 +69,7 @@ verify_jwt = true
 
 [functions.gmail-modify-message]
 verify_jwt = true
+
+[functions.send-shipping-reminders]
+verify_jwt = false
+
