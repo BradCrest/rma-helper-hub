@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { z } from "zod";
+import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
 import { Link } from "react-router-dom";
 import { 
   Search, 
