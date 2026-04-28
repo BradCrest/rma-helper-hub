@@ -76,10 +76,66 @@ const esc = (s?: string | number | null): string => {
     .replace(/'/g, "&#39;");
 };
 
+// Issue type options used by the form (kept in sync with RmaForm)
+const ISSUE_TYPE_OPTIONS = [
+  "螢幕顯示異常",
+  "電池/充電問題",
+  "按鍵故障",
+  "進水/受潮",
+  "外觀損傷",
+  "韌體/軟體問題",
+  "感測器異常",
+  "其他",
+];
+
+// Validation schema for editable fields
+const editSchema = z.object({
+  customer_name: z.string().trim().min(1, "客戶姓名必填").max(100),
+  customer_phone: z.string().trim().min(1, "聯絡電話必填").max(50),
+  mobile_phone: z.string().trim().max(50).optional().or(z.literal("")),
+  customer_email: z.string().trim().email("Email 格式錯誤").max(255),
+  customer_address: z.string().trim().max(500).optional().or(z.literal("")),
+  product_name: z.string().trim().min(1, "產品名稱必填").max(200),
+  product_model: z.string().trim().max(100).optional().or(z.literal("")),
+  serial_number: z.string().trim().max(100).optional().or(z.literal("")),
+  issue_type: z.string().trim().min(1, "問題類型必填"),
+  issue_description: z.string().trim().min(1, "問題描述必填").max(2000),
+  customer_notes: z.string().trim().max(2000).optional().or(z.literal("")),
+});
+
+type EditableForm = z.infer<typeof editSchema> & {
+  shipping_carrier: string;
+  shipping_tracking_number: string;
+  shipping_ship_date: string;
+  shipping_notes: string;
+};
+
+const emptyForm = (): EditableForm => ({
+  customer_name: "",
+  customer_phone: "",
+  mobile_phone: "",
+  customer_email: "",
+  customer_address: "",
+  product_name: "",
+  product_model: "",
+  serial_number: "",
+  issue_type: "",
+  issue_description: "",
+  customer_notes: "",
+  shipping_carrier: "",
+  shipping_tracking_number: "",
+  shipping_ship_date: "",
+  shipping_notes: "",
+});
+
 const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps) => {
+  const { isAdmin, user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [rmaData, setRmaData] = useState<RmaData | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<EditableForm>(emptyForm());
   const contentRef = useRef<HTMLDivElement>(null);
 
   const fetchRmaData = async () => {
