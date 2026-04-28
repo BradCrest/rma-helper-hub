@@ -1,6 +1,16 @@
-import { useState, useRef } from "react";
-import { Download, Printer } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Download, Printer, Pencil, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -11,8 +21,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { z } from "zod";
+import { useAuth } from "@/hooks/useAuth";
+import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
+
+interface InboundShipping {
+  id?: string;
+  carrier?: string | null;
+  tracking_number?: string | null;
+  ship_date?: string | null;
+  notes?: string | null;
+}
 
 interface RmaData {
+  id?: string;
   rma_number: string;
   customer_name: string;
   customer_email: string;
@@ -30,7 +52,11 @@ interface RmaData {
   customer_notes?: string;
   status: string;
   created_at: string;
+  updated_at?: string;
+  updated_by?: string | null;
+  updated_by_email?: string | null;
   photo_urls?: string[];
+  inbound_shipping?: InboundShipping | null;
 }
 
 interface RmaDetailDialogProps {
