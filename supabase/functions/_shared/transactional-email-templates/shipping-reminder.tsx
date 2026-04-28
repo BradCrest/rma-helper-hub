@@ -60,9 +60,12 @@ const ShippingReminderEmail = ({
 
         <Heading as="h2" style={h2}>寄件須知</Heading>
         <Text style={text}>
-          請將商品寄至以下地址：<br />
-          <strong>新北市汐止區康寧街169巷31號5樓</strong><br />
-          收件人：CREST 保固服務中心
+          本公司收件地址如下：<br />
+          <strong>242039 新北市新莊區化成路11巷86號1樓</strong>
+        </Text>
+        <Text style={text}>
+          英文地址：<br />
+          <strong>No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</strong>
         </Text>
         <Text style={warning}>
           ⚠️ 為避免遺失，本服務中心 <strong>無法接受親送</strong>，請務必透過物流寄送。
