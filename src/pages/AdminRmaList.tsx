@@ -162,7 +162,7 @@ const getStatusDurationInfo = (status: RmaStatus, updatedAt: string): { elapsed:
 
 const AdminRmaList = () => {
 
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, signOut, isSuperAdmin, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
