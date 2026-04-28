@@ -204,6 +204,25 @@ const AdminRmaList = () => {
   const [repairFee, setRepairFee] = useState<string>("");
   const [isSavingFee, setIsSavingFee] = useState(false);
 
+  // Detail edit states (admin)
+  const [editingDetail, setEditingDetail] = useState(false);
+  const [savingDetail, setSavingDetail] = useState(false);
+  const [editForm, setEditForm] = useState({
+    customer_name: "",
+    customer_phone: "",
+    customer_email: "",
+    customer_address: "",
+    product_name: "",
+    product_model: "",
+    serial_number: "",
+    issue_type: "",
+    issue_description: "",
+    customer_notes: "",
+    shipping_carrier: "",
+    shipping_tracking_number: "",
+    shipping_ship_date: "",
+  });
+
   // Deletion logs states
   interface DeletionLog {
     id: string;
