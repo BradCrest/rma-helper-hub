@@ -13,7 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ExternalLink, Megaphone } from "lucide-react";
+
+const POLICY_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update?srsltid=AfmBOooKlXrXFW6s3doVBFQ3uTxkt4jOHtALfSlmoU4RxRqDQTgAHbLU";
 
 const Index = () => {
   const [showNotice, setShowNotice] = useState(true);
@@ -41,6 +43,23 @@ const Index = () => {
                     Due to manpower constraints, we are currently unable to accept in-person deliveries. Please arrange shipment via courier service instead. Thank you.
                   </p>
                 </div>
+                <a
+                  href={POLICY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 rounded border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors group"
+                >
+                  <Megaphone className="h-5 w-5 text-primary shrink-0" />
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-primary">
+                      CREST 潛水電腦錶保固與維修政策調整公告
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      點擊查看完整公告 / View Full Announcement
+                    </p>
+                  </div>
+                  <ExternalLink className="h-4 w-4 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                </a>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -62,9 +81,21 @@ const Index = () => {
                 <div className="mb-4">
                   <img src={logo} alt="CREST Logo" className="h-12 md:h-16 w-auto" />
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
                   CREST 產品申請保固服務系統
                 </h2>
+                <a
+                  href={POLICY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-lg border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors group"
+                >
+                  <Megaphone className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-semibold text-primary">
+                    CREST 潛水電腦錶保固與維修政策調整公告
+                  </span>
+                  <ExternalLink className="h-4 w-4 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                </a>
                 <TabNavigation />
               </div>
 
