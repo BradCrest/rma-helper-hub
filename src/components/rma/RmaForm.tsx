@@ -761,6 +761,30 @@ const RmaForm = () => {
         productCount={csvProducts.length}
         errors={csvErrors}
       />
+
+      <AlertDialog
+        open={showInvalidSerialDialog}
+        onOpenChange={setShowInvalidSerialDialog}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex justify-center mb-2">
+              <AlertTriangle className="h-12 w-12 text-amber-500" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              {INVALID_SERIAL_TITLE}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="mt-2 whitespace-pre-line text-sm text-foreground bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+                {INVALID_SERIAL_DESCRIPTION}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="px-8">我知道了</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };
