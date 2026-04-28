@@ -244,6 +244,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       fetchRmaData();
     } else {
       setRmaData(null);
+      setEmailLogs([]);
       setEditing(false);
     }
     onOpenChange(isOpen);
