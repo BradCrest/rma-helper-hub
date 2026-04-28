@@ -1889,7 +1889,43 @@ const AdminRmaList = () => {
               </div>
 
               {/* Shipping Info */}
-              {selectedRmaShipping && (
+              {editingDetail ? (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">客戶寄件資訊</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">物流名稱</p>
+                        <input
+                          className="rma-input"
+                          value={editForm.shipping_carrier}
+                          onChange={(e) => setEditForm({ ...editForm, shipping_carrier: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">物流單號</p>
+                        <input
+                          className="rma-input"
+                          value={editForm.shipping_tracking_number}
+                          onChange={(e) => setEditForm({ ...editForm, shipping_tracking_number: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">寄出日期</p>
+                      <input
+                        type="date"
+                        className="rma-input"
+                        value={editForm.shipping_ship_date}
+                        onChange={(e) => setEditForm({ ...editForm, shipping_ship_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : selectedRmaShipping ? (
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 mb-3">
                     <Truck className="w-4 h-4 text-primary" />
@@ -1953,9 +1989,7 @@ const AdminRmaList = () => {
                     )}
                   </div>
                 </div>
-              )}
-
-              {!selectedRmaShipping && (
+              ) : (
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Package className="w-4 h-4" />
@@ -1963,6 +1997,7 @@ const AdminRmaList = () => {
                   </div>
                 </div>
               )}
+
 
               {/* Outbound Shipping Section */}
               <div className="pt-4 border-t border-border">
