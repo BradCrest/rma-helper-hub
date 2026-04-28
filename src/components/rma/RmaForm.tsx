@@ -244,6 +244,14 @@ const RmaForm = () => {
       return;
     }
 
+    const hasInvalidSerial = validProducts.some((p) =>
+      isInvalidSerialNumber(p.serialNumber)
+    );
+    if (hasInvalidSerial) {
+      setShowInvalidSerialDialog(true);
+      return;
+    }
+
     setShowPreview(true);
   };
 
