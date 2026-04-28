@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { isInvalidSerialNumber } from "@/lib/serialNumberValidator";
 
 const issueTypes = [
   "螢幕問題",
@@ -34,13 +35,14 @@ const accessoryOptions = [
 interface MultiProductFormProps {
   products: ProductEntry[];
   onChange: (products: ProductEntry[]) => void;
+  onInvalidSerial?: () => void;
 }
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-const MultiProductForm = ({ products, onChange }: MultiProductFormProps) => {
+const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductFormProps) => {
   const addProduct = () => {
     onChange([
       ...products,
@@ -139,6 +141,12 @@ const MultiProductForm = ({ products, onChange }: MultiProductFormProps) => {
                   onChange={(e) =>
                     updateProduct(product.id, "serialNumber", e.target.value)
                   }
+                  onBlur={(e) => {
+                    if (isInvalidSerialNumber(e.target.value)) {
+                      updateProduct(product.id, "serialNumber", "");
+                      onInvalidSerial?.();
+                    }
+                  }}
                   required
                 />
               </div>
