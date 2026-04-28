@@ -146,6 +146,22 @@ serve(async (req) => {
         });
       });
 
+      // For admin full-detail queries, also fetch latest inbound shipping per RMA
+      const inboundByRmaId: Record<string, any> = {};
+      if (includeFullDetails) {
+        const { data: shippingData } = await supabaseAdmin
+          .from('rma_shipping')
+          .select('id, rma_request_id, direction, carrier, tracking_number, ship_date, delivery_date, notes, photo_url, created_at')
+          .in('rma_request_id', rmaIds)
+          .eq('direction', 'inbound')
+          .order('created_at', { ascending: false });
+        (shippingData || []).forEach(s => {
+          if (!inboundByRmaId[s.rma_request_id]) {
+            inboundByRmaId[s.rma_request_id] = s;
+          }
+        });
+      }
+
       const maskedResults = filtered.map(rma => ({
         id: rma.id,
         rma_number: rma.rma_number,
@@ -155,15 +171,22 @@ serve(async (req) => {
         serial_number: rma.serial_number,
         issue_type: rma.issue_type,
         issue_description: includeFullDetails ? rma.issue_description : undefined,
+        customer_notes: includeFullDetails ? rma.customer_notes : undefined,
+        customer_type: includeFullDetails ? rma.customer_type : undefined,
+        mobile_phone: includeFullDetails ? rma.mobile_phone : undefined,
+        warranty_date: includeFullDetails ? rma.warranty_date : undefined,
         purchase_date: rma.purchase_date,
         created_at: rma.created_at,
         updated_at: rma.updated_at,
+        updated_by: includeFullDetails ? rma.updated_by : undefined,
+        updated_by_email: includeFullDetails ? rma.updated_by_email : undefined,
         customer_name: includeFullDetails ? rma.customer_name : maskName(rma.customer_name),
         customer_phone: includeFullDetails ? rma.customer_phone : maskPhone(rma.customer_phone),
         customer_email: includeFullDetails ? rma.customer_email : maskEmail(rma.customer_email),
         customer_address: includeFullDetails ? rma.customer_address : null,
         photo_urls: includeFullDetails ? rma.photo_urls : null,
         status_history: historyByRmaId[rma.id] || [],
+        inbound_shipping: includeFullDetails ? (inboundByRmaId[rma.id] || null) : undefined,
       }));
 
       console.log(`Found ${maskedResults.length} RMA(s) for query: ${rmaNumber} (admin=${isAdmin})`);
