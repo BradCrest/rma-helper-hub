@@ -44,6 +44,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { getEmailTemplateLabel, getEmailStatusLabel } from "@/lib/emailTemplateLabels";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
