@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Track from "./pages/Track";
 import Shipping from "./pages/Shipping";
+import ShippingForm from "./pages/ShippingForm";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminRmaList from "./pages/AdminRmaList";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/rma-multi-confirmation" element={<RmaMultiConfirmation />} />
             <Route path="/track" element={<Track />} />
             <Route path="/shipping" element={<Shipping />} />
+            <Route path="/shipping-form" element={<ShippingForm />} />
             <Route path="/admin" element={<Admin />} />
             <Route
               path="/admin/dashboard"

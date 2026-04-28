@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
         }
 
         // Send transactional email
-        const shippingUrl = `${PUBLISHED_URL}/shipping?rma=${encodeURIComponent(rma.rma_number)}&autoopen=1`;
+        const shippingUrl = `${PUBLISHED_URL}/shipping-form?rma=${encodeURIComponent(rma.rma_number)}`;
         const createdDate = new Date(rma.created_at).toLocaleDateString("zh-TW", {
           year: "numeric",
           month: "long",

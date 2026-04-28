@@ -28,7 +28,7 @@ const ShippingReminderEmail = ({
   rmaNumber = '',
   productName = '保固服務商品',
   createdDate = '',
-  shippingUrl = 'https://rma-helper-hub.lovable.app/shipping',
+  shippingUrl = 'https://rma-helper-hub.lovable.app/shipping-form',
 }: ShippingReminderProps) => (
   <Html lang="zh-TW" dir="ltr">
     <Head />
@@ -91,7 +91,7 @@ export const template = {
     rmaNumber: 'RC-2A-01-001',
     productName: 'CREST CR-4 潛水電腦錶',
     createdDate: '2026年4月25日',
-    shippingUrl: 'https://rma-helper-hub.lovable.app/shipping?rma=RC-2A-01-001&autoopen=1',
+    shippingUrl: 'https://rma-helper-hub.lovable.app/shipping-form?rma=RC-2A-01-001',
   },
 } satisfies TemplateEntry
 
