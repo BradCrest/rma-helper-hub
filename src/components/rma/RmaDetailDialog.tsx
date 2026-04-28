@@ -621,8 +621,19 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+          <DialogTitle className="flex items-center justify-between gap-2">
             <span>RMA 詳細資訊</span>
+            {rmaData && isAdmin && !editing && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setEditing(true)}
+                className="gap-1 mr-6"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                編輯
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -642,81 +653,278 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                 <p className="text-sm text-muted-foreground mt-2">
                   申請時間：{formatDate(rmaData.created_at)}
                 </p>
+                {rmaData.updated_at &&
+                  rmaData.updated_at !== rmaData.created_at &&
+                  rmaData.updated_by_email && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      修改時間：{formatDate(rmaData.updated_at)} ｜ 修改人：{rmaData.updated_by_email}
+                    </p>
+                  )}
               </div>
 
               {/* Customer Info */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg border-b pb-2">客戶資訊</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">客戶姓名</p>
-                    <p className="font-medium">{rmaData.customer_name}</p>
+                {editing ? (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <Label>客戶姓名</Label>
+                      <Input
+                        value={form.customer_name}
+                        onChange={(e) => updateField("customer_name", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>客戶類型</Label>
+                      <p className="font-medium pt-2">{rmaData.customer_type || "一般客戶"}</p>
+                    </div>
+                    <div>
+                      <Label>電子郵件</Label>
+                      <Input
+                        type="email"
+                        value={form.customer_email}
+                        onChange={(e) => updateField("customer_email", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>聯絡電話</Label>
+                      <Input
+                        value={form.customer_phone}
+                        onChange={(e) => updateField("customer_phone", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>手機號碼</Label>
+                      <Input
+                        value={form.mobile_phone}
+                        onChange={(e) => updateField("mobile_phone", e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label>聯絡地址</Label>
+                      <Input
+                        value={form.customer_address}
+                        onChange={(e) => updateField("customer_address", e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">客戶類型</p>
-                    <p className="font-medium">{rmaData.customer_type || "一般客戶"}</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">客戶姓名</p>
+                      <p className="font-medium">{rmaData.customer_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">客戶類型</p>
+                      <p className="font-medium">{rmaData.customer_type || "一般客戶"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">電子郵件</p>
+                      <p className="font-medium">{rmaData.customer_email}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">聯絡電話</p>
+                      <p className="font-medium">{rmaData.customer_phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">手機號碼</p>
+                      <p className="font-medium">{rmaData.mobile_phone || "-"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">聯絡地址</p>
+                      <p className="font-medium">{rmaData.customer_address || "-"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">電子郵件</p>
-                    <p className="font-medium">{rmaData.customer_email}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">聯絡電話</p>
-                    <p className="font-medium">{rmaData.customer_phone}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">手機號碼</p>
-                    <p className="font-medium">{rmaData.mobile_phone || "-"}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-muted-foreground">聯絡地址</p>
-                    <p className="font-medium">{rmaData.customer_address || "-"}</p>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Product Info */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg border-b pb-2">產品資訊</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">產品名稱</p>
-                    <p className="font-medium">{rmaData.product_name}</p>
+                {editing ? (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <Label>產品名稱</Label>
+                      <Input
+                        value={form.product_name}
+                        onChange={(e) => updateField("product_name", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>產品型號</Label>
+                      <Input
+                        value={form.product_model}
+                        onChange={(e) => updateField("product_model", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>產品序號</Label>
+                      <Input
+                        value={form.serial_number}
+                        onChange={(e) => updateField("serial_number", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>購買日期</Label>
+                      <p className="font-medium pt-2">{rmaData.purchase_date || "-"}</p>
+                    </div>
+                    <div>
+                      <Label>保固到期日</Label>
+                      <p className="font-medium pt-2">{rmaData.warranty_date || "-"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">產品型號</p>
-                    <p className="font-medium">{rmaData.product_model || "-"}</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">產品名稱</p>
+                      <p className="font-medium">{rmaData.product_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">產品型號</p>
+                      <p className="font-medium">{rmaData.product_model || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">產品序號</p>
+                      <p className="font-medium">{rmaData.serial_number || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">購買日期</p>
+                      <p className="font-medium">{rmaData.purchase_date || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">保固到期日</p>
+                      <p className="font-medium">{rmaData.warranty_date || "-"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">產品序號</p>
-                    <p className="font-medium">{rmaData.serial_number || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">購買日期</p>
-                    <p className="font-medium">{rmaData.purchase_date || "-"}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">保固到期日</p>
-                    <p className="font-medium">{rmaData.warranty_date || "-"}</p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              {/* Issue Description */}
+              {/* Issue */}
               <div className="space-y-3">
                 <h3 className="font-semibold text-lg border-b pb-2">問題描述</h3>
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="text-sm whitespace-pre-wrap">{rmaData.issue_description}</p>
-                </div>
+                {editing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label>問題類型</Label>
+                      <Select
+                        value={form.issue_type}
+                        onValueChange={(v) => updateField("issue_type", v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="選擇問題類型" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ISSUE_TYPE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                          {/* Preserve current value if it's not in the standard list */}
+                          {form.issue_type && !ISSUE_TYPE_OPTIONS.includes(form.issue_type) && (
+                            <SelectItem value={form.issue_type}>{form.issue_type}</SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>問題描述</Label>
+                      <Textarea
+                        rows={4}
+                        value={form.issue_description}
+                        onChange={(e) => updateField("issue_description", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">問題類型：</span>
+                      <span className="font-medium">{rmaData.issue_type}</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="text-sm whitespace-pre-wrap">{rmaData.issue_description}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Customer Notes */}
-              {rmaData.customer_notes && (
+              {(editing || rmaData.customer_notes) && (
                 <div className="space-y-3">
                   <h3 className="font-semibold text-lg border-b pb-2">隨附物品 / 備註</h3>
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <p className="text-sm whitespace-pre-wrap">{rmaData.customer_notes}</p>
-                  </div>
+                  {editing ? (
+                    <Textarea
+                      rows={3}
+                      value={form.customer_notes}
+                      onChange={(e) => updateField("customer_notes", e.target.value)}
+                      placeholder="例如：原包裝、說明書、配件…"
+                    />
+                  ) : (
+                    <div className="bg-muted/50 rounded-lg p-4">
+                      <p className="text-sm whitespace-pre-wrap">{rmaData.customer_notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Inbound Shipping (customer → company) */}
+              {(editing || rmaData.inbound_shipping) && (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg border-b pb-2">客戶寄件資訊</h3>
+                  {editing ? (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <Label>物流公司</Label>
+                        <Input
+                          value={form.shipping_carrier}
+                          onChange={(e) => updateField("shipping_carrier", e.target.value)}
+                          placeholder="如：黑貓、新竹貨運"
+                        />
+                      </div>
+                      <div>
+                        <Label>追蹤號碼</Label>
+                        <Input
+                          value={form.shipping_tracking_number}
+                          onChange={(e) => updateField("shipping_tracking_number", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label>寄件日期</Label>
+                        <Input
+                          type="date"
+                          value={form.shipping_ship_date}
+                          onChange={(e) => updateField("shipping_ship_date", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label>備註</Label>
+                        <Textarea
+                          rows={2}
+                          value={form.shipping_notes}
+                          onChange={(e) => updateField("shipping_notes", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">物流公司</p>
+                        <p className="font-medium">{rmaData.inbound_shipping?.carrier || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">追蹤號碼</p>
+                        <p className="font-medium">{rmaData.inbound_shipping?.tracking_number || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">寄件日期</p>
+                        <p className="font-medium">{rmaData.inbound_shipping?.ship_date || "-"}</p>
+                      </div>
+                      {rmaData.inbound_shipping?.notes && (
+                        <div className="col-span-2">
+                          <p className="text-muted-foreground">備註</p>
+                          <p className="font-medium whitespace-pre-wrap">{rmaData.inbound_shipping.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -733,18 +941,46 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
 
             {/* Actions */}
             <div className="flex gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={handlePrint} className="flex-1 gap-2">
-                <Printer className="w-4 h-4" />
-                列印
-              </Button>
-              <Button 
-                onClick={handleDownloadPdf} 
-                disabled={generatingPdf}
-                className="flex-1 gap-2"
-              >
-                <Download className="w-4 h-4" />
-                {generatingPdf ? "生成中..." : "下載 PDF"}
-              </Button>
+              {editing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditing(false);
+                      // Reset form back to current rmaData
+                      if (rmaData) setRmaData({ ...rmaData });
+                    }}
+                    disabled={saving}
+                    className="flex-1 gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    取消
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {saving ? "儲存中..." : "儲存"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={handlePrint} className="flex-1 gap-2">
+                    <Printer className="w-4 h-4" />
+                    列印
+                  </Button>
+                  <Button
+                    onClick={handleDownloadPdf}
+                    disabled={generatingPdf}
+                    className="flex-1 gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    {generatingPdf ? "生成中..." : "下載 PDF"}
+                  </Button>
+                </>
+              )}
             </div>
           </>
         ) : (
