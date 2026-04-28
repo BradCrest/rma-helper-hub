@@ -96,29 +96,35 @@ const Shipping = () => {
   };
 
   // Auto-open modal when arriving from email reminder link (?rma=...&autoopen=1)
+  // Read directly from window.location to avoid any react-router timing issues.
   useEffect(() => {
-    const rmaParam = searchParams.get("rma");
-    const autoOpen = searchParams.get("autoopen");
+    const params = new URLSearchParams(window.location.search);
+    const rmaParam = params.get("rma");
+    const autoOpen = params.get("autoopen");
 
     if (!rmaParam) return;
 
-    // Pre-fill main page form
     setRmaNumber(rmaParam);
 
     if (autoOpen === "1" || autoOpen === "true") {
-      // Open modal first
       setShowModal(true);
-      // Trigger search after the modal has mounted
-      setTimeout(() => {
+      // Run search after modal mount
+      const t1 = window.setTimeout(() => {
         performSearch(rmaParam);
-      }, 50);
-      // Clean URL params later, after state has settled
-      setTimeout(() => {
+      }, 80);
+      // Clean URL after the search has had time to fire
+      const t2 = window.setTimeout(() => {
         const next = new URLSearchParams(window.location.search);
         next.delete("rma");
         next.delete("autoopen");
-        setSearchParams(next, { replace: true });
-      }, 400);
+        const qs = next.toString();
+        const newUrl = window.location.pathname + (qs ? `?${qs}` : "");
+        window.history.replaceState({}, "", newUrl);
+      }, 800);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
