@@ -184,13 +184,18 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-      
+
+      // Pass the admin user's JWT so lookup-rma returns unmasked PII (real email
+      // is required to correlate with email_send_log entries).
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token || supabaseKey;
+
       const response = await fetch(
         `${supabaseUrl}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaNumber)}&full_details=true`,
         {
           method: "GET",
           headers: {
-            "Authorization": `Bearer ${supabaseKey}`,
+            "Authorization": `Bearer ${accessToken}`,
             "apikey": supabaseKey,
           },
         }
