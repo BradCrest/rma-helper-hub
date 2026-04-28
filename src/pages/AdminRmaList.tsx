@@ -489,9 +489,9 @@ const AdminRmaList = () => {
     // Load repair fee
     setRepairFee(rma.repair_fee != null ? String(rma.repair_fee) : "");
     
-    // Fetch shipping info (inbound & outbound), status history, and contacts for this RMA
+    // Fetch shipping info (inbound & outbound), status history, contacts, and email logs for this RMA
     try {
-      const [inboundResult, outboundResult, historyResult, contactsResult] = await Promise.all([
+      const [inboundResult, outboundResult, historyResult, contactsResult, emailLogsResult] = await Promise.all([
         supabase
           .from("rma_shipping")
           .select("*")
@@ -513,19 +513,48 @@ const AdminRmaList = () => {
           .from("rma_customer_contacts")
           .select("*")
           .eq("rma_request_id", rma.id)
-          .order("contact_date", { ascending: false })
+          .order("contact_date", { ascending: false }),
+        rma.customer_email
+          ? supabase
+              .from("email_send_log")
+              .select("*")
+              .eq("recipient_email", rma.customer_email)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] as any[] }),
       ]);
       
       setSelectedRmaShipping(inboundResult.data);
       setOutboundShipping(outboundResult.data);
       setStatusHistory(historyResult.data || []);
       setContacts(contactsResult.data || []);
+
+      // Deduplicate email logs by message_id (keep latest per message_id),
+      // and filter to logs related to this RMA when metadata contains rma_number/rma_request_id.
+      const allLogs = (emailLogsResult.data || []) as any[];
+      const seen = new Set<string>();
+      const dedup: any[] = [];
+      for (const log of allLogs) {
+        const key = log.message_id || `__no_mid__${log.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        dedup.push(log);
+      }
+      const filtered = dedup.filter((log) => {
+        const meta = log.metadata || {};
+        const matchedByRma =
+          meta.rma_number === rma.rma_number ||
+          meta.rma_request_id === rma.id;
+        // If any log carries rma metadata, only keep matching ones; otherwise keep all (legacy logs).
+        return matchedByRma || (!meta.rma_number && !meta.rma_request_id);
+      });
+      setEmailLogs(filtered);
     } catch (error) {
       console.error("Error fetching RMA details:", error);
       setSelectedRmaShipping(null);
       setOutboundShipping(null);
       setStatusHistory([]);
       setContacts([]);
+      setEmailLogs([]);
     }
   };
 
