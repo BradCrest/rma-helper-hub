@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { isInvalidSerialNumber } from './serialNumberValidator';
 
 export interface ProductEntry {
   id: string;
