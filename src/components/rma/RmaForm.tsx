@@ -8,6 +8,21 @@ import MultiProductForm from "./MultiProductForm";
 import CsvImportSection from "./CsvImportSection";
 import CsvCustomerInfoDialog from "./CsvCustomerInfoDialog";
 import MultiProductPreview from "./MultiProductPreview";
+import {
+  isInvalidSerialNumber,
+  INVALID_SERIAL_TITLE,
+  INVALID_SERIAL_DESCRIPTION,
+} from "@/lib/serialNumberValidator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
 const customerTypes = [
   { id: "consumer", label: "一般消費者" },
@@ -115,6 +130,10 @@ const RmaForm = () => {
     }
     if (!issueDescription.trim()) {
       toast.error("請描述問題");
+      return;
+    }
+    if (isInvalidSerialNumber(serialNumber)) {
+      setShowInvalidSerialDialog(true);
       return;
     }
 
@@ -497,6 +516,9 @@ const RmaForm = () => {
                 className="rma-input"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
+                onBlur={(e) =>
+                  handleSerialBlur(e.target.value, () => setSerialNumber(""))
+                }
               />
             </div>
           )}
