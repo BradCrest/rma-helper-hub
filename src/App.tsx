@@ -17,6 +17,7 @@ import AdminLogistics from "./pages/AdminLogistics";
 import AdminEmailKnowledge from "./pages/AdminEmailKnowledge";
 import RmaConfirmation from "./pages/RmaConfirmation";
 import RmaMultiConfirmation from "./pages/RmaMultiConfirmation";
+import Unsubscribe from "./pages/Unsubscribe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -83,6 +84,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
