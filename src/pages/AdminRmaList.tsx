@@ -231,7 +231,7 @@ const AdminRmaList = () => {
       // Apply search filter
       if (searchTerm.trim()) {
         query = query.or(
-          `rma_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%`
+          `rma_number.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%,serial_number.ilike.%${searchTerm}%`
         );
       }
 
