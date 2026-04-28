@@ -1669,14 +1669,46 @@ const AdminRmaList = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-foreground">RMA 詳細資訊</h2>
-                <button
-                  onClick={() => setSelectedRma(null)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && !editingDetail && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingDetail(true)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      編輯
+                    </button>
+                  )}
+                  {isAdmin && editingDetail && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetailEdit}
+                        disabled={savingDetail}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {savingDetail ? "儲存中..." : "儲存"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingDetail(false)}
+                        disabled={savingDetail}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors"
+                      >
+                        取消
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setSelectedRma(null)}
+                    className="text-muted-foreground hover:text-foreground ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1697,41 +1729,98 @@ const AdminRmaList = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">客戶名稱</p>
-                  <p className="text-foreground">{selectedRma.customer_name}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_name}
+                      onChange={(e) => setEditForm({ ...editForm, customer_name: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_name}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">聯絡電話</p>
-                  <p className="text-foreground">{selectedRma.customer_phone}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_phone}
+                      onChange={(e) => setEditForm({ ...editForm, customer_phone: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_phone}</p>
+                  )}
                 </div>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">電子郵件</p>
-                <p className="text-foreground">{selectedRma.customer_email}</p>
+                {editingDetail ? (
+                  <input
+                    type="email"
+                    className="rma-input"
+                    value={editForm.customer_email}
+                    onChange={(e) => setEditForm({ ...editForm, customer_email: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-foreground">{selectedRma.customer_email}</p>
+                )}
               </div>
 
-              {selectedRma.customer_address && (
+              {(editingDetail || selectedRma.customer_address) && (
                 <div>
                   <p className="text-sm text-muted-foreground">客戶地址</p>
-                  <p className="text-foreground">{selectedRma.customer_address}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_address}
+                      onChange={(e) => setEditForm({ ...editForm, customer_address: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_address}</p>
+                  )}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">產品名稱</p>
-                  <p className="text-foreground">{selectedRma.product_name}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.product_name}
+                      onChange={(e) => setEditForm({ ...editForm, product_name: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.product_name}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">產品型號</p>
-                  <p className="text-foreground">{selectedRma.product_model || "-"}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.product_model}
+                      onChange={(e) => setEditForm({ ...editForm, product_model: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.product_model || "-"}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">序號</p>
-                  <p className="text-foreground">{selectedRma.serial_number || "-"}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.serial_number}
+                      onChange={(e) => setEditForm({ ...editForm, serial_number: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.serial_number || "-"}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">購買日期</p>
@@ -1741,17 +1830,62 @@ const AdminRmaList = () => {
 
               <div>
                 <p className="text-sm text-muted-foreground">問題類型</p>
-                <p className="text-foreground">{selectedRma.issue_type}</p>
+                {editingDetail ? (
+                  <select
+                    className="rma-input"
+                    value={editForm.issue_type}
+                    onChange={(e) => setEditForm({ ...editForm, issue_type: e.target.value })}
+                  >
+                    {["螢幕顯示異常","電池/充電問題","按鍵故障","按鍵問題","進水/受潮","外觀損傷","韌體/軟體問題","感測器異常","其他"].map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {editForm.issue_type && !["螢幕顯示異常","電池/充電問題","按鍵故障","按鍵問題","進水/受潮","外觀損傷","韌體/軟體問題","感測器異常","其他"].includes(editForm.issue_type) && (
+                      <option value={editForm.issue_type}>{editForm.issue_type}</option>
+                    )}
+                  </select>
+                ) : (
+                  <p className="text-foreground">{selectedRma.issue_type}</p>
+                )}
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">問題描述</p>
-                <p className="text-foreground whitespace-pre-wrap">{selectedRma.issue_description}</p>
+                {editingDetail ? (
+                  <Textarea
+                    rows={4}
+                    value={editForm.issue_description}
+                    onChange={(e) => setEditForm({ ...editForm, issue_description: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-foreground whitespace-pre-wrap">{selectedRma.issue_description}</p>
+                )}
               </div>
+
+              {(editingDetail || selectedRma.customer_notes) && (
+                <div>
+                  <p className="text-sm text-muted-foreground">隨附物品 / 備註</p>
+                  {editingDetail ? (
+                    <Textarea
+                      rows={3}
+                      value={editForm.customer_notes}
+                      onChange={(e) => setEditForm({ ...editForm, customer_notes: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground whitespace-pre-wrap">{selectedRma.customer_notes}</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <p className="text-sm text-muted-foreground">建立日期</p>
                 <p className="text-foreground">{formatDate(selectedRma.created_at)}</p>
+                {selectedRma.updated_at &&
+                  selectedRma.updated_at !== selectedRma.created_at &&
+                  selectedRma.updated_by_email && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      修改日期：{formatDate(selectedRma.updated_at)} ｜ 修改人：{selectedRma.updated_by_email}
+                    </p>
+                  )}
               </div>
 
               {/* Shipping Info */}
