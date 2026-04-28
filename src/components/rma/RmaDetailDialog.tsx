@@ -24,6 +24,16 @@ import html2canvas from "html2canvas";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
+import { getEmailTemplateLabel, getEmailStatusLabel } from "@/lib/emailTemplateLabels";
+
+interface EmailLogEntry {
+  message_id: string | null;
+  template_name: string;
+  recipient_email: string;
+  status: string;
+  created_at: string;
+  error_message: string | null;
+}
 
 interface InboundShipping {
   id?: string;
@@ -136,7 +146,36 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EditableForm>(emptyForm());
+  const [emailLogs, setEmailLogs] = useState<EmailLogEntry[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const fetchEmailLogs = async (customerEmail: string) => {
+    if (!customerEmail) {
+      setEmailLogs([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("email_send_log")
+      .select("message_id, template_name, recipient_email, status, created_at, error_message")
+      .eq("recipient_email", customerEmail)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      console.error("Failed to load email logs:", error);
+      setEmailLogs([]);
+      return;
+    }
+    // Dedupe by message_id — keep newest entry (already sorted desc).
+    const seen = new Set<string>();
+    const deduped: EmailLogEntry[] = [];
+    for (const row of (data || []) as EmailLogEntry[]) {
+      const key = row.message_id || `${row.template_name}-${row.created_at}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(row);
+    }
+    setEmailLogs(deduped);
+  };
 
   const fetchRmaData = async () => {
     if (!rmaNumber) return;
