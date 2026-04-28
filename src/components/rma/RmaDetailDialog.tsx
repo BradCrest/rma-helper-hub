@@ -203,7 +203,9 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       const result = await response.json();
       
       if (result.results && result.results.length > 0) {
-        setRmaData(result.results[0]);
+        const rec = result.results[0];
+        setRmaData(rec);
+        fetchEmailLogs(rec.customer_email);
       } else {
         throw new Error("RMA not found");
       }
