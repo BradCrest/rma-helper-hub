@@ -1,92 +1,38 @@
+# 阻止對舊 RMA 寄送提醒
 
-# 48 小時未寄件自動 Email 提醒 + Slack 通知
-
-## 確認資訊
-- Email 寄件網域：`crestdiving.com`（會使用子網域 `notify.crestdiving.com` 寄信）
-- 連結指向：`https://rma-helper-hub.lovable.app/shipping?rma=<RMA>&autoopen=1`
-- 只寄一次提醒
-- 寄送提醒時同步通知 Slack
+目前共有 **70 筆**已登記但未寄件超過 48 小時的舊 RMA。一旦 DNS 驗證完成、cron 啟動，這 70 筆會立刻全部收到提醒信。執行下列雙保險避免此情況。
 
 ---
 
-## 實作步驟
+## 1. Edge Function 加入啟用時間點
 
-### 1. 設定 Email 寄件網域
-- 引導您完成 `crestdiving.com` 網域設定（會在介面顯示設定對話框，需在網域註冊商加上 NS 記錄）
-- 系統自動建立 Email 基礎架構（佇列、追蹤、退信處理）
+修改 `supabase/functions/send-shipping-reminders/index.ts`：
 
-### 2. 建立 Transactional Email 模板
-- 路徑：`supabase/functions/_shared/transactional-email-templates/shipping-reminder.tsx`
-- 內容（中文）：
-  - 標題：「提醒您：請填寫保固服務寄件資訊」
-  - 顯示 RMA 編號、產品名稱、申請日期
-  - CTA 按鈕「立即填寫寄件資訊」→ `https://rma-helper-hub.lovable.app/shipping?rma=<RMA>&autoopen=1`
-  - 公司收件地址
-  - 提醒：保固服務中心無法親送
-- 註冊到 `registry.ts`
+- 新增常數 `REMINDER_ENABLED_AFTER = "2026-04-28T12:00:00Z"`
+- 在查詢條件加上 `.gte("created_at", REMINDER_ENABLED_AFTER)`
+- 只有此時間點之後建立的 RMA 才可能觸發提醒
+- 管理員手動觸發（傳 `rma_request_id`）的路徑不受此限制 — 仍可手動補寄
 
-### 3. 修改 `src/pages/Shipping.tsx`
-- 使用 `useSearchParams` 讀取 `rma` 與 `autoopen`
-- 若帶有 `rma` 參數，自動填入搜尋框
-- 若同時有 `autoopen=1`，自動開啟 Modal 並執行搜尋，跳到「填寫寄件資訊」表單
+部署：`send-shipping-reminders`
 
-### 4. 資料庫 Migration
+## 2. 標記既有 70 筆 RMA 為已通知（保險作法）
+
+執行一次性資料更新：
+
 ```sql
-ALTER TABLE rma_requests 
-  ADD COLUMN shipping_reminder_sent_at timestamptz;
+UPDATE rma_requests
+SET shipping_reminder_sent_at = now()
+WHERE status = 'registered'
+  AND shipping_reminder_sent_at IS NULL
+  AND created_at <= now() - interval '48 hours';
 ```
 
-### 5. 新建 Edge Function：`send-shipping-reminders`
-邏輯：
-1. 查詢符合條件的 RMA：
-   - `status = 'registered'`
-   - 沒有 `direction='inbound'` 的 `rma_shipping` 記錄
-   - `created_at <= now() - interval '48 hours'`
-   - `shipping_reminder_sent_at IS NULL`
-   - `customer_email IS NOT NULL`
-2. 對每筆：
-   - 呼叫 `send-transactional-email`，template `shipping-reminder`
-   - `idempotencyKey = shipping-reminder-<rma_id>`
-   - 同步呼叫 `slack-notify` 通知管理員（訊息：「📧 已寄送 48 小時未寄件提醒給 客戶名稱 (RMA: RC...)」）
-   - 寄送成功後 update `shipping_reminder_sent_at = now()`
-
-### 6. 設定 pg_cron 排程
-- 啟用 `pg_cron` 與 `pg_net` 擴充
-- 每小時執行一次 `send-shipping-reminders`
-
-### 7. 管理員手動重發按鈕（選用，方便測試）
-- 在 Admin RMA 詳細對話框中加入「重新發送寄件提醒」按鈕
-- 清掉 `shipping_reminder_sent_at` 並立即觸發 edge function
+預期影響：70 筆 RMA 的 `shipping_reminder_sent_at` 從 NULL → 現在時間，徹底排除在自動寄送對象之外。
 
 ---
 
-## 流程
+## 結果
 
-```text
-[客戶提交 RMA]
-      ↓ 等待 48 小時
-[cron 每小時掃描] 
-      ↓
-[找到符合條件的 RMA]
-      ↓
-[寄送 Email 提醒] + [Slack 通知管理員]
-      ↓
-[標記 shipping_reminder_sent_at]
-      ↓
-[客戶點擊信中連結]
-      ↓
-/shipping?rma=RC...&autoopen=1
-      ↓
-[自動帶入 + 開啟對話框 + 搜尋成功 → 填寫表單]
-```
-
----
-
-## 您需要做的
-
-1. 點擊本訊息中即將出現的「設定電子郵件網域」按鈕
-2. 輸入 `crestdiving.com`
-3. 系統會給您 NS 記錄，請至 `crestdiving.com` 的網域註冊商加上這些記錄
-4. DNS 驗證可能需要數小時到 72 小時（但模板與 Edge Function 可以先建好部署，DNS 驗證完成後自動開始寄信）
-
-確認後我就開始實作。
+- 過去所有 RMA：完全不會收到提醒
+- 從現在起新建立的 RMA：滿 48 小時未寄件 → 自動寄送提醒（如預期）
+- 管理員仍可在管理後台手動觸發任何 RMA 的提醒（不受時間點限制）
