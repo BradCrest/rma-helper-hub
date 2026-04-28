@@ -210,6 +210,10 @@ export function parseExcelContent(buffer: ArrayBuffer): ParseResult {
         errors.push({ row: rowNum, message: '產品序號為必填' });
         continue;
       }
+      if (isInvalidSerialNumber(serialNumber)) {
+        errors.push({ row: rowNum, message: `序號「${serialNumber}」疑似為 EN13319 標準或 NCC 核准號（CCA 開頭），不是產品序號。請改填包裝盒或錶身上的序號。` });
+        continue;
+      }
       
       const issueDescription = String(row[columnIndices.issueDescription ?? -1] || '').trim();
       const purchaseDate = formatDate(row[columnIndices.purchaseDate ?? -1]);
