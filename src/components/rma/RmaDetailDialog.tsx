@@ -970,6 +970,53 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                 </div>
               )}
 
+              {/* Email Send History */}
+              <div className="space-y-3 pt-4 border-t">
+                <h3 className="font-semibold text-lg">Email 寄送記錄</h3>
+                {emailLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">尚未發送任何 Email</p>
+                ) : (
+                  <div className="space-y-2">
+                    {emailLogs.map((log, idx) => (
+                      <div
+                        key={`${log.message_id || idx}-${log.created_at}`}
+                        className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted/40 border"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm">
+                            {getEmailTemplateLabel(log.template_name)}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {log.recipient_email}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(log.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
+                          </div>
+                          {log.error_message && (
+                            <div className="text-xs text-destructive mt-1 break-words">
+                              {log.error_message}
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                            log.status === "sent"
+                              ? "bg-green-100 text-green-700"
+                              : log.status === "failed" || log.status === "dlq" || log.status === "bounced"
+                              ? "bg-red-100 text-red-700"
+                              : log.status === "suppressed" || log.status === "complained"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {getEmailStatusLabel(log.status)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Status */}
               <div className="pt-4 border-t">
                 <div className="flex items-center justify-between">
