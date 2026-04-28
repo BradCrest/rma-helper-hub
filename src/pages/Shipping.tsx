@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Search, ArrowLeft, Globe, X, Upload, Camera, Loader2, Check } from "lucide-react";
 import Footer from "@/components/layout/Footer";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ interface RmaResult {
 }
 
 const Shipping = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [rmaNumber, setRmaNumber] = useState("");
   const [isSearching, setIsSearching] = useState(false);
