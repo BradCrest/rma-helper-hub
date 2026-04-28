@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X } from "lucide-react";
+import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X, Download } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Pagination,
   PaginationContent,
@@ -166,6 +174,91 @@ const AdminEmailKnowledge = () => {
   };
 
   const handleSignOut = async () => { await signOut(); navigate("/admin"); };
+
+  const triggerDownload = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const escapeCsv = (val: any) => {
+    if (val === null || val === undefined) return "";
+    const s = typeof val === "string" ? val : JSON.stringify(val);
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const handleExport = (format: "json" | "csv" | "md", scope: "all" | "filtered") => {
+    const data = scope === "filtered" ? filtered : sources;
+    if (data.length === 0) {
+      toast.error("沒有可匯出的資料");
+      return;
+    }
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const baseName = `knowledge-base-${scope === "filtered" ? "filtered-" : ""}${stamp}`;
+
+    try {
+      if (format === "json") {
+        const payload = {
+          exported_at: now.toISOString(),
+          scope,
+          total: data.length,
+          sources: data,
+        };
+        triggerDownload(JSON.stringify(payload, null, 2), `${baseName}.json`, "application/json");
+      } else if (format === "csv") {
+        const headers = ["類型", "標題", "標籤", "語言", "內容", "檔案名稱", "建立時間", "更新時間"];
+        const rows = data.map((s) => [
+          SOURCE_LABELS[s.source_type]?.label ?? s.source_type,
+          s.title,
+          s.metadata?.tag ?? "",
+          s.metadata?.language ?? "",
+          s.content,
+          s.file_name ?? "",
+          new Date(s.created_at).toLocaleString("zh-TW"),
+          new Date(s.updated_at).toLocaleString("zh-TW"),
+        ]);
+        const csv = [headers, ...rows].map((r) => r.map(escapeCsv).join(",")).join("\r\n");
+        // UTF-8 BOM for Excel
+        triggerDownload("\uFEFF" + csv, `${baseName}.csv`, "text/csv;charset=utf-8");
+      } else {
+        const lines: string[] = [];
+        lines.push(`# 客戶往來知識庫匯出`);
+        lines.push(`匯出時間：${now.toLocaleString("zh-TW")}`);
+        lines.push(`共 ${data.length} 筆${scope === "filtered" ? "（已套用篩選）" : ""}`);
+        lines.push("");
+        lines.push("---");
+        lines.push("");
+        for (const s of data) {
+          const label = SOURCE_LABELS[s.source_type]?.label ?? s.source_type;
+          lines.push(`## [${label}] ${s.title}`);
+          if (s.metadata?.tag) lines.push(`- 標籤：#${s.metadata.tag}`);
+          if (s.metadata?.language) lines.push(`- 語言：${s.metadata.language}`);
+          if (s.file_name) lines.push(`- 檔案：${s.file_name}`);
+          lines.push(`- 更新：${new Date(s.updated_at).toLocaleString("zh-TW")}`);
+          lines.push("");
+          lines.push(s.content);
+          lines.push("");
+          lines.push("---");
+          lines.push("");
+        }
+        triggerDownload(lines.join("\n"), `${baseName}.md`, "text/markdown;charset=utf-8");
+      }
+      toast.success(`已匯出 ${data.length} 筆（${format.toUpperCase()}）`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("匯出失敗：" + (e.message || "請稍後再試"));
+    }
+  };
+
   const filtered = useMemo(
     () => sources.filter((s) => {
       if (filter !== "all" && s.source_type !== filter) return false;
@@ -220,7 +313,28 @@ const AdminEmailKnowledge = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶往來知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground">{user?.email}</span><Link to="/" className="rma-btn-secondary text-sm"><Home className="w-4 h-4" /> 首頁</Link><button onClick={handleSignOut} className="rma-btn-secondary text-sm"><LogOut className="w-4 h-4" /> 登出</button></div></div></div></header>
+      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶往來知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="rma-btn-secondary text-sm" title="匯出知識庫"><Download className="w-4 h-4" /> 匯出</button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64 bg-popover z-50">
+            <DropdownMenuLabel>匯出全部（{sources.length} 筆）</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleExport("json", "all")}>JSON（完整 metadata，可重新匯入）</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv", "all")}>CSV（Excel 可直接開啟）</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("md", "all")}>Markdown（人類可讀）</DropdownMenuItem>
+            {filtered.length !== sources.length && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>匯出篩選結果（{filtered.length} 筆）</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExport("json", "filtered")}>JSON</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("csv", "filtered")}>CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("md", "filtered")}>Markdown</DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Link to="/" className="rma-btn-secondary text-sm"><Home className="w-4 h-4" /> 首頁</Link><button onClick={handleSignOut} className="rma-btn-secondary text-sm"><LogOut className="w-4 h-4" /> 登出</button></div></div></div></header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30"><div className="flex items-center gap-3"><Mail className="w-5 h-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Gmail 自動同步</p><p className="text-sm text-muted-foreground">即將推出 — 第二階段將支援 Gmail OAuth 自動抓取信件</p></div></div><button disabled className="rma-btn-secondary opacity-50 cursor-not-allowed">連接 Gmail（即將推出）</button></div>

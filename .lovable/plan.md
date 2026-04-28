@@ -1,140 +1,84 @@
+# 知識庫匯出功能
+
 ## 目標
+在 `/admin/email-knowledge` 頁面右上角新增「📥 匯出知識庫」下拉按鈕，讓管理員可以隨時把整個 RAG 知識庫下載成檔案，方便備份、檢視或日後重新匯入。
 
-在「客戶來信」分頁的 AI 草稿下方新增「儲存到知識庫」功能，把客戶原信 + 編輯後的回覆寫入既有的 `email_knowledge_sources`，並觸發背景索引；同時改善信件清單的快取行為，避免每次切換分頁都重新拉取。
+## 功能設計
 
----
+### 按鈕位置
+放在頁面標題列「📧 客戶往來知識庫」旁邊，與「首頁」「登出」同一排。使用下拉選單（DropdownMenu）展開三個選項：
+- 匯出為 JSON（含完整 metadata，可重新匯入）
+- 匯出為 CSV（Excel 可直接開啟）
+- 匯出為 Markdown（每筆一個區塊，方便閱讀）
 
-## 一、新增「儲存到知識庫」功能
+### 匯出範圍
+從 `email_knowledge_sources` 撈取**全部**知識來源（不受目前篩選影響），會尊重目前篩選器：
+- 若使用者已套用「類型」或「標籤」篩選，按鈕旁顯示「目前篩選：XXX（N 筆）」並提供「匯出全部」與「匯出篩選結果」兩個選項
+- 預設匯出全部
 
-### UI（CustomerEmailTab.tsx，AI 草稿區塊下方）
+### 各格式內容
 
-新增一個摺疊區塊「💾 存入知識庫」，包含：
-
-- **標題**（自動帶入信件主旨，可編輯）
-- **標籤**（選填輸入框，例如：保固、退貨）
-- **儲存內容預覽**（唯讀，顯示將寫入的格式，見下方）
-- **儲存按鈕**（寫入後顯示成功狀態 + 「在知識庫檢視」連結）
-
-只有在「AI 草稿已產生且非空」時，這個區塊才會出現（因為要存的是「來信 + 回覆」配對）。
-
-### 寫入格式
-
-把客戶原信和編輯後的草稿合併成一筆 `email` 類型的知識來源，內容格式：
-
-```text
-【客戶來信】
-寄件人：{name} <{email}>
-主旨：{subject}
-時間：{date}
-{RMA: xxx 若有偵測到}
-
-{原信純文字內容}
-
----
-
-【客服回覆】
-{編輯後的草稿內容}
-```
-
-### 寫入邏輯
-
-直接呼叫 `supabase.from("email_knowledge_sources").insert(...)`（沿用 AdminEmailKnowledge.tsx 第 109-130 行的模式），payload：
-
-```ts
+**JSON**（`knowledge-base-YYYYMMDD-HHmm.json`）
+```json
 {
-  source_type: "email",
-  title: 形如「客戶來信：{主旨}」,
-  content: 上述合併文字,
-  metadata: {
-    language: "zh-TW",
-    tag: 使用者輸入的標籤 || undefined,
-    sender: "{name} <{email}>",
-    gmail_message_id: detail.id,           // 用於去重檢查
-    rma_number: detectedRma || undefined,
-    saved_at: new Date().toISOString(),
-  },
-  created_by: user?.id,
+  "exported_at": "2026-04-28T...",
+  "total": 123,
+  "sources": [
+    {
+      "id": "...",
+      "source_type": "faq",
+      "title": "...",
+      "content": "...",
+      "metadata": { "language": "zh-TW", "tag": "保固", "gmail_message_id": "...", ... },
+      "file_name": "...",
+      "created_at": "...",
+      "updated_at": "..."
+    }
+  ]
 }
 ```
 
-寫入成功後呼叫 `kickoffEmailEmbeddingJob("customer-email-save")` 觸發背景索引（與既有流程一致），並 toast 顯示結果。
+**CSV**（`knowledge-base-YYYYMMDD-HHmm.csv`）
+欄位：`類型, 標題, 標籤, 語言, 內容, 檔案名稱, 建立時間, 更新時間`
+- 內容欄位處理換行與引號跳脫
+- 加 UTF-8 BOM 讓 Excel 正確顯示中文
 
-### 防重複
+**Markdown**（`knowledge-base-YYYYMMDD-HHmm.md`）
+```markdown
+# 客戶往來知識庫匯出
+匯出時間：2026-04-28 ...
+共 123 筆
 
-寫入前先用 `gmail_message_id` 查一下：
+---
 
-```ts
-supabase.from("email_knowledge_sources")
-  .select("id").eq("metadata->>gmail_message_id", detail.id).maybeSingle()
+## [FAQ] 標題
+- 標籤：#保固
+- 語言：zh-TW
+- 更新：2026-04-20
+
+內容...
+
+---
 ```
 
-若已存在，按鈕改為「更新已儲存內容」走 `update` 路徑；若是新存，呈現「✓ 已存入知識庫」並停留在該狀態（含「在知識庫檢視」按鈕，連到 `/admin/email-knowledge`）。
+## 技術實作
 
-### 額外：選擇切換信件後重置
+**檔案異動**：只動 `src/pages/AdminEmailKnowledge.tsx` 一個檔案，純前端實作，不需要新 Edge Function（管理員已有 RLS 讀取權限）。
 
-切換到別封信時，重置「已存入」狀態。
+**新增**：
+- `handleExport(format: 'json' | 'csv' | 'md')` 函式
+- 用 Blob + URL.createObjectURL 觸發瀏覽器下載
+- 工具函式：`escapeCsvField()`、`formatAsMarkdown()`、`formatAsJson()`
+- 引入 `lucide-react` 的 `Download` 與 `ChevronDown` icon
+- 使用既有的 `DropdownMenu` UI 元件
 
----
+**不需要**：
+- 不需要資料庫 migration
+- 不需要 Edge Function
+- 不需要新 secrets
+- 不需要打包 storage 原始檔（這次先不做，未來如要可加 ZIP 選項）
 
-## 二、改善信件清單快取
-
-### 現況問題
-
-每次離開再回到 `/admin/logistics`、或切換到其他分頁再回來，`CustomerEmailTab` 都會 unmount → 重新 mount → 重新 `loadMessages()`。
-
-### 解決方案：模組層級快取 + TTL
-
-在 `CustomerEmailTab.tsx` 檔案頂部建立 module-scope 快取（不需要 React Query，最小改動）：
-
-```ts
-// 模組級快取：跨 mount 保留
-const emailListCache = new Map<string, { data: EmailListItem[]; ts: number }>();
-const emailDetailCache = new Map<string, EmailDetail>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分鐘
-```
-
-**清單快取行為：**
-- key = `${filter}|${search}` (即 query 字串)
-- mount 時若快取存在且未過期 → 直接顯示快取，不發 request
-- 使用者按「同步」按鈕 → 強制刷新並更新快取（這是唯一觸發網路請求的方式，當快取有效時）
-- 切換 filter/search 時，若該 key 有快取也直接用，否則 fetch
-
-**信件內文快取：**
-- key = `messageId`
-- 已讀過的信件直接從快取顯示，不重打 `gmail-get-message`
-- 標記已讀的 modify call 仍照舊（只第一次跑）
-
-### 視覺提示
-
-工具列加上「最後同步：X 分鐘前」小字，讓使用者知道資料是快取的，需要時可手動按「同步」。
-
----
-
-## 技術細節
-
-**檔案異動：**
-- `src/components/logistics/CustomerEmailTab.tsx` — 新增儲存區塊 UI、寫入邏輯、模組層級快取
-- 不需要新的 edge function（直接用 supabase-js 寫表）
-- 不需要 DB migration（沿用 `email_knowledge_sources` 既有結構，metadata jsonb 自由擴充）
-
-**沿用既有功能：**
-- 寫入後背景索引：`kickoffEmailEmbeddingJob("customer-email-save")` (lib/email-embedding-job.ts)
-- 知識庫頁面已會自動顯示新增的 `email` 類型項目，含 metadata 標籤、語言過濾
-
-**不會破壞：**
-- 切換分頁回來看到舊資料是預期行為，按「同步」即可拉新
-- Gmail 第一次 mount 仍會 fetch（首次無快取）
-- 5 分鐘 TTL 過期後自動重抓
-
----
-
-## 驗收
-
-1. 開一封客戶來信 → 按 ✨AI 草擬回覆 → 編輯草稿
-2. AI 草稿下方出現「💾 存入知識庫」區塊
-3. 輸入標籤（例如「保固詢問」）→ 按儲存
-4. Toast 顯示「已存入知識庫，背景索引已排程」
-5. 到 `/admin/email-knowledge` → 篩選「客戶 Email」→ 看到剛存入的記錄，內容包含原信 + 回覆
-6. 同一封信再按一次 → 變成「更新已儲存內容」
-7. 離開 `/admin/logistics` 切到別頁再回來 → 信件清單立即顯示（無 loading），標示「最後同步：X 分鐘前」
-8. 按「同步」→ 重新拉取最新信件
+## 範圍限制
+- 只匯出 `email_knowledge_sources` 內容（含 metadata）
+- 不匯出向量資料（`email_embeddings`）— 對人類無意義，且檔案會非常大
+- 不匯出原始上傳檔案（PDF/Word）— 之後若需要可再加「打包原始檔 ZIP」按鈕
