@@ -102,8 +102,15 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        const emailRes = await supabase.functions.invoke("send-transactional-email", {
-          body: {
+        // Direct fetch to send-transactional-email (more reliable than functions.invoke in cron context)
+        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "apikey": supabaseServiceKey,
+          },
+          body: JSON.stringify({
             templateName: "shipping-reminder",
             recipientEmail: rma.customer_email,
             idempotencyKey: `shipping-reminder-${rma.id}`,
@@ -114,12 +121,14 @@ Deno.serve(async (req) => {
               createdDate,
               shippingUrl,
             },
-          },
+          }),
         });
 
-        if (emailRes.error) {
-          throw new Error(`Email send failed: ${emailRes.error.message || JSON.stringify(emailRes.error)}`);
+        if (!emailResp.ok) {
+          const errText = await emailResp.text();
+          throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
         }
+        await emailResp.text();
 
         // Mark as sent
         const { error: updErr } = await supabase
