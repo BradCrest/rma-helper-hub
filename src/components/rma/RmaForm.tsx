@@ -555,6 +555,7 @@ const RmaForm = () => {
               <MultiProductForm
                 products={multiProducts}
                 onChange={setMultiProducts}
+                onInvalidSerial={() => setShowInvalidSerialDialog(true)}
               />
             </div>
           </>
