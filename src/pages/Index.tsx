@@ -13,7 +13,9 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ExternalLink, Megaphone } from "lucide-react";
+
+const POLICY_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update?srsltid=AfmBOooKlXrXFW6s3doVBFQ3uTxkt4jOHtALfSlmoU4RxRqDQTgAHbLU";
 
 const Index = () => {
   const [showNotice, setShowNotice] = useState(true);
