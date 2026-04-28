@@ -84,7 +84,7 @@ const ShippingReminderEmail = ({
 export const template = {
   component: ShippingReminderEmail,
   subject: (data: Record<string, any>) =>
-    `提醒您：請填寫保固服務寄件資訊${data?.rmaNumber ? ` (${data.rmaNumber})` : ''}`,
+    `CREST 提醒您：請填寫保固服務寄件資訊${data?.rmaNumber ? ` (${data.rmaNumber})` : ''}`,
   displayName: '48 小時未寄件提醒',
   previewData: {
     customerName: '王小明',
