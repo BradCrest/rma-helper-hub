@@ -81,9 +81,21 @@ const Index = () => {
                 <div className="mb-4">
                   <img src={logo} alt="CREST Logo" className="h-12 md:h-16 w-auto" />
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-6">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
                   CREST 產品申請保固服務系統
                 </h2>
+                <a
+                  href={POLICY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-lg border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors group"
+                >
+                  <Megaphone className="h-4 w-4 text-primary shrink-0" />
+                  <span className="text-sm font-semibold text-primary">
+                    CREST 潛水電腦錶保固與維修政策調整公告
+                  </span>
+                  <ExternalLink className="h-4 w-4 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                </a>
                 <TabNavigation />
               </div>
 
