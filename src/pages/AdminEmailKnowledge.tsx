@@ -174,6 +174,91 @@ const AdminEmailKnowledge = () => {
   };
 
   const handleSignOut = async () => { await signOut(); navigate("/admin"); };
+
+  const triggerDownload = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const escapeCsv = (val: any) => {
+    if (val === null || val === undefined) return "";
+    const s = typeof val === "string" ? val : JSON.stringify(val);
+    if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const handleExport = (format: "json" | "csv" | "md", scope: "all" | "filtered") => {
+    const data = scope === "filtered" ? filtered : sources;
+    if (data.length === 0) {
+      toast.error("沒有可匯出的資料");
+      return;
+    }
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+    const baseName = `knowledge-base-${scope === "filtered" ? "filtered-" : ""}${stamp}`;
+
+    try {
+      if (format === "json") {
+        const payload = {
+          exported_at: now.toISOString(),
+          scope,
+          total: data.length,
+          sources: data,
+        };
+        triggerDownload(JSON.stringify(payload, null, 2), `${baseName}.json`, "application/json");
+      } else if (format === "csv") {
+        const headers = ["類型", "標題", "標籤", "語言", "內容", "檔案名稱", "建立時間", "更新時間"];
+        const rows = data.map((s) => [
+          SOURCE_LABELS[s.source_type]?.label ?? s.source_type,
+          s.title,
+          s.metadata?.tag ?? "",
+          s.metadata?.language ?? "",
+          s.content,
+          s.file_name ?? "",
+          new Date(s.created_at).toLocaleString("zh-TW"),
+          new Date(s.updated_at).toLocaleString("zh-TW"),
+        ]);
+        const csv = [headers, ...rows].map((r) => r.map(escapeCsv).join(",")).join("\r\n");
+        // UTF-8 BOM for Excel
+        triggerDownload("\uFEFF" + csv, `${baseName}.csv`, "text/csv;charset=utf-8");
+      } else {
+        const lines: string[] = [];
+        lines.push(`# 客戶往來知識庫匯出`);
+        lines.push(`匯出時間：${now.toLocaleString("zh-TW")}`);
+        lines.push(`共 ${data.length} 筆${scope === "filtered" ? "（已套用篩選）" : ""}`);
+        lines.push("");
+        lines.push("---");
+        lines.push("");
+        for (const s of data) {
+          const label = SOURCE_LABELS[s.source_type]?.label ?? s.source_type;
+          lines.push(`## [${label}] ${s.title}`);
+          if (s.metadata?.tag) lines.push(`- 標籤：#${s.metadata.tag}`);
+          if (s.metadata?.language) lines.push(`- 語言：${s.metadata.language}`);
+          if (s.file_name) lines.push(`- 檔案：${s.file_name}`);
+          lines.push(`- 更新：${new Date(s.updated_at).toLocaleString("zh-TW")}`);
+          lines.push("");
+          lines.push(s.content);
+          lines.push("");
+          lines.push("---");
+          lines.push("");
+        }
+        triggerDownload(lines.join("\n"), `${baseName}.md`, "text/markdown;charset=utf-8");
+      }
+      toast.success(`已匯出 ${data.length} 筆（${format.toUpperCase()}）`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error("匯出失敗：" + (e.message || "請稍後再試"));
+    }
+  };
+
   const filtered = useMemo(
     () => sources.filter((s) => {
       if (filter !== "all" && s.source_type !== filter) return false;
