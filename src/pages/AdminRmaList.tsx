@@ -899,7 +899,7 @@ const AdminRmaList = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="搜尋 RMA 編號、客戶名稱、電話或郵件..."
+                placeholder="搜尋 RMA 編號、客戶名稱、電話、郵件或產品序號..."
                 className="rma-input pl-10"
                 value={searchTerm}
                 onChange={(e) => {
