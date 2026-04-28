@@ -175,6 +175,16 @@ const AdminRmaList = () => {
   const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
   const [outboundShipping, setOutboundShipping] = useState<RmaShipping | null>(null);
   const [statusHistory, setStatusHistory] = useState<RmaStatusHistory[]>([]);
+  const [emailLogs, setEmailLogs] = useState<Array<{
+    id: string;
+    message_id: string | null;
+    template_name: string;
+    recipient_email: string;
+    status: string;
+    error_message: string | null;
+    metadata: any;
+    created_at: string;
+  }>>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isConfirmingReceive, setIsConfirmingReceive] = useState(false);
   const [isSubmittingOutbound, setIsSubmittingOutbound] = useState(false);
