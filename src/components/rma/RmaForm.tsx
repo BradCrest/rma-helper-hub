@@ -8,6 +8,21 @@ import MultiProductForm from "./MultiProductForm";
 import CsvImportSection from "./CsvImportSection";
 import CsvCustomerInfoDialog from "./CsvCustomerInfoDialog";
 import MultiProductPreview from "./MultiProductPreview";
+import {
+  isInvalidSerialNumber,
+  INVALID_SERIAL_TITLE,
+  INVALID_SERIAL_DESCRIPTION,
+} from "@/lib/serialNumberValidator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 
 const customerTypes = [
   { id: "consumer", label: "一般消費者" },
@@ -74,6 +89,14 @@ const RmaForm = () => {
   const [csvProducts, setCsvProducts] = useState<ProductEntry[]>([]);
   const [csvErrors, setCsvErrors] = useState<ParseError[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [showInvalidSerialDialog, setShowInvalidSerialDialog] = useState(false);
+
+  const handleSerialBlur = (value: string, clear: () => void) => {
+    if (isInvalidSerialNumber(value)) {
+      setShowInvalidSerialDialog(true);
+      clear();
+    }
+  };
 
   const handleAccessoryToggle = (id: string) => {
     setSelectedAccessories((prev) =>
@@ -115,6 +138,10 @@ const RmaForm = () => {
     }
     if (!issueDescription.trim()) {
       toast.error("請描述問題");
+      return;
+    }
+    if (isInvalidSerialNumber(serialNumber)) {
+      setShowInvalidSerialDialog(true);
       return;
     }
 
@@ -214,6 +241,14 @@ const RmaForm = () => {
 
     if (validProducts.length === 0) {
       toast.error("請至少新增一筆有效的產品資料（產品型號和序號為必填）");
+      return;
+    }
+
+    const hasInvalidSerial = validProducts.some((p) =>
+      isInvalidSerialNumber(p.serialNumber)
+    );
+    if (hasInvalidSerial) {
+      setShowInvalidSerialDialog(true);
       return;
     }
 
@@ -497,6 +532,9 @@ const RmaForm = () => {
                 className="rma-input"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
+                onBlur={(e) =>
+                  handleSerialBlur(e.target.value, () => setSerialNumber(""))
+                }
               />
             </div>
           )}
@@ -525,6 +563,7 @@ const RmaForm = () => {
               <MultiProductForm
                 products={multiProducts}
                 onChange={setMultiProducts}
+                onInvalidSerial={() => setShowInvalidSerialDialog(true)}
               />
             </div>
           </>
@@ -731,6 +770,30 @@ const RmaForm = () => {
         productCount={csvProducts.length}
         errors={csvErrors}
       />
+
+      <AlertDialog
+        open={showInvalidSerialDialog}
+        onOpenChange={setShowInvalidSerialDialog}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex justify-center mb-2">
+              <AlertTriangle className="h-12 w-12 text-amber-500" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">
+              {INVALID_SERIAL_TITLE}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="mt-2 whitespace-pre-line text-sm text-foreground bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+                {INVALID_SERIAL_DESCRIPTION}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center">
+            <AlertDialogAction className="px-8">我知道了</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

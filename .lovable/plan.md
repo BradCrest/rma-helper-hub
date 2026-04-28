@@ -1,84 +1,84 @@
-# 知識庫匯出功能
-
 ## 目標
-在 `/admin/email-knowledge` 頁面右上角新增「📥 匯出知識庫」下拉按鈕，讓管理員可以隨時把整個 RAG 知識庫下載成檔案，方便備份、檢視或日後重新匯入。
 
-## 功能設計
+當客戶在「產品序號」欄位填入下列**非產品序號**的代碼時，攔截並彈出提醒，告知正確的序號位置：
 
-### 按鈕位置
-放在頁面標題列「📧 客戶往來知識庫」旁邊，與「首頁」「登出」同一排。使用下拉選單（DropdownMenu）展開三個選項：
-- 匯出為 JSON（含完整 metadata，可重新匯入）
-- 匯出為 CSV（Excel 可直接開啟）
-- 匯出為 Markdown（每筆一個區塊，方便閱讀）
+- `EN` 開頭（例：EN13319）
+- 包含 `13319`
+- `EN13319`
+- `CCA` 開頭的 NCC 核准號（例：CCAB12LP1234T5）
 
-### 匯出範圍
-從 `email_knowledge_sources` 撈取**全部**知識來源（不受目前篩選影響），會尊重目前篩選器：
-- 若使用者已套用「類型」或「標籤」篩選，按鈕旁顯示「目前篩選：XXX（N 筆）」並提供「匯出全部」與「匯出篩選結果」兩個選項
-- 預設匯出全部
+## 偵測規則（不分大小寫、忽略空白與連字號）
 
-### 各格式內容
+正規化方式：`value.toUpperCase().replace(/[\s\-]/g, '')`
 
-**JSON**（`knowledge-base-YYYYMMDD-HHmm.json`）
-```json
-{
-  "exported_at": "2026-04-28T...",
-  "total": 123,
-  "sources": [
-    {
-      "id": "...",
-      "source_type": "faq",
-      "title": "...",
-      "content": "...",
-      "metadata": { "language": "zh-TW", "tag": "保固", "gmail_message_id": "...", ... },
-      "file_name": "...",
-      "created_at": "...",
-      "updated_at": "..."
-    }
-  ]
-}
+判斷為**無效序號**的條件（任一成立）：
+1. 以 `EN` 開頭
+2. 字串中包含 `13319`
+3. 以 `CCA` 開頭（NCC 核准號格式）
+
+## 提示訊息（彈窗 / Toast）
+
+標題：**這不是產品序號**
+
+內容：
+> 您輸入的看起來是 **歐盟潛水標準（EN13319）** 或 **NCC 核准號（CCA 開頭）**，並非產品序號。
+>
+> ✅ 產品序號可在以下位置找到：
+> - **產品包裝盒**上的標籤
+> - **錶身背面**的刻印
+>
+> 請重新確認後再填寫，謝謝。
+
+## 觸發時機
+
+採用「**onBlur 即時驗證 + 送出再次攔截**」雙保險：
+
+1. **onBlur**：使用者離開序號欄位時，若符合無效規則 → 跳 AlertDialog（彈窗，需按確認），並清空欄位讓他重填
+2. **送出時**：再次檢查，若仍無效 → toast.error 並中止送出
+
+彈窗比 toast 更有阻擋力，能確保使用者真的看到（toast 容易被忽略）。
+
+## 修改範圍
+
+### 1. 新增共用驗證 helper
+新檔：`src/lib/serialNumberValidator.ts`
+- `isInvalidSerialNumber(value: string): boolean`
+- `INVALID_SERIAL_MESSAGE` 常數（彈窗文字）
+
+### 2. `src/components/rma/RmaForm.tsx`（單筆模式）
+- 在序號 `<input>` 加 `onBlur` 驗證
+- 在 `handleSubmit` 內加最終攔截
+- 新增 AlertDialog state 顯示提示
+
+### 3. `src/components/rma/MultiProductForm.tsx`（多筆模式）
+- 序號欄位加 `onBlur` 驗證
+- 觸發父層共用的 AlertDialog（透過 prop 或 sonner toast 升級版）
+
+### 4. `src/components/rma/CsvImportSection.tsx` / `rmaMultiCsvParser.ts`（CSV 匯入）
+- 在解析時若偵測到無效序號 → 加入 `errors` 陣列，附帶說明 「第 N 列序號疑似 EN13319/NCC 號，請檢查」
+- 不擋下匯入流程，但於 preview 警示
+
+### 5. （可選）後端 `supabase/functions/submit-rma/index.ts`
+- 加同樣的伺服器端檢查作為最後防線，回傳 400
+
+## 不修改的部分
+
+- 後台 `AdminRmaList` 等顯示頁面不動（避免影響歷史資料）
+- 已存在資料庫的舊紀錄不回溯處理
+
+## UI 範例
+
+```text
+┌─────────────────────────────────┐
+│  ⚠️  這不是產品序號              │
+├─────────────────────────────────┤
+│  您輸入的看起來是 EN13319 標準   │
+│  或 NCC 核准號，並非產品序號。   │
+│                                  │
+│  產品序號可在以下位置找到：      │
+│  • 產品包裝盒上的標籤            │
+│  • 錶身背面的刻印                │
+│                                  │
+│              [ 我知道了 ]        │
+└─────────────────────────────────┘
 ```
-
-**CSV**（`knowledge-base-YYYYMMDD-HHmm.csv`）
-欄位：`類型, 標題, 標籤, 語言, 內容, 檔案名稱, 建立時間, 更新時間`
-- 內容欄位處理換行與引號跳脫
-- 加 UTF-8 BOM 讓 Excel 正確顯示中文
-
-**Markdown**（`knowledge-base-YYYYMMDD-HHmm.md`）
-```markdown
-# 客戶往來知識庫匯出
-匯出時間：2026-04-28 ...
-共 123 筆
-
----
-
-## [FAQ] 標題
-- 標籤：#保固
-- 語言：zh-TW
-- 更新：2026-04-20
-
-內容...
-
----
-```
-
-## 技術實作
-
-**檔案異動**：只動 `src/pages/AdminEmailKnowledge.tsx` 一個檔案，純前端實作，不需要新 Edge Function（管理員已有 RLS 讀取權限）。
-
-**新增**：
-- `handleExport(format: 'json' | 'csv' | 'md')` 函式
-- 用 Blob + URL.createObjectURL 觸發瀏覽器下載
-- 工具函式：`escapeCsvField()`、`formatAsMarkdown()`、`formatAsJson()`
-- 引入 `lucide-react` 的 `Download` 與 `ChevronDown` icon
-- 使用既有的 `DropdownMenu` UI 元件
-
-**不需要**：
-- 不需要資料庫 migration
-- 不需要 Edge Function
-- 不需要新 secrets
-- 不需要打包 storage 原始檔（這次先不做，未來如要可加 ZIP 選項）
-
-## 範圍限制
-- 只匯出 `email_knowledge_sources` 內容（含 metadata）
-- 不匯出向量資料（`email_embeddings`）— 對人類無意義，且檔案會非常大
-- 不匯出原始上傳檔案（PDF/Word）— 之後若需要可再加「打包原始檔 ZIP」按鈕
