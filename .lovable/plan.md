@@ -1,56 +1,73 @@
 ## 背景
 
-目前 Email 藍色按鈕導向 `/shipping?rma=...&autoopen=1`，依賴前端 React 的 `useEffect` 彈出 Modal 並自動搜尋。實際運作時，自動開啟未觸發（疑似為發布版本快取或前端時序問題），使用者仍需手動點按。
+兩個需求：
+1. **RC7EA058460** 的 `issue_type = '軟體問題'`，這類問題通常不需要寄回維修，所以不應該寄送「未寄件提醒」Email。
+2. 未來會有多種 Email（提醒、狀態更新、完工通知等），需要一個統一的地方記錄每筆 RMA 已發送過哪些 Email。
 
-## 解決方案
-
-新增一個 **Email 專用的單一填寫頁面**：`/shipping-form?rma=RC...`
-
-此頁面流程簡單直接：
-1. 進入頁面時自動以 URL 中的 RMA 編號透過 `lookup-rma` 查詢，並直接顯示 RMA 摘要（RMA 編號、產品名稱、狀態）。
-2. 頁面**直接渲染寄件資訊表單**（物流名稱、物流單號、選填照片）— 沒有 Modal、沒有 Tab、沒有額外按鈕。
-3. 送出後呼叫 `submit-shipping` Edge Function 寫入資料庫，狀態自動轉為 `shipped`。
-4. 成功後顯示確認畫面（含 RMA 編號、感謝訊息、回首頁按鈕）。
-5. 若 RMA 已寄出 / 找不到 / 狀態不允許 → 顯示對應錯誤畫面，提供回首頁連結。
-
-不會動到既有 `/shipping` 頁面與 `/track` 流程，現有 Modal 行為保留供其他入口使用。
+實際上，系統已有 `email_send_log` 資料表記錄所有寄出的 Email，但目前在 RMA 詳細頁面（`RmaDetailDialog`）並沒有顯示。我們可以利用現有的 log 表，在 RMA 詳情中新增一個「Email 寄送記錄」區塊。
 
 ## 變更內容
 
-### 1. 新增 `src/pages/ShippingForm.tsx`
-- 路徑：`/shipping-form`
-- 從 URL `?rma=` 讀取 RMA 編號（無編號則顯示錯誤）
-- 載入時自動呼叫 `lookup-rma` Edge Function
-- 三種畫面狀態：
-  - **載入中**：顯示 spinner
-  - **填寫中**：顯示 RMA 摘要卡 + 寄件資訊表單（物流名稱、單號、照片上傳、寄件須知與不可親送提醒）
-  - **完成**：成功訊息 + RMA 編號 + 回首頁
-  - **錯誤**：找不到 RMA / 已寄出 / 狀態不符 → 友善錯誤畫面
-- 沿用現有 `rma-card` / `rma-input` / `rma-btn-primary` 樣式，視覺一致
-- 照片上傳：5MB 上限，上傳到 `rma-photos` bucket
-- 提交：呼叫 `submit-shipping`（沿用現有 Edge Function，不需修改）
+### 1. 寄送提醒時跳過「軟體問題」
 
-### 2. 註冊路由 `src/App.tsx`
-- 新增 `<Route path="/shipping-form" element={<ShippingForm />} />`
+**檔案：** `supabase/functions/send-shipping-reminders/index.ts`
 
-### 3. 更新 Email 模板 `supabase/functions/_shared/transactional-email-templates/shipping-reminder.tsx`
-- 將按鈕 `shippingUrl` 預設值與 `previewData` 改為指向 `/shipping-form?rma=...`
-- 移除 `&autoopen=1` 參數（不再需要）
+在自動排程（cron）的查詢條件加入 `.neq('issue_type', '軟體問題')`，避免軟體問題的 RMA 進入提醒名單。
 
-### 4. 更新 `supabase/functions/send-shipping-reminders/index.ts`
-- 將寄送提醒 email 時組裝的 `shippingUrl` 從 `/shipping?rma=X&autoopen=1` 改為 `/shipping-form?rma=X`
+手動觸發（admin 從後台按鈕重寄）一樣保留 issue_type 檢查，但會回傳明確訊息（例如 `skipped: software_issue`），讓管理員知道為什麼沒寄。
 
-### 5. 部署與測試
-- 部署 `send-shipping-reminders` 與 `send-transactional-email`（後者吃模板）
-- 重寄一次測試信到 `RC7EA057459`，驗證點擊藍色按鈕後直接看到填寫表單
+> 註：此規則僅適用「未寄件提醒」這封信。其他類型的 Email（如狀態變更通知）不受影響。
+> 
+> 若未來想擴充「不寄提醒的問題類型清單」（例如還想加入 `APP問題`、`韌體問題`），可以改成陣列比對。本次先以「軟體問題」為單一條件，保持簡單。
+
+### 2. RMA 詳情頁面新增「Email 寄送記錄」區塊
+
+**檔案：** `src/components/rma/RmaDetailDialog.tsx`
+
+在 Dialog 內新增一個區塊（放在「寄件資訊」之後、「狀態歷程」附近），顯示這筆 RMA 寄出過的所有 Email：
+
+- **資料來源：** `email_send_log` 表，透過 `recipient_email = customer_email` 篩選。
+- **顯示欄位：** 
+  - 寄送時間（`created_at`）
+  - 信件類型（`template_name` → 顯示中文名稱對照表，例如 `shipping-reminder` → "未寄件提醒"）
+  - 收件人（`recipient_email`）
+  - 狀態（`status`：pending/sent/failed/suppressed → 中文 badge）
+- **排序：** 最新在上。
+- **權限：** RLS 上 `email_send_log` 目前僅 service role 可讀。需新增一條 admin SELECT policy，讓管理員也能讀。
+- **空狀態：** 「尚未發送任何 Email」。
+
+### 3. 模板名稱中文對照
+
+在前端建立一個小型對照表，方便未來新增 Email 模板時擴充：
+
+```text
+shipping-reminder      → 未寄件提醒
+(未來新增的模板)        → 對應中文名稱
+```
+
+放在 `src/lib/emailTemplateLabels.ts`，集中管理。
+
+## 技術細節
+
+### 資料庫變更
+- 新增 RLS policy：`email_send_log` 允許 `is_admin(auth.uid())` SELECT。
+- 不需要新增表格 — `email_send_log` 已具備所有必要欄位（message_id、template_name、recipient_email、status、created_at）。
+- 同一封信可能有多筆 log（pending → sent），前端用 `message_id` 去重，只顯示最新狀態。
+
+### Edge Function 變更
+- `send-shipping-reminders/index.ts`：自動排程查詢加 `.neq('issue_type', '軟體問題')`；手動觸發路徑檢查 issue_type 並回傳 `{ skipped: 'software_issue' }`。
+- 部署 `send-shipping-reminders`。
+
+### 前端變更
+- `RmaDetailDialog.tsx`：新增 `useEffect` 在 dialog 打開時 query `email_send_log`，渲染清單。
+- `src/lib/emailTemplateLabels.ts`：新增模板名稱對照表。
 
 ## 不變更項目
 
-- `submit-shipping` Edge Function 邏輯（已支援 customer 直送、會自動更新狀態為 `shipped`、發 Slack 通知）
-- 現有 `/shipping` 頁面（Tab 切換 + Modal 流程保留給直接從首頁進入的使用者）
-- 資料庫 schema、RLS 政策
+- `email_send_log` 表結構不變。
+- 其他 Edge Function 不變。
+- 既有寄信流程（pgmq 佇列、send-transactional-email）不變。
 
-## 風險與緩解
+## 風險
 
-- **使用者誤把舊連結傳給其他人**：舊 `/shipping?rma=...&autoopen=1` 依然可運作（只是回到 Modal 流程），不會 404。
-- **重複提交**：`submit-shipping` 已檢查 `existingShipping` 與 `status='registered'`，重送會回 400 並顯示「此 RMA 已有寄件資訊」。
+- 軟體問題的 RMA 之後仍可能需要寄送其他通知（例如「我們已收到您的詢問」），這些不會被本次修改影響，因為過濾條件只在 `send-shipping-reminders` 內。
