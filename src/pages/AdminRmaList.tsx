@@ -237,6 +237,141 @@ const AdminRmaList = () => {
   const [deletionLogs, setDeletionLogs] = useState<DeletionLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
+  // Sync edit form whenever selected RMA / shipping changes
+  useEffect(() => {
+    if (!selectedRma) {
+      setEditingDetail(false);
+      return;
+    }
+    setEditForm({
+      customer_name: selectedRma.customer_name || "",
+      customer_phone: selectedRma.customer_phone || "",
+      customer_email: selectedRma.customer_email || "",
+      customer_address: selectedRma.customer_address || "",
+      product_name: selectedRma.product_name || "",
+      product_model: selectedRma.product_model || "",
+      serial_number: selectedRma.serial_number || "",
+      issue_type: selectedRma.issue_type || "",
+      issue_description: selectedRma.issue_description || "",
+      customer_notes: selectedRma.customer_notes || "",
+      shipping_carrier: selectedRmaShipping?.carrier || "",
+      shipping_tracking_number: selectedRmaShipping?.tracking_number || "",
+      shipping_ship_date: selectedRmaShipping?.ship_date || "",
+    });
+  }, [selectedRma, selectedRmaShipping]);
+
+  const detailEditSchema = z.object({
+    customer_name: z.string().trim().min(1, "客戶名稱必填").max(200),
+    customer_phone: z.string().trim().min(1, "聯絡電話必填").max(50),
+    customer_email: z.string().trim().email("Email 格式錯誤").max(255),
+    customer_address: z.string().trim().max(500).optional().or(z.literal("")),
+    product_name: z.string().trim().min(1, "產品名稱必填").max(200),
+    product_model: z.string().trim().max(100).optional().or(z.literal("")),
+    serial_number: z.string().trim().max(100).optional().or(z.literal("")),
+    issue_type: z.string().trim().min(1, "問題類型必填"),
+    issue_description: z.string().trim().min(1, "問題描述必填").max(2000),
+    customer_notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  });
+
+  const handleSaveDetailEdit = async () => {
+    if (!selectedRma || !user) return;
+
+    const parsed = detailEditSchema.safeParse({
+      customer_name: editForm.customer_name,
+      customer_phone: editForm.customer_phone,
+      customer_email: editForm.customer_email,
+      customer_address: editForm.customer_address,
+      product_name: editForm.product_name,
+      product_model: editForm.product_model,
+      serial_number: editForm.serial_number,
+      issue_type: editForm.issue_type,
+      issue_description: editForm.issue_description,
+      customer_notes: editForm.customer_notes,
+    });
+    if (!parsed.success) {
+      const firstErr = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
+      toast.error(firstErr || "請檢查欄位內容");
+      return;
+    }
+
+    if (editForm.serial_number && isInvalidSerialNumber(editForm.serial_number)) {
+      toast.error(INVALID_SERIAL_DESCRIPTION);
+      return;
+    }
+
+    setSavingDetail(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const updatePayload = {
+        customer_name: editForm.customer_name.trim(),
+        customer_phone: editForm.customer_phone.trim(),
+        customer_email: editForm.customer_email.trim(),
+        customer_address: editForm.customer_address.trim() || null,
+        product_name: editForm.product_name.trim(),
+        product_model: editForm.product_model.trim() || null,
+        serial_number: editForm.serial_number.trim() || null,
+        issue_type: editForm.issue_type.trim(),
+        issue_description: editForm.issue_description.trim(),
+        customer_notes: editForm.customer_notes.trim() || null,
+        updated_by: user.id,
+        updated_by_email: user.email || null,
+        updated_at: nowIso,
+      };
+
+      const { error: updateErr } = await supabase
+        .from("rma_requests")
+        .update(updatePayload)
+        .eq("id", selectedRma.id);
+      if (updateErr) throw updateErr;
+
+      const hasShippingValue =
+        editForm.shipping_carrier.trim() ||
+        editForm.shipping_tracking_number.trim() ||
+        editForm.shipping_ship_date.trim();
+
+      let nextShipping = selectedRmaShipping;
+      if (hasShippingValue || selectedRmaShipping?.id) {
+        const shippingPayload = {
+          rma_request_id: selectedRma.id,
+          direction: "inbound",
+          carrier: editForm.shipping_carrier.trim() || null,
+          tracking_number: editForm.shipping_tracking_number.trim() || null,
+          ship_date: editForm.shipping_ship_date.trim() || null,
+        };
+        if (selectedRmaShipping?.id) {
+          const { data, error: shipErr } = await supabase
+            .from("rma_shipping")
+            .update(shippingPayload)
+            .eq("id", selectedRmaShipping.id)
+            .select()
+            .maybeSingle();
+          if (shipErr) throw shipErr;
+          if (data) nextShipping = data as RmaShipping;
+        } else if (hasShippingValue) {
+          const { data, error: shipErr } = await supabase
+            .from("rma_shipping")
+            .insert(shippingPayload)
+            .select()
+            .maybeSingle();
+          if (shipErr) throw shipErr;
+          if (data) nextShipping = data as RmaShipping;
+        }
+      }
+
+      toast.success("已儲存修改");
+      setSelectedRma({ ...selectedRma, ...updatePayload } as RmaRequest);
+      setSelectedRmaShipping(nextShipping);
+      setEditingDetail(false);
+      fetchRmaList();
+    } catch (err: any) {
+      console.error("Error saving RMA edits:", err);
+      toast.error(err?.message || "儲存失敗");
+    } finally {
+      setSavingDetail(false);
+    }
+  };
+
+
   const fetchRmaList = async () => {
     setIsLoading(true);
     try {
