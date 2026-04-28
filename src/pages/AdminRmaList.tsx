@@ -44,6 +44,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { getEmailTemplateLabel, getEmailStatusLabel } from "@/lib/emailTemplateLabels";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -174,6 +175,16 @@ const AdminRmaList = () => {
   const [selectedRmaShipping, setSelectedRmaShipping] = useState<RmaShipping | null>(null);
   const [outboundShipping, setOutboundShipping] = useState<RmaShipping | null>(null);
   const [statusHistory, setStatusHistory] = useState<RmaStatusHistory[]>([]);
+  const [emailLogs, setEmailLogs] = useState<Array<{
+    id: string;
+    message_id: string | null;
+    template_name: string;
+    recipient_email: string;
+    status: string;
+    error_message: string | null;
+    metadata: any;
+    created_at: string;
+  }>>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isConfirmingReceive, setIsConfirmingReceive] = useState(false);
   const [isSubmittingOutbound, setIsSubmittingOutbound] = useState(false);
@@ -478,9 +489,9 @@ const AdminRmaList = () => {
     // Load repair fee
     setRepairFee(rma.repair_fee != null ? String(rma.repair_fee) : "");
     
-    // Fetch shipping info (inbound & outbound), status history, and contacts for this RMA
+    // Fetch shipping info (inbound & outbound), status history, contacts, and email logs for this RMA
     try {
-      const [inboundResult, outboundResult, historyResult, contactsResult] = await Promise.all([
+      const [inboundResult, outboundResult, historyResult, contactsResult, emailLogsResult] = await Promise.all([
         supabase
           .from("rma_shipping")
           .select("*")
@@ -502,19 +513,48 @@ const AdminRmaList = () => {
           .from("rma_customer_contacts")
           .select("*")
           .eq("rma_request_id", rma.id)
-          .order("contact_date", { ascending: false })
+          .order("contact_date", { ascending: false }),
+        rma.customer_email
+          ? supabase
+              .from("email_send_log")
+              .select("*")
+              .eq("recipient_email", rma.customer_email)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] as any[] }),
       ]);
       
       setSelectedRmaShipping(inboundResult.data);
       setOutboundShipping(outboundResult.data);
       setStatusHistory(historyResult.data || []);
       setContacts(contactsResult.data || []);
+
+      // Deduplicate email logs by message_id (keep latest per message_id),
+      // and filter to logs related to this RMA when metadata contains rma_number/rma_request_id.
+      const allLogs = (emailLogsResult.data || []) as any[];
+      const seen = new Set<string>();
+      const dedup: any[] = [];
+      for (const log of allLogs) {
+        const key = log.message_id || `__no_mid__${log.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        dedup.push(log);
+      }
+      const filtered = dedup.filter((log) => {
+        const meta = log.metadata || {};
+        const matchedByRma =
+          meta.rma_number === rma.rma_number ||
+          meta.rma_request_id === rma.id;
+        // If any log carries rma metadata, only keep matching ones; otherwise keep all (legacy logs).
+        return matchedByRma || (!meta.rma_number && !meta.rma_request_id);
+      });
+      setEmailLogs(filtered);
     } catch (error) {
       console.error("Error fetching RMA details:", error);
       setSelectedRmaShipping(null);
       setOutboundShipping(null);
       setStatusHistory([]);
       setContacts([]);
+      setEmailLogs([]);
     }
   };
 
@@ -2135,6 +2175,59 @@ const AdminRmaList = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Email Send History */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-3">
+                  <Send className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-medium text-foreground">Email 寄送記錄</p>
+                </div>
+                {emailLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">尚無 Email 寄送記錄</p>
+                ) : (
+                  <div className="space-y-2">
+                    {emailLogs.map((log) => {
+                      const statusClass =
+                        log.status === "sent"
+                          ? "bg-green-100 text-green-800"
+                          : log.status === "failed" || log.status === "dlq"
+                          ? "bg-red-100 text-red-800"
+                          : log.status === "suppressed" || log.status === "bounced" || log.status === "complained"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-muted text-muted-foreground";
+                      return (
+                        <div
+                          key={log.id}
+                          className="flex items-start justify-between gap-3 rounded-md border border-border bg-card p-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium text-foreground">
+                                {getEmailTemplateLabel(log.template_name)}
+                              </span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass}`}>
+                                {getEmailStatusLabel(log.status)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground truncate">
+                              收件人：{log.recipient_email}
+                            </p>
+                            {log.error_message && (
+                              <p className="mt-1 text-xs text-red-600 break-words">
+                                錯誤：{log.error_message}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                            <Clock className="w-3 h-3" />
+                            {formatDate(log.created_at)}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
