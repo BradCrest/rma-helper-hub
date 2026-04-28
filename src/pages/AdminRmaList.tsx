@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { z } from "zod";
+import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
 import { Link } from "react-router-dom";
 import { 
   Search, 
@@ -160,7 +162,7 @@ const getStatusDurationInfo = (status: RmaStatus, updatedAt: string): { elapsed:
 
 const AdminRmaList = () => {
 
-  const { user, signOut, isSuperAdmin } = useAuth();
+  const { user, signOut, isSuperAdmin, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -202,6 +204,25 @@ const AdminRmaList = () => {
   const [repairFee, setRepairFee] = useState<string>("");
   const [isSavingFee, setIsSavingFee] = useState(false);
 
+  // Detail edit states (admin)
+  const [editingDetail, setEditingDetail] = useState(false);
+  const [savingDetail, setSavingDetail] = useState(false);
+  const [editForm, setEditForm] = useState({
+    customer_name: "",
+    customer_phone: "",
+    customer_email: "",
+    customer_address: "",
+    product_name: "",
+    product_model: "",
+    serial_number: "",
+    issue_type: "",
+    issue_description: "",
+    customer_notes: "",
+    shipping_carrier: "",
+    shipping_tracking_number: "",
+    shipping_ship_date: "",
+  });
+
   // Deletion logs states
   interface DeletionLog {
     id: string;
@@ -215,6 +236,141 @@ const AdminRmaList = () => {
   const [showDeletionLogs, setShowDeletionLogs] = useState(false);
   const [deletionLogs, setDeletionLogs] = useState<DeletionLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+
+  // Sync edit form whenever selected RMA / shipping changes
+  useEffect(() => {
+    if (!selectedRma) {
+      setEditingDetail(false);
+      return;
+    }
+    setEditForm({
+      customer_name: selectedRma.customer_name || "",
+      customer_phone: selectedRma.customer_phone || "",
+      customer_email: selectedRma.customer_email || "",
+      customer_address: selectedRma.customer_address || "",
+      product_name: selectedRma.product_name || "",
+      product_model: selectedRma.product_model || "",
+      serial_number: selectedRma.serial_number || "",
+      issue_type: selectedRma.issue_type || "",
+      issue_description: selectedRma.issue_description || "",
+      customer_notes: selectedRma.customer_notes || "",
+      shipping_carrier: selectedRmaShipping?.carrier || "",
+      shipping_tracking_number: selectedRmaShipping?.tracking_number || "",
+      shipping_ship_date: selectedRmaShipping?.ship_date || "",
+    });
+  }, [selectedRma, selectedRmaShipping]);
+
+  const detailEditSchema = z.object({
+    customer_name: z.string().trim().min(1, "客戶名稱必填").max(200),
+    customer_phone: z.string().trim().min(1, "聯絡電話必填").max(50),
+    customer_email: z.string().trim().email("Email 格式錯誤").max(255),
+    customer_address: z.string().trim().max(500).optional().or(z.literal("")),
+    product_name: z.string().trim().min(1, "產品名稱必填").max(200),
+    product_model: z.string().trim().max(100).optional().or(z.literal("")),
+    serial_number: z.string().trim().max(100).optional().or(z.literal("")),
+    issue_type: z.string().trim().min(1, "問題類型必填"),
+    issue_description: z.string().trim().min(1, "問題描述必填").max(2000),
+    customer_notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  });
+
+  const handleSaveDetailEdit = async () => {
+    if (!selectedRma || !user) return;
+
+    const parsed = detailEditSchema.safeParse({
+      customer_name: editForm.customer_name,
+      customer_phone: editForm.customer_phone,
+      customer_email: editForm.customer_email,
+      customer_address: editForm.customer_address,
+      product_name: editForm.product_name,
+      product_model: editForm.product_model,
+      serial_number: editForm.serial_number,
+      issue_type: editForm.issue_type,
+      issue_description: editForm.issue_description,
+      customer_notes: editForm.customer_notes,
+    });
+    if (!parsed.success) {
+      const firstErr = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
+      toast.error(firstErr || "請檢查欄位內容");
+      return;
+    }
+
+    if (editForm.serial_number && isInvalidSerialNumber(editForm.serial_number)) {
+      toast.error(INVALID_SERIAL_DESCRIPTION);
+      return;
+    }
+
+    setSavingDetail(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const updatePayload = {
+        customer_name: editForm.customer_name.trim(),
+        customer_phone: editForm.customer_phone.trim(),
+        customer_email: editForm.customer_email.trim(),
+        customer_address: editForm.customer_address.trim() || null,
+        product_name: editForm.product_name.trim(),
+        product_model: editForm.product_model.trim() || null,
+        serial_number: editForm.serial_number.trim() || null,
+        issue_type: editForm.issue_type.trim(),
+        issue_description: editForm.issue_description.trim(),
+        customer_notes: editForm.customer_notes.trim() || null,
+        updated_by: user.id,
+        updated_by_email: user.email || null,
+        updated_at: nowIso,
+      };
+
+      const { error: updateErr } = await supabase
+        .from("rma_requests")
+        .update(updatePayload)
+        .eq("id", selectedRma.id);
+      if (updateErr) throw updateErr;
+
+      const hasShippingValue =
+        editForm.shipping_carrier.trim() ||
+        editForm.shipping_tracking_number.trim() ||
+        editForm.shipping_ship_date.trim();
+
+      let nextShipping = selectedRmaShipping;
+      if (hasShippingValue || selectedRmaShipping?.id) {
+        const shippingPayload = {
+          rma_request_id: selectedRma.id,
+          direction: "inbound",
+          carrier: editForm.shipping_carrier.trim() || null,
+          tracking_number: editForm.shipping_tracking_number.trim() || null,
+          ship_date: editForm.shipping_ship_date.trim() || null,
+        };
+        if (selectedRmaShipping?.id) {
+          const { data, error: shipErr } = await supabase
+            .from("rma_shipping")
+            .update(shippingPayload)
+            .eq("id", selectedRmaShipping.id)
+            .select()
+            .maybeSingle();
+          if (shipErr) throw shipErr;
+          if (data) nextShipping = data as RmaShipping;
+        } else if (hasShippingValue) {
+          const { data, error: shipErr } = await supabase
+            .from("rma_shipping")
+            .insert(shippingPayload)
+            .select()
+            .maybeSingle();
+          if (shipErr) throw shipErr;
+          if (data) nextShipping = data as RmaShipping;
+        }
+      }
+
+      toast.success("已儲存修改");
+      setSelectedRma({ ...selectedRma, ...updatePayload } as RmaRequest);
+      setSelectedRmaShipping(nextShipping);
+      setEditingDetail(false);
+      fetchRmaList();
+    } catch (err: any) {
+      console.error("Error saving RMA edits:", err);
+      toast.error(err?.message || "儲存失敗");
+    } finally {
+      setSavingDetail(false);
+    }
+  };
+
 
   const fetchRmaList = async () => {
     setIsLoading(true);
@@ -1513,14 +1669,46 @@ const AdminRmaList = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-bold text-foreground">RMA 詳細資訊</h2>
-                <button
-                  onClick={() => setSelectedRma(null)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  {isAdmin && !editingDetail && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingDetail(true)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      編輯
+                    </button>
+                  )}
+                  {isAdmin && editingDetail && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetailEdit}
+                        disabled={savingDetail}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {savingDetail ? "儲存中..." : "儲存"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingDetail(false)}
+                        disabled={savingDetail}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-muted text-foreground transition-colors"
+                      >
+                        取消
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setSelectedRma(null)}
+                    className="text-muted-foreground hover:text-foreground ml-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1541,41 +1729,98 @@ const AdminRmaList = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">客戶名稱</p>
-                  <p className="text-foreground">{selectedRma.customer_name}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_name}
+                      onChange={(e) => setEditForm({ ...editForm, customer_name: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_name}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">聯絡電話</p>
-                  <p className="text-foreground">{selectedRma.customer_phone}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_phone}
+                      onChange={(e) => setEditForm({ ...editForm, customer_phone: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_phone}</p>
+                  )}
                 </div>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">電子郵件</p>
-                <p className="text-foreground">{selectedRma.customer_email}</p>
+                {editingDetail ? (
+                  <input
+                    type="email"
+                    className="rma-input"
+                    value={editForm.customer_email}
+                    onChange={(e) => setEditForm({ ...editForm, customer_email: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-foreground">{selectedRma.customer_email}</p>
+                )}
               </div>
 
-              {selectedRma.customer_address && (
+              {(editingDetail || selectedRma.customer_address) && (
                 <div>
                   <p className="text-sm text-muted-foreground">客戶地址</p>
-                  <p className="text-foreground">{selectedRma.customer_address}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.customer_address}
+                      onChange={(e) => setEditForm({ ...editForm, customer_address: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.customer_address}</p>
+                  )}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">產品名稱</p>
-                  <p className="text-foreground">{selectedRma.product_name}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.product_name}
+                      onChange={(e) => setEditForm({ ...editForm, product_name: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.product_name}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">產品型號</p>
-                  <p className="text-foreground">{selectedRma.product_model || "-"}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.product_model}
+                      onChange={(e) => setEditForm({ ...editForm, product_model: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.product_model || "-"}</p>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">序號</p>
-                  <p className="text-foreground">{selectedRma.serial_number || "-"}</p>
+                  {editingDetail ? (
+                    <input
+                      className="rma-input"
+                      value={editForm.serial_number}
+                      onChange={(e) => setEditForm({ ...editForm, serial_number: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground">{selectedRma.serial_number || "-"}</p>
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">購買日期</p>
@@ -1585,21 +1830,102 @@ const AdminRmaList = () => {
 
               <div>
                 <p className="text-sm text-muted-foreground">問題類型</p>
-                <p className="text-foreground">{selectedRma.issue_type}</p>
+                {editingDetail ? (
+                  <select
+                    className="rma-input"
+                    value={editForm.issue_type}
+                    onChange={(e) => setEditForm({ ...editForm, issue_type: e.target.value })}
+                  >
+                    {["螢幕顯示異常","電池/充電問題","按鍵故障","按鍵問題","進水/受潮","外觀損傷","韌體/軟體問題","感測器異常","其他"].map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    {editForm.issue_type && !["螢幕顯示異常","電池/充電問題","按鍵故障","按鍵問題","進水/受潮","外觀損傷","韌體/軟體問題","感測器異常","其他"].includes(editForm.issue_type) && (
+                      <option value={editForm.issue_type}>{editForm.issue_type}</option>
+                    )}
+                  </select>
+                ) : (
+                  <p className="text-foreground">{selectedRma.issue_type}</p>
+                )}
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">問題描述</p>
-                <p className="text-foreground whitespace-pre-wrap">{selectedRma.issue_description}</p>
+                {editingDetail ? (
+                  <Textarea
+                    rows={4}
+                    value={editForm.issue_description}
+                    onChange={(e) => setEditForm({ ...editForm, issue_description: e.target.value })}
+                  />
+                ) : (
+                  <p className="text-foreground whitespace-pre-wrap">{selectedRma.issue_description}</p>
+                )}
               </div>
+
+              {(editingDetail || selectedRma.customer_notes) && (
+                <div>
+                  <p className="text-sm text-muted-foreground">隨附物品 / 備註</p>
+                  {editingDetail ? (
+                    <Textarea
+                      rows={3}
+                      value={editForm.customer_notes}
+                      onChange={(e) => setEditForm({ ...editForm, customer_notes: e.target.value })}
+                    />
+                  ) : (
+                    <p className="text-foreground whitespace-pre-wrap">{selectedRma.customer_notes}</p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <p className="text-sm text-muted-foreground">建立日期</p>
                 <p className="text-foreground">{formatDate(selectedRma.created_at)}</p>
+                {selectedRma.updated_at &&
+                  selectedRma.updated_at !== selectedRma.created_at &&
+                  selectedRma.updated_by_email && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      修改日期：{formatDate(selectedRma.updated_at)} ｜ 修改人：{selectedRma.updated_by_email}
+                    </p>
+                  )}
               </div>
 
               {/* Shipping Info */}
-              {selectedRmaShipping && (
+              {editingDetail ? (
+                <div className="pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Truck className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">客戶寄件資訊</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">物流名稱</p>
+                        <input
+                          className="rma-input"
+                          value={editForm.shipping_carrier}
+                          onChange={(e) => setEditForm({ ...editForm, shipping_carrier: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">物流單號</p>
+                        <input
+                          className="rma-input"
+                          value={editForm.shipping_tracking_number}
+                          onChange={(e) => setEditForm({ ...editForm, shipping_tracking_number: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">寄出日期</p>
+                      <input
+                        type="date"
+                        className="rma-input"
+                        value={editForm.shipping_ship_date}
+                        onChange={(e) => setEditForm({ ...editForm, shipping_ship_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : selectedRmaShipping ? (
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 mb-3">
                     <Truck className="w-4 h-4 text-primary" />
@@ -1663,9 +1989,7 @@ const AdminRmaList = () => {
                     )}
                   </div>
                 </div>
-              )}
-
-              {!selectedRmaShipping && (
+              ) : (
                 <div className="pt-4 border-t border-border">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Package className="w-4 h-4" />
@@ -1673,6 +1997,7 @@ const AdminRmaList = () => {
                   </div>
                 </div>
               )}
+
 
               {/* Outbound Shipping Section */}
               <div className="pt-4 border-t border-border">
