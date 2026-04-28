@@ -99,17 +99,26 @@ const Shipping = () => {
   useEffect(() => {
     const rmaParam = searchParams.get("rma");
     const autoOpen = searchParams.get("autoopen");
-    if (rmaParam) {
-      setRmaNumber(rmaParam);
-      if (autoOpen === "1") {
-        setShowModal(true);
+
+    if (!rmaParam) return;
+
+    // Pre-fill main page form
+    setRmaNumber(rmaParam);
+
+    if (autoOpen === "1" || autoOpen === "true") {
+      // Open modal first
+      setShowModal(true);
+      // Trigger search after the modal has mounted
+      setTimeout(() => {
         performSearch(rmaParam);
-      }
-      // Clean URL params after consuming
-      const next = new URLSearchParams(searchParams);
-      next.delete("rma");
-      next.delete("autoopen");
-      setSearchParams(next, { replace: true });
+      }, 50);
+      // Clean URL params later, after state has settled
+      setTimeout(() => {
+        const next = new URLSearchParams(window.location.search);
+        next.delete("rma");
+        next.delete("autoopen");
+        setSearchParams(next, { replace: true });
+      }, 400);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

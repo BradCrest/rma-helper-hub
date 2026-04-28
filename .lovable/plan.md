@@ -1,37 +1,39 @@
-# 修正 Email 範本地址 + 確認自動開窗機制
+# 修正 Email 按鈕無法觸發「新增寄件資訊」彈窗的問題
 
-## 1. 修正 Email 範本中的收件地址
+## 問題診斷
 
-修改 `supabase/functions/_shared/transactional-email-templates/shipping-reminder.tsx`：
+URL `?rma=...&autoopen=1` 是正確的，`/shipping` 頁面也有 `useEffect` 處理。但目前邏輯中：
 
-**舊地址（錯誤）：**
-> 新北市汐止區康寧街169巷31號5樓 / CREST 保固服務中心
+```ts
+setShowModal(true);
+performSearch(rmaParam);          // 立即執行
+setSearchParams(next, ...);       // 同步馬上清除參數
+```
 
-**新地址（正確）：**
-> **中文：** 242039 新北市新莊區化成路11巷86號1樓
-> **英文：** No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039
+三個 state 變更**在同一個 tick 內**發生，導致：
+1. `setSearchParams` 觸發路由重新 render，可能在 modal 完成 mount 前就把 URL 清掉
+2. 在 React StrictMode 下 effect 會跑兩次，第二次 `searchParams` 已空 → 看起來沒作用
+3. `performSearch` 在 modal 還沒掛載時就跑，搜尋結果可能沒 reflect 到 modal 的 `step` 狀態上
 
-採用兩段式呈現（中／英分行 + 粗體強調），與寄件視窗截圖中的「後續步驟」資訊一致。
+## 修正方案
 
-部署：`send-transactional-email`（範本檔案是被它讀取的）
+修改 `src/pages/Shipping.tsx` 的 `useEffect` (line 98-115)：
 
-## 2. 關於藍色按鈕的連結 — 已經做到了 ✅
+1. **先 setShowModal(true)** 開啟彈窗
+2. **延遲 50ms 後** 再呼叫 `performSearch(rmaParam)` — 確保 modal DOM 已掛載
+3. **延遲 400ms 後** 才清除 URL 參數 — 不干擾 modal 開啟與搜尋流程
+4. 從 `window.location.search` 重新讀取參數做清除（避免使用過時的 closure 值）
 
-**完全沒有問題，這正是現在的運作方式：**
+這樣即可確保信件按鈕點擊後：
+→ Modal 立即開啟  
+→ 自動執行搜尋  
+→ 搜尋成功後切到「填寫寄件資訊」表單（即您截圖期望的畫面）  
+→ URL 清乾淨
 
-- 信件按鈕連結：`https://rma-helper-hub.lovable.app/shipping?rma=RC7EA057459&autoopen=1`
-- `Shipping.tsx` 已實作 `useEffect` 偵測 URL 參數：
-  - 讀到 `?rma=...` → 自動填入 RMA 編號
-  - 讀到 `&autoopen=1` → 自動開啟「新增寄件資訊」視窗 + 自動執行搜尋
-  - 搜尋成功 → 自動切到「填寫寄件資訊」表單（就是您截圖的畫面）
-  - 處理完後自動清除 URL 參數，避免重複觸發
+## 不需要修改
 
-**您截圖的畫面就是按鈕點擊後的實際結果。** 客戶從信件點按鈕後，看到的是已經帶入 RMA 編號、跳到表單步驟、可直接填寫物流資訊的視窗 — 完全不需要客戶手動輸入 RMA。
+- 信件範本（URL 已正確）
+- `send-shipping-reminders` Edge Function
+- `Tracking` / `Track` 頁面
 
-## 3. 同步更新 Memory
-
-更新 `mem://ui/shipping-address-and-policy`，記錄正確地址（中英對照），避免日後其他位置又出現舊地址。
-
----
-
-**結果**：信件內容的地址改正、按鈕點擊體驗維持目前實作（已正確運作）。
+只改 `src/pages/Shipping.tsx` 一個 `useEffect`，無需重新部署 Edge Function。
