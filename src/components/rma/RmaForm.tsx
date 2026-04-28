@@ -89,6 +89,14 @@ const RmaForm = () => {
   const [csvProducts, setCsvProducts] = useState<ProductEntry[]>([]);
   const [csvErrors, setCsvErrors] = useState<ParseError[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [showInvalidSerialDialog, setShowInvalidSerialDialog] = useState(false);
+
+  const handleSerialBlur = (value: string, clear: () => void) => {
+    if (isInvalidSerialNumber(value)) {
+      setShowInvalidSerialDialog(true);
+      clear();
+    }
+  };
 
   const handleAccessoryToggle = (id: string) => {
     setSelectedAccessories((prev) =>
