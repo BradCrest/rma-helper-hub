@@ -313,7 +313,28 @@ const AdminEmailKnowledge = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶往來知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground">{user?.email}</span><Link to="/" className="rma-btn-secondary text-sm"><Home className="w-4 h-4" /> 首頁</Link><button onClick={handleSignOut} className="rma-btn-secondary text-sm"><LogOut className="w-4 h-4" /> 登出</button></div></div></div></header>
+      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶往來知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="rma-btn-secondary text-sm" title="匯出知識庫"><Download className="w-4 h-4" /> 匯出</button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64 bg-popover z-50">
+            <DropdownMenuLabel>匯出全部（{sources.length} 筆）</DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleExport("json", "all")}>JSON（完整 metadata，可重新匯入）</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv", "all")}>CSV（Excel 可直接開啟）</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("md", "all")}>Markdown（人類可讀）</DropdownMenuItem>
+            {filtered.length !== sources.length && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>匯出篩選結果（{filtered.length} 筆）</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleExport("json", "filtered")}>JSON</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("csv", "filtered")}>CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("md", "filtered")}>Markdown</DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Link to="/" className="rma-btn-secondary text-sm"><Home className="w-4 h-4" /> 首頁</Link><button onClick={handleSignOut} className="rma-btn-secondary text-sm"><LogOut className="w-4 h-4" /> 登出</button></div></div></div></header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30"><div className="flex items-center gap-3"><Mail className="w-5 h-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Gmail 自動同步</p><p className="text-sm text-muted-foreground">即將推出 — 第二階段將支援 Gmail OAuth 自動抓取信件</p></div></div><button disabled className="rma-btn-secondary opacity-50 cursor-not-allowed">連接 Gmail（即將推出）</button></div>
