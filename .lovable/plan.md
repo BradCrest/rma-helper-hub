@@ -1,29 +1,56 @@
-我會做兩個修正：
+## 背景
 
-1. 更新寄件提醒信標題
-   - 將信件主旨改成：
-     `CREST 提醒您：請填寫保固服務寄件資訊 (RC7EA057459)`
-   - 會保留動態 RMA 編號，所以之後不同 RMA 會顯示對應編號：
-     `CREST 提醒您：請填寫保固服務寄件資訊 (RMA編號)`
+目前 Email 藍色按鈕導向 `/shipping?rma=...&autoopen=1`，依賴前端 React 的 `useEffect` 彈出 Modal 並自動搜尋。實際運作時，自動開啟未觸發（疑似為發布版本快取或前端時序問題），使用者仍需手動點按。
 
-2. 修正藍色按鈕無法自動彈出寄件資訊表單
-   - 我檢查到目前已發布網站開啟 `https://rma-helper-hub.lovable.app/shipping?rma=RC7EA057459&autoopen=1` 時，頁面仍停在「查詢您的RMA保固服務狀態」，沒有自動打開彈窗。
-   - 這表示目前 email 連結雖然 URL 正確，但發布版網站沒有成功執行自動開啟流程，可能是目前發布版還沒套用最新前端行為，或目前的 `useSearchParams` 初始化流程在已發布環境沒有穩定觸發。
+## 解決方案
 
-3. 改用更穩定的自動開啟方式
-   - 在 `/shipping` 頁面改成直接讀取瀏覽器網址的 `rma` 與 `autoopen` 參數。
-   - 當網址包含 `?rma=RC7EA057459&autoopen=1` 時：
-     1. 自動打開「新增寄件資訊」彈窗
-     2. 自動帶入 RMA 編號
-     3. 自動搜尋該 RMA
-     4. 若找到，直接切到「新增寄件資訊」表單，不再停在主查詢畫面
-   - 我也會避免太早清除網址參數，確保流程完成後才清掉。
+新增一個 **Email 專用的單一填寫頁面**：`/shipping-form?rma=RC...`
 
-4. 部署與測試信
-   - 修改 email 模板後，會重新部署寄件相關的後端寄信功能，確保新標題和新模板生效。
-   - 完成後會再寄一封 RC7EA057459 的測試信，讓你可以直接點藍色按鈕驗證。
+此頁面流程簡單直接：
+1. 進入頁面時自動以 URL 中的 RMA 編號透過 `lookup-rma` 查詢，並直接顯示 RMA 摘要（RMA 編號、產品名稱、狀態）。
+2. 頁面**直接渲染寄件資訊表單**（物流名稱、物流單號、選填照片）— 沒有 Modal、沒有 Tab、沒有額外按鈕。
+3. 送出後呼叫 `submit-shipping` Edge Function 寫入資料庫，狀態自動轉為 `shipped`。
+4. 成功後顯示確認畫面（含 RMA 編號、感謝訊息、回首頁按鈕）。
+5. 若 RMA 已寄出 / 找不到 / 狀態不允許 → 顯示對應錯誤畫面，提供回首頁連結。
 
-技術細節
-- 會修改 `supabase/functions/_shared/transactional-email-templates/shipping-reminder.tsx` 的 subject。
-- 會加強 `src/pages/Shipping.tsx` 的 URL auto-open 邏輯，避免只靠 `useSearchParams` 初始狀態。
-- 因為 email 模板屬於後端寄信功能，修改後必須重新部署寄信 function 才會真的套用到收到的 email。
+不會動到既有 `/shipping` 頁面與 `/track` 流程，現有 Modal 行為保留供其他入口使用。
+
+## 變更內容
+
+### 1. 新增 `src/pages/ShippingForm.tsx`
+- 路徑：`/shipping-form`
+- 從 URL `?rma=` 讀取 RMA 編號（無編號則顯示錯誤）
+- 載入時自動呼叫 `lookup-rma` Edge Function
+- 三種畫面狀態：
+  - **載入中**：顯示 spinner
+  - **填寫中**：顯示 RMA 摘要卡 + 寄件資訊表單（物流名稱、單號、照片上傳、寄件須知與不可親送提醒）
+  - **完成**：成功訊息 + RMA 編號 + 回首頁
+  - **錯誤**：找不到 RMA / 已寄出 / 狀態不符 → 友善錯誤畫面
+- 沿用現有 `rma-card` / `rma-input` / `rma-btn-primary` 樣式，視覺一致
+- 照片上傳：5MB 上限，上傳到 `rma-photos` bucket
+- 提交：呼叫 `submit-shipping`（沿用現有 Edge Function，不需修改）
+
+### 2. 註冊路由 `src/App.tsx`
+- 新增 `<Route path="/shipping-form" element={<ShippingForm />} />`
+
+### 3. 更新 Email 模板 `supabase/functions/_shared/transactional-email-templates/shipping-reminder.tsx`
+- 將按鈕 `shippingUrl` 預設值與 `previewData` 改為指向 `/shipping-form?rma=...`
+- 移除 `&autoopen=1` 參數（不再需要）
+
+### 4. 更新 `supabase/functions/send-shipping-reminders/index.ts`
+- 將寄送提醒 email 時組裝的 `shippingUrl` 從 `/shipping?rma=X&autoopen=1` 改為 `/shipping-form?rma=X`
+
+### 5. 部署與測試
+- 部署 `send-shipping-reminders` 與 `send-transactional-email`（後者吃模板）
+- 重寄一次測試信到 `RC7EA057459`，驗證點擊藍色按鈕後直接看到填寫表單
+
+## 不變更項目
+
+- `submit-shipping` Edge Function 邏輯（已支援 customer 直送、會自動更新狀態為 `shipped`、發 Slack 通知）
+- 現有 `/shipping` 頁面（Tab 切換 + Modal 流程保留給直接從首頁進入的使用者）
+- 資料庫 schema、RLS 政策
+
+## 風險與緩解
+
+- **使用者誤把舊連結傳給其他人**：舊 `/shipping?rma=...&autoopen=1` 依然可運作（只是回到 Modal 流程），不會 404。
+- **重複提交**：`submit-shipping` 已檢查 `existingShipping` 與 `status='registered'`，重送會回 400 並顯示「此 RMA 已有寄件資訊」。
