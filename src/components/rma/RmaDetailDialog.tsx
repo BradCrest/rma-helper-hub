@@ -176,14 +176,124 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
     }
   };
 
+  // Sync form values whenever rmaData changes (also resets edit fields)
+  useEffect(() => {
+    if (!rmaData) return;
+    setForm({
+      customer_name: rmaData.customer_name || "",
+      customer_phone: rmaData.customer_phone || "",
+      mobile_phone: rmaData.mobile_phone || "",
+      customer_email: rmaData.customer_email || "",
+      customer_address: rmaData.customer_address || "",
+      product_name: rmaData.product_name || "",
+      product_model: rmaData.product_model || "",
+      serial_number: rmaData.serial_number || "",
+      issue_type: rmaData.issue_type || "",
+      issue_description: rmaData.issue_description || "",
+      customer_notes: rmaData.customer_notes || "",
+      shipping_carrier: rmaData.inbound_shipping?.carrier || "",
+      shipping_tracking_number: rmaData.inbound_shipping?.tracking_number || "",
+      shipping_ship_date: rmaData.inbound_shipping?.ship_date || "",
+      shipping_notes: rmaData.inbound_shipping?.notes || "",
+    });
+  }, [rmaData]);
+
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen && rmaNumber) {
       fetchRmaData();
     } else {
       setRmaData(null);
+      setEditing(false);
     }
     onOpenChange(isOpen);
   };
+
+  const handleSave = async () => {
+    if (!rmaData?.id || !user) return;
+
+    const parsed = editSchema.safeParse(form);
+    if (!parsed.success) {
+      const firstErr = Object.values(parsed.error.flatten().fieldErrors).flat()[0];
+      toast.error(firstErr || "請檢查欄位內容");
+      return;
+    }
+
+    if (form.serial_number && isInvalidSerialNumber(form.serial_number)) {
+      toast.error(INVALID_SERIAL_DESCRIPTION);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const nowIso = new Date().toISOString();
+
+      const { error: updateErr } = await supabase
+        .from("rma_requests")
+        .update({
+          customer_name: form.customer_name.trim(),
+          customer_phone: form.customer_phone.trim(),
+          mobile_phone: form.mobile_phone?.trim() || null,
+          customer_email: form.customer_email.trim(),
+          customer_address: form.customer_address?.trim() || null,
+          product_name: form.product_name.trim(),
+          product_model: form.product_model?.trim() || null,
+          serial_number: form.serial_number?.trim() || null,
+          issue_type: form.issue_type.trim(),
+          issue_description: form.issue_description.trim(),
+          customer_notes: form.customer_notes?.trim() || null,
+          updated_by: user.id,
+          updated_by_email: user.email || null,
+          updated_at: nowIso,
+        })
+        .eq("id", rmaData.id);
+
+      if (updateErr) throw updateErr;
+
+      const hasShippingValue =
+        form.shipping_carrier.trim() ||
+        form.shipping_tracking_number.trim() ||
+        form.shipping_ship_date.trim() ||
+        form.shipping_notes.trim();
+
+      if (hasShippingValue || rmaData.inbound_shipping?.id) {
+        const shippingPayload = {
+          rma_request_id: rmaData.id,
+          direction: "inbound",
+          carrier: form.shipping_carrier.trim() || null,
+          tracking_number: form.shipping_tracking_number.trim() || null,
+          ship_date: form.shipping_ship_date.trim() || null,
+          notes: form.shipping_notes.trim() || null,
+        };
+
+        if (rmaData.inbound_shipping?.id) {
+          const { error: shipErr } = await supabase
+            .from("rma_shipping")
+            .update(shippingPayload)
+            .eq("id", rmaData.inbound_shipping.id);
+          if (shipErr) throw shipErr;
+        } else if (hasShippingValue) {
+          const { error: shipErr } = await supabase
+            .from("rma_shipping")
+            .insert(shippingPayload);
+          if (shipErr) throw shipErr;
+        }
+      }
+
+      toast.success("已儲存修改");
+      setEditing(false);
+      await fetchRmaData();
+    } catch (err: any) {
+      console.error("Error saving RMA edits:", err);
+      toast.error(err?.message || "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateField = <K extends keyof EditableForm>(key: K, value: EditableForm[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
 
   const handlePrint = () => {
     if (!rmaData) return;
