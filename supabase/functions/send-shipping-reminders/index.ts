@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
 
     let query = supabase
       .from("rma_requests")
-      .select("id, rma_number, customer_name, customer_email, product_name, created_at, shipping_reminder_sent_at")
+      .select("id, rma_number, customer_name, customer_email, product_name, issue_type, created_at, shipping_reminder_sent_at")
       .eq("status", "registered")
       .not("customer_email", "is", null);
 
@@ -50,7 +50,9 @@ Deno.serve(async (req) => {
       query = query
         .is("shipping_reminder_sent_at", null)
         .lte("created_at", cutoffIso)
-        .gte("created_at", REMINDER_ENABLED_AFTER);
+        .gte("created_at", REMINDER_ENABLED_AFTER)
+        // Skip software-only issues — these don't require shipping the device back.
+        .neq("issue_type", "軟體問題");
     }
 
     const { data: candidates, error: candErr } = await query.limit(100);
@@ -90,6 +92,14 @@ Deno.serve(async (req) => {
 
         if (!rma.customer_email) {
           console.log(`Skip ${rma.rma_number}: no customer email`);
+          continue;
+        }
+
+        // Skip software-only issues — recipient doesn't need to ship anything back.
+        // Applies to both auto and manual triggers.
+        if (rma.issue_type === "軟體問題") {
+          console.log(`Skip ${rma.rma_number}: software-only issue`);
+          errors.push({ rma_number: rma.rma_number, error: "skipped_software_issue" });
           continue;
         }
 

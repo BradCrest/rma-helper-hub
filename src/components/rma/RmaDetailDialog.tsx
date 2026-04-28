@@ -24,6 +24,16 @@ import html2canvas from "html2canvas";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
+import { getEmailTemplateLabel, getEmailStatusLabel } from "@/lib/emailTemplateLabels";
+
+interface EmailLogEntry {
+  message_id: string | null;
+  template_name: string;
+  recipient_email: string;
+  status: string;
+  created_at: string;
+  error_message: string | null;
+}
 
 interface InboundShipping {
   id?: string;
@@ -136,7 +146,36 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<EditableForm>(emptyForm());
+  const [emailLogs, setEmailLogs] = useState<EmailLogEntry[]>([]);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const fetchEmailLogs = async (customerEmail: string) => {
+    if (!customerEmail) {
+      setEmailLogs([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("email_send_log")
+      .select("message_id, template_name, recipient_email, status, created_at, error_message")
+      .eq("recipient_email", customerEmail)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) {
+      console.error("Failed to load email logs:", error);
+      setEmailLogs([]);
+      return;
+    }
+    // Dedupe by message_id — keep newest entry (already sorted desc).
+    const seen = new Set<string>();
+    const deduped: EmailLogEntry[] = [];
+    for (const row of (data || []) as EmailLogEntry[]) {
+      const key = row.message_id || `${row.template_name}-${row.created_at}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(row);
+    }
+    setEmailLogs(deduped);
+  };
 
   const fetchRmaData = async () => {
     if (!rmaNumber) return;
@@ -164,7 +203,9 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       const result = await response.json();
       
       if (result.results && result.results.length > 0) {
-        setRmaData(result.results[0]);
+        const rec = result.results[0];
+        setRmaData(rec);
+        fetchEmailLogs(rec.customer_email);
       } else {
         throw new Error("RMA not found");
       }
@@ -203,6 +244,7 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
       fetchRmaData();
     } else {
       setRmaData(null);
+      setEmailLogs([]);
       setEditing(false);
     }
     onOpenChange(isOpen);
@@ -927,6 +969,53 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                   )}
                 </div>
               )}
+
+              {/* Email Send History */}
+              <div className="space-y-3 pt-4 border-t">
+                <h3 className="font-semibold text-lg">Email 寄送記錄</h3>
+                {emailLogs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">尚未發送任何 Email</p>
+                ) : (
+                  <div className="space-y-2">
+                    {emailLogs.map((log, idx) => (
+                      <div
+                        key={`${log.message_id || idx}-${log.created_at}`}
+                        className="flex items-start justify-between gap-3 p-3 rounded-md bg-muted/40 border"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm">
+                            {getEmailTemplateLabel(log.template_name)}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {log.recipient_email}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {new Date(log.created_at).toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}
+                          </div>
+                          {log.error_message && (
+                            <div className="text-xs text-destructive mt-1 break-words">
+                              {log.error_message}
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                            log.status === "sent"
+                              ? "bg-green-100 text-green-700"
+                              : log.status === "failed" || log.status === "dlq" || log.status === "bounced"
+                              ? "bg-red-100 text-red-700"
+                              : log.status === "suppressed" || log.status === "complained"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {getEmailStatusLabel(log.status)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Status */}
               <div className="pt-4 border-t">
