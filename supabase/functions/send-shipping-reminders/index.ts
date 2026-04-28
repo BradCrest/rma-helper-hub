@@ -95,6 +95,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // Skip software-only issues — recipient doesn't need to ship anything back.
+        // Applies to both auto and manual triggers.
+        if (rma.issue_type === "軟體問題") {
+          console.log(`Skip ${rma.rma_number}: software-only issue`);
+          errors.push({ rma_number: rma.rma_number, error: "skipped_software_issue" });
+          continue;
+        }
+
         // Send transactional email
         const shippingUrl = `${PUBLISHED_URL}/shipping-form?rma=${encodeURIComponent(rma.rma_number)}`;
         const createdDate = new Date(rma.created_at).toLocaleDateString("zh-TW", {
