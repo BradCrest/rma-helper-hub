@@ -659,20 +659,32 @@ ${draft.trim()}`;
                     accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
                     onChange={(e) => handleAddAttachments(e.target.files)}
                   />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
-                  >
-                    {uploadingFiles ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Paperclip className="w-3.5 h-3.5" />
-                    )}
-                    加入附件
-                  </Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      檔案庫
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                    >
+                      {uploadingFiles ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Paperclip className="w-3.5 h-3.5" />
+                      )}
+                      上傳
+                    </Button>
+                  </div>
                 </div>
                 {attachments.length > 0 && (
                   <ul className="space-y-1 border rounded p-2 bg-muted/20">
