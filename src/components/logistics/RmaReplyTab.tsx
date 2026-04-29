@@ -139,7 +139,46 @@ const RmaReplyTab = () => {
     setThreadLoading(false);
   }, []);
 
-  // when selecting, load thread + reset draft + clear unread
+  const deleteThreadAttachment = useCallback(async (
+    messageId: string,
+    attachment: ThreadAttachment,
+    rmaId: string,
+  ) => {
+    if (!attachment.path) {
+      toast.error("此附件沒有有效路徑，無法刪除");
+      return;
+    }
+    if (!confirm(`確定要刪除附件「${attachment.name}」？此動作無法復原。`)) return;
+    try {
+      // Remove from storage
+      const { error: rmErr } = await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .remove([attachment.path]);
+      if (rmErr) throw new Error(`儲存刪除失敗：${rmErr.message}`);
+
+      // Read current attachments, filter, then update
+      const { data: msgRow, error: readErr } = await supabase
+        .from("rma_thread_messages")
+        .select("attachments")
+        .eq("id", messageId)
+        .maybeSingle();
+      if (readErr) throw new Error(`讀取訊息失敗：${readErr.message}`);
+      const current = Array.isArray(msgRow?.attachments)
+        ? (msgRow!.attachments as unknown as ThreadAttachment[])
+        : [];
+      const next = current.filter((a) => a.path !== attachment.path);
+      const { error: updErr } = await supabase
+        .from("rma_thread_messages")
+        .update({ attachments: next as unknown as never })
+        .eq("id", messageId);
+      if (updErr) throw new Error(`更新訊息失敗：${updErr.message}`);
+
+      toast.success("附件已刪除");
+      await loadThread(rmaId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "刪除失敗");
+    }
+  }, [loadThread]);
   useEffect(() => {
     if (!selected) return;
     loadThread(selected.id);
