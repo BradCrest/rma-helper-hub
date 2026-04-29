@@ -83,7 +83,23 @@ serve(async (req) => {
         },
       );
     }
-    const { rmaRequestId, subject, body } = parsed.data;
+    const { rmaRequestId, subject, body, attachments } = parsed.data;
+
+    // Validate attachment paths: must be scoped under rma-replies/{rmaRequestId}/
+    const expectedPrefix = `rma-replies/${rmaRequestId}/`;
+    for (const a of attachments) {
+      if (!a.path.startsWith(expectedPrefix)) {
+        return new Response(
+          JSON.stringify({
+            error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
 
     // Fetch RMA
     const { data: rma, error: rmaErr } = await admin
