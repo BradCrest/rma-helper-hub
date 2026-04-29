@@ -743,6 +743,12 @@ ${draft.trim()}`;
           </div>
         )}
       </div>
+      <SharedLibraryPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onConfirm={handleAddFromLibrary}
+        maxSelectable={MAX_ATTACHMENTS - attachments.length}
+      />
     </div>
   );
 };
