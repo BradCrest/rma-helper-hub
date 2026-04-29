@@ -62,6 +62,27 @@ const RmaReplyEmail = ({
           <Text style={replyText}>{replyBody}</Text>
         </Section>
 
+        {attachments && attachments.length > 0 ? (
+          <Section style={attachmentBox}>
+            <Text style={attachmentTitle}>
+              📎 附件（{attachments.length}）
+            </Text>
+            {attachments.map((a, idx) => (
+              <Section key={idx} style={attachmentRow}>
+                <Link href={a.url} style={attachmentLink}>
+                  📄 {a.name}
+                </Link>
+                {a.size ? (
+                  <Text style={attachmentSize}>{formatBytes(a.size)}</Text>
+                ) : null}
+              </Section>
+            ))}
+            <Text style={attachmentNote}>
+              附件下載連結 30 天內有效。
+            </Text>
+          </Section>
+        ) : null}
+
         {replyUrl ? (
           <>
             <Text style={text}>
