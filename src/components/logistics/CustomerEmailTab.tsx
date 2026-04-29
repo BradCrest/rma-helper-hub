@@ -365,6 +365,143 @@ const CustomerEmailTab = () => {
     window.open(`https://mail.google.com/mail/u/0/#inbox/${detail.id}`, "_blank");
   };
 
+  // ===== 寄出回覆相關 handlers =====
+  const recipient = useMemo(() => {
+    if (!detail) return null;
+    return parseFromHeader(detail.from);
+  }, [detail]);
+
+  const handleAddAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !detail) return;
+    const fileArr = Array.from(files);
+    if (attachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const safeName = sanitizeForKey(file.name);
+        const path = `email-replies/${detail.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+          source: "upload",
+        });
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (idx: number) => {
+    const att = attachments[idx];
+    if (!att) return;
+    if (att.source !== "library") {
+      await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    }
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddFromLibrary = async (picked: PickedLibFile[]) => {
+    if (!detail || picked.length === 0) return;
+    if (attachments.length + picked.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    const added: UploadedAttachment[] = picked.map((f) => ({
+      name: f.name,
+      path: f.path,
+      size: f.size,
+      contentType: f.content_type || undefined,
+      source: "library",
+      libraryFileId: f.id,
+    }));
+    setAttachments((prev) => [...prev, ...added]);
+    toast.success(`已從檔案庫加入 ${added.length} 個附件`);
+    for (const f of picked) {
+      (async () => {
+        const { data: row } = await supabase
+          .from("shared_library_files")
+          .select("download_count")
+          .eq("id", f.id)
+          .maybeSingle();
+        await supabase
+          .from("shared_library_files")
+          .update({ download_count: (row?.download_count ?? 0) + 1 })
+          .eq("id", f.id);
+      })().catch(() => {});
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!detail || !recipient) return;
+    if (!draft.trim() || !replySubject.trim()) {
+      toast.error("主旨與內文不可為空");
+      return;
+    }
+    if (!recipient.email || !recipient.email.includes("@")) {
+      toast.error("無法解析收件人 Email");
+      return;
+    }
+    const attachmentNote = attachments.length > 0 ? `（含 ${attachments.length} 個附件）` : "";
+    if (!confirm(`確定要以 noreply 寄送回覆給 ${recipient.email} 嗎？${attachmentNote}`)) return;
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-customer-email-reply", {
+        body: {
+          gmailMessageId: detail.id,
+          recipientEmail: recipient.email,
+          recipientName: recipient.name || undefined,
+          rmaNumber: detectedRma || undefined,
+          subject: replySubject.trim(),
+          body: draft.trim(),
+          attachments,
+        },
+      });
+      if (error) throw error;
+      const result = data as any;
+      if (result?.error) {
+        throw new Error(
+          typeof result.error === "string" ? result.error : JSON.stringify(result.error),
+        );
+      }
+      toast.success(`已寄出回覆給 ${recipient.email}`);
+      setAttachments([]);
+    } catch (e: any) {
+      toast.error("寄送失敗：" + (e?.message || ""));
+    } finally {
+      setSending(false);
+    }
+  };
+
   // 組合「客戶來信 + 客服回覆」寫入內容
   const buildKnowledgeContent = useCallback((d: EmailDetail, replyText: string): string => {
     const bodyText = d.textPlain || htmlToText(d.textHtml) || d.snippet;
