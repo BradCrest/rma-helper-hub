@@ -834,23 +834,74 @@ const ReceivingTab = () => {
               寄送診斷通知給客戶
             </AlertDialogTitle>
             <AlertDialogDescription>
-              以下內容讀取自<strong>已儲存</strong>的資料。如有修改未儲存，請先取消並按「儲存記錄」。
+              依下方保固判斷自動套用對應模板。寄出前可手動編輯主旨與內容。
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {selectedRma && (
             <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-[80px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-[90px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
                 <span className="text-muted-foreground">收件人</span>
                 <span className="font-mono">{selectedRma.customer_email}</span>
-                <span className="text-muted-foreground">主旨</span>
-                <span className="font-medium">{buildDiagnosisEmail().subject}</span>
+                <span className="text-muted-foreground">產品型號</span>
+                <span className="font-medium">{selectedRma.product_model || selectedRma.product_name}</span>
+              </div>
+
+              {/* 保固判斷區 */}
+              <div className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-muted-foreground text-xs">保固狀態：</span>
+                  <Badge variant={systemWithinWarranty ? "default" : "secondary"}>
+                    系統判斷：{systemWithinWarranty ? "保固內" : "已過保"}
+                  </Badge>
+                  {selectedRma.warranty_date && (
+                    <span className="text-[10px] text-muted-foreground">
+                      ({format(new Date(selectedRma.warranty_date), "yyyy/MM/dd")} 到期)
+                    </span>
+                  )}
+                  {warrantyOverride !== null && warrantyOverride !== systemWithinWarranty && (
+                    <Badge variant="destructive" className="text-[10px]">已覆寫</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">以保固內處理</span>
+                  <Switch
+                    checked={effectiveWithinWarranty}
+                    onCheckedChange={handleWarrantyToggle}
+                    disabled={notifying || cleaningUp}
+                  />
+                </div>
+              </div>
+
+              {!effectiveWithinWarranty && (
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-[11px] text-amber-900 dark:text-amber-200">
+                  過保固模板已自動帶入「{selectedRma.product_model || "—"}」整新機價格：
+                  A {formatNT(getRefurbPrices(selectedRma.product_model).A)}　
+                  B {formatNT(getRefurbPrices(selectedRma.product_model).B)}　
+                  C {formatNT(getRefurbPrices(selectedRma.product_model).C)}
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="notifySubject" className="text-xs">主旨</Label>
+                <Input
+                  id="notifySubject"
+                  value={notifySubject}
+                  onChange={(e) => setNotifySubject(e.target.value)}
+                  disabled={notifying || cleaningUp}
+                  className="text-sm"
+                />
               </div>
               <div>
-                <p className="text-muted-foreground mb-1">信件內容預覽</p>
-                <pre className="whitespace-pre-wrap text-xs p-3 bg-muted/30 rounded-lg border border-border max-h-64 overflow-y-auto font-sans">
-{buildDiagnosisEmail().body}
-                </pre>
+                <Label htmlFor="notifyBody" className="text-xs">信件內容（可編輯）</Label>
+                <Textarea
+                  id="notifyBody"
+                  value={notifyBody}
+                  onChange={(e) => setNotifyBody(e.target.value)}
+                  disabled={notifying || cleaningUp}
+                  rows={12}
+                  className="font-mono text-xs"
+                />
               </div>
               {/* Attachments */}
               <div className="space-y-2">
