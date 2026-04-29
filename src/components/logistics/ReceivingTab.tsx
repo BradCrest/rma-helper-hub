@@ -147,6 +147,10 @@ const ReceivingTab = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
   const notifyFileInputRef = useRef<HTMLInputElement | null>(null);
+  // null = 跟隨系統判斷; true/false = admin 手動覆寫
+  const [warrantyOverride, setWarrantyOverride] = useState<boolean | null>(null);
+  const [notifyBody, setNotifyBody] = useState("");
+  const [notifySubject, setNotifySubject] = useState("");
 
   useEffect(() => {
     fetchRmaList();
