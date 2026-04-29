@@ -424,7 +424,7 @@ const ReceivingTab = () => {
           rmaRequestId: selectedRma.id,
           subject,
           body,
-          attachments: [],
+          attachments: notifyAttachments,
         },
       });
       if (error) throw error;
@@ -455,6 +455,8 @@ const ReceivingTab = () => {
         console.error("Status update failed:", statusErr);
       }
 
+      // Email sent — clear local state but DO NOT delete files (cleanup cron will handle)
+      setNotifyAttachments([]);
       setNotifyDialogOpen(false);
       setDialogOpen(false);
       fetchRmaList();
