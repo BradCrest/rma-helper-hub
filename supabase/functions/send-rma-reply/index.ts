@@ -131,10 +131,18 @@ serve(async (req) => {
     }
 
     // Send via the transactional email system (noreply@notify.crestdiving.com)
-    const { data: sendData, error: sendErr } = await admin.functions.invoke(
-      "send-transactional-email",
+    // Call via fetch directly so we can forward the user's JWT (admin.functions.invoke
+    // would send the service-role key, which the gateway rejects as invalid JWT format).
+    const sendRes = await fetch(
+      `${supabaseUrl}/functions/v1/send-transactional-email`,
       {
-        body: {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader,
+          apikey: anonKey,
+        },
+        body: JSON.stringify({
           templateName: "rma-reply",
           recipientEmail: rma.customer_email,
           idempotencyKey: `rma-reply-${inserted.id}`,
@@ -145,15 +153,16 @@ serve(async (req) => {
             replyBody: body,
             replyUrl,
           },
-        },
+        }),
       },
     );
 
-    if (sendErr) {
-      console.error("send-transactional-email error:", sendErr);
+    if (!sendRes.ok) {
+      const errText = await sendRes.text();
+      console.error("send-transactional-email error:", sendRes.status, errText);
       return new Response(
         JSON.stringify({
-          error: `寄送失敗：${sendErr.message ?? "unknown"}`,
+          error: `寄送失敗 (${sendRes.status})：${errText.slice(0, 500)}`,
         }),
         {
           status: 500,
@@ -161,6 +170,7 @@ serve(async (req) => {
         },
       );
     }
+    const sendData = await sendRes.json().catch(() => null);
 
     return new Response(
       JSON.stringify({
