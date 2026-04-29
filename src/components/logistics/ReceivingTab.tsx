@@ -1,9 +1,19 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Search, Eye, CheckCircle, AlertCircle } from "lucide-react";
+import { Package, Search, Eye, CheckCircle, AlertCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -36,6 +46,7 @@ interface RmaRequest {
   id: string;
   rma_number: string;
   customer_name: string;
+  customer_email: string | null;
   product_name: string;
   product_model: string | null;
   serial_number: string | null;
@@ -43,6 +54,8 @@ interface RmaRequest {
   received_date: string | null;
   issue_type: string;
   issue_description: string;
+  initial_diagnosis: string | null;
+  diagnosis_category: string | null;
   created_at: string;
 }
 
@@ -80,6 +93,10 @@ const ReceivingTab = () => {
   const [actualMethod, setActualMethod] = useState("");
   const [replacementModel, setReplacementModel] = useState("");
   const [replacementSerial, setReplacementSerial] = useState("");
+
+  // Notify customer dialog state
+  const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   useEffect(() => {
     fetchRmaList();
@@ -233,6 +250,92 @@ const ReceivingTab = () => {
     } catch (error) {
       console.error("Error updating status:", error);
       toast.error("更新狀態失敗");
+    }
+  };
+
+  // Build diagnosis notification email from saved values only
+  const buildDiagnosisEmail = () => {
+    if (!selectedRma) return { subject: "", body: "" };
+    const subject = `[${selectedRma.rma_number}] 產品檢測結果與處理方式確認`;
+    const productLine = [selectedRma.product_name, selectedRma.product_model]
+      .filter(Boolean)
+      .join(" ");
+    const category = selectedRma.diagnosis_category || "未分類";
+    const diagnosis = selectedRma.initial_diagnosis || "（尚未填寫）";
+    const method =
+      repairDetail?.actual_method ||
+      repairDetail?.planned_method ||
+      "待確認";
+    const cost =
+      repairDetail?.estimated_cost != null
+        ? `NT$ ${repairDetail.estimated_cost}`
+        : "待報價";
+
+    const body = `您好 ${selectedRma.customer_name}，
+
+您的產品 ${productLine} 已完成初步檢測，結果如下：
+
+【診斷分類】${category}
+【診斷描述】${diagnosis}
+【建議處理方式】${method}
+【預估費用】${cost}
+
+請點擊下方「填寫我的回覆」按鈕確認您是否同意進行此處理方式，
+或回覆任何疑問，我們會儘速為您處理。
+
+謝謝您！`;
+    return { subject, body };
+  };
+
+  const handleSendDiagnosisNotification = async () => {
+    if (!selectedRma) return;
+    setNotifying(true);
+    try {
+      const { subject, body } = buildDiagnosisEmail();
+      const { data, error } = await supabase.functions.invoke("send-rma-reply", {
+        body: {
+          rmaRequestId: selectedRma.id,
+          subject,
+          body,
+          attachments: [],
+        },
+      });
+      if (error) throw error;
+      const result = data as { error?: string } | null;
+      if (result?.error) throw new Error(result.error);
+      toast.success(`已寄出診斷通知給 ${selectedRma.customer_email}`);
+
+      // Auto-update status to contacting
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-rma-status`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                rma_id: selectedRma.id,
+                new_status: "contacting",
+              }),
+            }
+          );
+        }
+      } catch (statusErr) {
+        console.error("Status update failed:", statusErr);
+      }
+
+      setNotifyDialogOpen(false);
+      setDialogOpen(false);
+      fetchRmaList();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error("寄送失敗：" + msg);
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -542,9 +645,28 @@ const ReceivingTab = () => {
                 </div>
 
 
-                <div className="flex justify-end gap-3 pt-4">
+                <div className="flex flex-wrap justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     取消
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setNotifyDialogOpen(true)}
+                    disabled={
+                      !selectedRma?.customer_email ||
+                      !selectedRma?.initial_diagnosis?.trim()
+                    }
+                    title={
+                      !selectedRma?.customer_email
+                        ? "此 RMA 沒有客戶 Email"
+                        : !selectedRma?.initial_diagnosis?.trim()
+                        ? "請先填寫並儲存初步診斷"
+                        : "寄送診斷結果給客戶"
+                    }
+                    className="gap-1"
+                  >
+                    <Mail className="w-4 h-4" />
+                    通知客戶診斷結果
                   </Button>
                   <Button onClick={handleSaveRepairDetail} disabled={saving}>
                     {saving ? "儲存中..." : "儲存記錄"}
@@ -555,6 +677,54 @@ const ReceivingTab = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Notify Customer Diagnosis Dialog */}
+      <AlertDialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              寄送診斷通知給客戶
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              以下內容讀取自<strong>已儲存</strong>的資料。如有修改未儲存，請先取消並按「儲存記錄」。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {selectedRma && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-[80px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
+                <span className="text-muted-foreground">收件人</span>
+                <span className="font-mono">{selectedRma.customer_email}</span>
+                <span className="text-muted-foreground">主旨</span>
+                <span className="font-medium">{buildDiagnosisEmail().subject}</span>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">信件內容預覽</p>
+                <pre className="whitespace-pre-wrap text-xs p-3 bg-muted/30 rounded-lg border border-border max-h-64 overflow-y-auto font-sans">
+{buildDiagnosisEmail().body}
+                </pre>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                寄出後 RMA 狀態將自動切換為「聯繫客戶中」。
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={notifying}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleSendDiagnosisNotification();
+              }}
+              disabled={notifying}
+            >
+              {notifying ? "寄送中..." : "確認寄出"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
