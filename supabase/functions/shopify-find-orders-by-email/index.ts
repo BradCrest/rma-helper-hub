@@ -93,7 +93,22 @@ Deno.serve(async (req) => {
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const SHOPIFY_DOMAIN = Deno.env.get("SHOPIFY_STORE_PERMANENT_DOMAIN") ||
       "newnewcrest.myshopify.com";
-    const SHOPIFY_TOKEN = Deno.env.get("SHOPIFY_ACCESS_TOKEN");
+    // Prefer user-scoped online token (granted via shopify--connect_shopify_account
+    // which inherits the connecting user's full scope set including read_orders).
+    // Fall back to the store-level token if no online token is configured.
+    let SHOPIFY_TOKEN = Deno.env.get("SHOPIFY_ONLINE_ACCESS_TOKEN");
+    if (!SHOPIFY_TOKEN) {
+      // Find any env var matching SHOPIFY_ONLINE_ACCESS_TOKEN:user:* (single-user setup).
+      for (const [k, v] of Object.entries(Deno.env.toObject())) {
+        if (k.startsWith("SHOPIFY_ONLINE_ACCESS_TOKEN") && v) {
+          SHOPIFY_TOKEN = v;
+          break;
+        }
+      }
+    }
+    if (!SHOPIFY_TOKEN) {
+      SHOPIFY_TOKEN = Deno.env.get("SHOPIFY_ACCESS_TOKEN") ?? undefined;
+    }
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return json({ error: "Server not configured" }, 500);
