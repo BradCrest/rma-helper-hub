@@ -76,6 +76,10 @@ const ReceivingTab = () => {
   const [internalReference, setInternalReference] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
   const [initialDiagnosis, setInitialDiagnosis] = useState("");
+  const [diagnosisCategory, setDiagnosisCategory] = useState("");
+  const [actualMethod, setActualMethod] = useState("");
+  const [replacementModel, setReplacementModel] = useState("");
+  const [replacementSerial, setReplacementSerial] = useState("");
 
   useEffect(() => {
     fetchRmaList();
