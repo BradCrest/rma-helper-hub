@@ -893,6 +893,11 @@ const ReceivingTab = () => {
                   <Badge variant={systemWithinWarranty ? "default" : "secondary"}>
                     系統判斷：{systemWithinWarranty ? "保固內" : "已過保"}
                   </Badge>
+                  {isLegacyBatch && (
+                    <Badge variant="destructive" className="text-[10px]">
+                      Legacy 批次
+                    </Badge>
+                  )}
                   {selectedRma.warranty_date && (
                     <span className="text-[10px] text-muted-foreground">
                       ({format(new Date(selectedRma.warranty_date), "yyyy/MM/dd")} 到期)
@@ -911,6 +916,12 @@ const ReceivingTab = () => {
                   />
                 </div>
               </div>
+
+              {isLegacyBatch && !effectiveWithinWarranty && (
+                <div className="p-2 bg-destructive/10 border border-destructive/30 rounded text-[11px] text-destructive">
+                  ⚠️ 此產品為 2018–2022 老批次，依 2025/11/12 公告已不提供原廠維修。Email 將自動採用 Legacy 特殊換購文案。
+                </div>
+              )}
 
               {!effectiveWithinWarranty && (
                 <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-[11px] text-amber-900 dark:text-amber-200">
