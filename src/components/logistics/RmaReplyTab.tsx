@@ -225,7 +225,20 @@ const RmaReplyTab = () => {
           toast.error(`檔案超過 25 MB：${file.name}`);
           continue;
         }
-        const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${file.name}`;
+        const sanitizeForKey = (name: string) => {
+          const dot = name.lastIndexOf(".");
+          const base = dot > 0 ? name.slice(0, dot) : name;
+          const ext = dot > 0 ? name.slice(dot) : "";
+          const safeBase =
+            base
+              .replace(/[^\w.-]+/g, "_")
+              .replace(/_+/g, "_")
+              .replace(/^_|_$/g, "") || "file";
+          const safeExt = ext.replace(/[^\w.]+/g, "");
+          return `${safeBase}${safeExt}`.slice(0, 120);
+        };
+        const safeName = sanitizeForKey(file.name);
+        const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${safeName}`;
         const { error: upErr } = await supabase.storage
           .from(ATTACHMENT_BUCKET)
           .upload(path, file, {
