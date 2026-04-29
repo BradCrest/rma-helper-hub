@@ -1026,7 +1026,7 @@ const CustomerEmailTab = () => {
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         onConfirm={handleAddFromLibrary}
-        maxSelect={MAX_ATTACHMENTS - attachments.length}
+        maxSelectable={MAX_ATTACHMENTS - attachments.length}
       />
     </>
   );
