@@ -157,6 +157,7 @@ Deno.serve(async (req) => {
       template_name: templateName,
       recipient_email: effectiveRecipient,
       status: 'suppressed',
+      metadata: logMetadata,
     })
 
     console.log('Email suppressed', { effectiveRecipient, templateName })
@@ -191,6 +192,7 @@ Deno.serve(async (req) => {
       recipient_email: effectiveRecipient,
       status: 'failed',
       error_message: 'Failed to look up unsubscribe token',
+      metadata: logMetadata,
     })
     return new Response(
       JSON.stringify({ error: 'Failed to prepare email' }),
@@ -224,6 +226,7 @@ Deno.serve(async (req) => {
         recipient_email: effectiveRecipient,
         status: 'failed',
         error_message: 'Failed to create unsubscribe token',
+        metadata: logMetadata,
       })
       return new Response(
         JSON.stringify({ error: 'Failed to prepare email' }),
@@ -253,6 +256,7 @@ Deno.serve(async (req) => {
         recipient_email: effectiveRecipient,
         status: 'failed',
         error_message: 'Failed to confirm unsubscribe token storage',
+        metadata: logMetadata,
       })
       return new Response(
         JSON.stringify({ error: 'Failed to prepare email' }),
@@ -276,6 +280,7 @@ Deno.serve(async (req) => {
       status: 'suppressed',
       error_message:
         'Unsubscribe token used but email missing from suppressed list',
+      metadata: logMetadata,
     })
     return new Response(
       JSON.stringify({ success: false, reason: 'email_suppressed' }),
@@ -310,6 +315,7 @@ Deno.serve(async (req) => {
     template_name: templateName,
     recipient_email: effectiveRecipient,
     status: 'pending',
+    metadata: logMetadata,
   })
 
   const { error: enqueueError } = await supabase.rpc('enqueue_email', {
@@ -343,6 +349,7 @@ Deno.serve(async (req) => {
       recipient_email: effectiveRecipient,
       status: 'failed',
       error_message: 'Failed to enqueue email',
+      metadata: logMetadata,
     })
 
     return new Response(JSON.stringify({ error: 'Failed to enqueue email' }), {
