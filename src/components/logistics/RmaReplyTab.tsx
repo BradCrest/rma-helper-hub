@@ -146,6 +146,7 @@ const RmaReplyTab = () => {
     setSubject(`Re: [${selected.rma_number}] 您的維修申請進度回覆`);
     setDraft("");
     setRagInfo(null);
+    setAttachments([]);
 
     if (selected.has_unread_customer_reply) {
       supabase
