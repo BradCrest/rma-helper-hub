@@ -46,6 +46,7 @@ interface RmaRequest {
   id: string;
   rma_number: string;
   customer_name: string;
+  customer_email: string | null;
   product_name: string;
   product_model: string | null;
   serial_number: string | null;
@@ -53,6 +54,8 @@ interface RmaRequest {
   received_date: string | null;
   issue_type: string;
   issue_description: string;
+  initial_diagnosis: string | null;
+  diagnosis_category: string | null;
   created_at: string;
 }
 
