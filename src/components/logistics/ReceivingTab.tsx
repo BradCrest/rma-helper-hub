@@ -808,7 +808,7 @@ const ReceivingTab = () => {
       </Dialog>
 
       {/* Notify Customer Diagnosis Dialog */}
-      <AlertDialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
+      <AlertDialog open={notifyDialogOpen} onOpenChange={handleNotifyDialogChange}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
