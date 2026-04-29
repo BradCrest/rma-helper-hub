@@ -817,8 +817,135 @@ const CustomerEmailTab = () => {
                     readOnly={draftLoading}
                   />
                   <p className="text-xs text-muted-foreground">
-                    可直接編輯後複製貼回 Gmail 寄出
+                    可直接編輯後以 noreply 寄出，或複製貼回 Gmail
                   </p>
+                </div>
+              )}
+
+              {/* 寄出回覆區塊：草稿存在時顯示 */}
+              {draft.trim() && !draftLoading && recipient && (
+                <div className="border-t border-border pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-medium">以 noreply 寄出回覆</Label>
+                  </div>
+
+                  <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-sm">
+                    <span className="text-muted-foreground">收件人：</span>
+                    <span className="font-medium break-all">
+                      {recipient.email}
+                      {recipient.name && recipient.name !== recipient.email && (
+                        <span className="text-muted-foreground ml-2">({recipient.name})</span>
+                      )}
+                    </span>
+                    <Label htmlFor="reply-subject" className="text-muted-foreground">
+                      主旨：
+                    </Label>
+                    <Input
+                      id="reply-subject"
+                      value={replySubject}
+                      onChange={(e) => setReplySubject(e.target.value)}
+                      className="h-9"
+                      disabled={sending}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <Label className="text-xs text-muted-foreground">
+                        附件（{attachments.length}/{MAX_ATTACHMENTS}）
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => handleAddAttachments(e.target.files)}
+                          accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingFiles || sending || attachments.length >= MAX_ATTACHMENTS}
+                        >
+                          {uploadingFiles ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Paperclip className="w-4 h-4 mr-2" />
+                          )}
+                          上傳檔案
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPickerOpen(true)}
+                          disabled={sending || attachments.length >= MAX_ATTACHMENTS}
+                        >
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          從檔案庫選擇
+                        </Button>
+                      </div>
+                    </div>
+
+                    {attachments.length > 0 && (
+                      <ul className="border border-border rounded-md divide-y divide-border">
+                        {attachments.map((a, idx) => (
+                          <li
+                            key={`${a.path}-${idx}`}
+                            className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <span className="truncate">{a.name}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {formatBytes(a.size)}
+                              </span>
+                              {a.source === "library" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50"
+                                >
+                                  檔案庫
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => handleRemoveAttachment(idx)}
+                              disabled={sending}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                    <p className="text-xs text-muted-foreground">
+                      寄件人為 noreply 系統信箱，附件下載連結 30 天內有效
+                    </p>
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sending || uploadingFiles || !draft.trim() || !replySubject.trim()}
+                      size="sm"
+                    >
+                      {sending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      {sending ? "寄送中..." : "以 noreply 寄出"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
