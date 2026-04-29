@@ -54,11 +54,12 @@ const BASE_RMA = {
   rma_number: "RMA-2024-001",
   customer_name: "王小明",
   customer_email: "wang@example.com",
-  product_name: "TERIC",
-  product_model: "TERIC",
+  product_name: "CR-4",
+  product_model: "CR-4",
   serial_number: "SN12345",
   status: "inspecting",
   received_date: "2024-01-15",
+  warranty_date: null,
   issue_type: "功能異常",
   issue_description: "顯示器不亮",
   initial_diagnosis: "電池接觸不良",
@@ -312,32 +313,38 @@ describe("ReceivingTab - Phase 2 通知客戶診斷結果", () => {
     expect(screen.getByText("wang@example.com")).toBeInTheDocument();
   });
 
-  it("AlertDialog 主旨包含 RMA 編號", async () => {
+  it("AlertDialog 主旨 input 包含 RMA 編號", async () => {
     setupSupabaseMock();
     render(<ReceivingTab />);
     await openNotifyDialog();
+    // 主旨現在是可編輯的 input，用 getByDisplayValue
     expect(
-      screen.getByText(/\[RMA-2024-001\] 產品檢測結果與處理方式確認/)
+      screen.getByDisplayValue(/RMA-2024-001.*產品檢測結果與處理方式確認/)
     ).toBeInTheDocument();
   });
 
-  it("AlertDialog 信件預覽包含診斷分類、診斷描述、處理方式和費用", async () => {
+  it("過保固時，信件預覽含診斷描述和 CR-4 三級整新機價格", async () => {
+    // BASE_RMA: product_model="CR-4", warranty_date=null (過保固)
     setupSupabaseMock();
     render(<ReceivingTab />);
     await openNotifyDialog();
-
-    // 【xxx】格式只出現在 email 預覽的 <pre> 裡
-    expect(screen.getByText(/【診斷描述】電池接觸不良/)).toBeInTheDocument();
-    expect(screen.getByText(/【診斷分類】功能異常/)).toBeInTheDocument();
-    expect(screen.getByText(/【預估費用】NT\$ 1500/)).toBeInTheDocument();
-    expect(screen.getByText(/【建議處理方式】維修/)).toBeInTheDocument();
+    // body 現在是可編輯 textarea，價格來自 buildDiagnosisNotificationBody
+    const bodyInput = screen.getByLabelText(/信件內容/) as HTMLTextAreaElement;
+    expect(bodyInput.value).toContain("電池接觸不良");
+    expect(bodyInput.value).toContain("NT$ 3,680"); // CR-4 A級
+    expect(bodyInput.value).toContain("NT$ 3,180"); // CR-4 B級
+    expect(bodyInput.value).toContain("原錶退回");
   });
 
-  it("無費用資料時，預覽顯示「待報價」", async () => {
-    setupSupabaseMock({ repairDetail: { ...BASE_REPAIR, estimated_cost: null } });
+  it("保固內時，信件預覽顯示免費換新模板，不顯示 ABC 價格", async () => {
+    const warrantyRma = { ...BASE_RMA, warranty_date: "2099-12-31" };
+    setupSupabaseMock({ rmaList: [warrantyRma] });
     render(<ReceivingTab />);
     await openNotifyDialog();
-    expect(screen.getByText(/待報價/)).toBeInTheDocument();
+    const bodyInput = screen.getByLabelText(/信件內容/) as HTMLTextAreaElement;
+    expect(bodyInput.value).toContain("更換整新機");
+    expect(bodyInput.value).toContain("免費");
+    expect(bodyInput.value).not.toContain("NT$ 3,680");
   });
 
   // ── send-rma-reply invoke payload ───────────────────────────────────────
@@ -361,10 +368,10 @@ describe("ReceivingTab - Phase 2 通知客戶診斷結果", () => {
         })
       );
     });
-    // body 內容也驗證
+    // body 內容驗證（過保固 CR-4：含診斷描述和 A 級價格）
     const invokeCall = mockInvoke.mock.calls[0][1];
     expect(invokeCall.body.body).toContain("電池接觸不良");
-    expect(invokeCall.body.body).toContain("NT$ 1500");
+    expect(invokeCall.body.body).toContain("NT$ 3,680");
   });
 
   // ── 寄出後狀態切換 ─────────────────────────────────────────────────────
