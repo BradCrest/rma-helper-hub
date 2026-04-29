@@ -171,4 +171,6 @@ const buttonSecondary = {
 }
 const hr = { borderColor: '#e2e8f0', margin: '24px 0' }
 const hrLight = { borderColor: '#f1f5f9', margin: '16px 0' }
+const addrPara = { fontSize: '14px', color: '#0f172a', lineHeight: '1.8', margin: '0 0 16px' }
+const addrParaLast = { fontSize: '14px', color: '#0f172a', lineHeight: '1.8', margin: '0' }
 const footer = { fontSize: '12px', color: '#94a3b8', margin: '20px 0 0', lineHeight: '1.5' }
