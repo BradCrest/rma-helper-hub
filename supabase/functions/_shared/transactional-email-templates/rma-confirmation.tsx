@@ -79,27 +79,26 @@ const RmaConfirmationEmail = ({
         <Hr style={hr} />
 
         <Heading as="h2" style={h2}>寄件須知</Heading>
-        <Text style={text}>
-          為避免影響您的保固服務時程，請將產品正確寄至以下地址。<br />
-          本公司收件地址如下：
-        </Text>
         <Section style={addressBox}>
-          <Text style={infoLine}><strong>八洋精密股份有限公司</strong></Text>
-          <Text style={infoLine}>客服部</Text>
-          <Text style={infoLine}>電話：02-2994-7450</Text>
-          <Text style={infoLine}>地址：242039 新北市新莊區化成路11巷86號1樓</Text>
-        </Section>
-
-        <Hr style={hrLight} />
-
-        <Text style={text}>
-          To avoid any delay in your warranty service, please send the product to the following address:
-        </Text>
-        <Section style={addressBox}>
-          <Text style={infoLine}><strong>EOPI CO., LTD</strong></Text>
-          <Text style={infoLine}>Customer Service Dept.</Text>
-          <Text style={infoLine}>TEL: 886-2-2994-7450</Text>
-          <Text style={infoLine}>Address: No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</Text>
+          <Text style={addrPara}>
+            為避免影響您的保固服務時程，請將產品正確寄至以下地址。<br />
+            本公司收件地址如下：
+          </Text>
+          <Text style={addrPara}>
+            <strong>八洋精密股份有限公司</strong><br />
+            客服部<br />
+            電話：02-2994-7450<br />
+            <strong>地址：242039 新北市新莊區化成路11巷86號1樓</strong>
+          </Text>
+          <Text style={addrPara}>
+            To avoid any delay in your warranty service, please send the product to the following address:
+          </Text>
+          <Text style={addrParaLast}>
+            <strong>EOPI CO., LTD</strong><br />
+            Customer Service Dept.<br />
+            TEL: 886-2-2994-7450<br />
+            <strong>Address: No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</strong>
+          </Text>
         </Section>
 
         <Hr style={hr} />
