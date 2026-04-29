@@ -219,6 +219,7 @@ serve(async (req) => {
             rmaNumber: rma.rma_number,
             replyBody: body,
             replyUrl,
+            attachments: templateAttachments,
           },
         }),
       },
