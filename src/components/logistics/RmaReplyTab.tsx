@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,42 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+const ATTACHMENT_BUCKET = "rma-attachments";
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_EXTENSIONS = [
+  "jpg", "jpeg", "png", "heic", "webp",
+  "pdf", "doc", "docx", "xls", "xlsx", "zip",
+];
+
+interface UploadedAttachment {
+  name: string;
+  path: string;
+  size: number;
+  contentType?: string;
+}
+
+interface ThreadAttachment {
+  name: string;
+  path?: string;
+  size?: number;
+  contentType?: string | null;
+  uploadedAt?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx + 1).toLowerCase();
+}
+
 
 interface RmaRow {
   id: string;
