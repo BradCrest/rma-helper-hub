@@ -117,7 +117,7 @@ export default function SharedLibrarySettings() {
   };
 
   const handleDelete = async (f: LibFile) => {
-    if (!confirm(`確定要刪除「${f.name}」？此動作無法復原。`)) return;
+    if (!confirm(`確定要刪除「${f.name}」？\n\n注意：此檔案可能已被歷史 RMA 回覆 email 引用，刪除後相關下載連結將立即失效。\n此動作無法復原。`)) return;
     const { error: storageErr } = await supabase.storage.from(BUCKET).remove([f.path]);
     if (storageErr) {
       toast.error("刪除檔案失敗：" + storageErr.message);
