@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2, FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import SharedLibraryPicker, { type PickedLibFile } from "@/components/admin/SharedLibraryPicker";
 
 const ATTACHMENT_BUCKET = "rma-attachments";
 const MAX_ATTACHMENTS = 5;
@@ -106,6 +107,7 @@ const RmaReplyTab = () => {
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const selected = rmas.find((r) => r.id === selectedId) || null;
 
@@ -313,6 +315,55 @@ const RmaReplyTab = () => {
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleAddFromLibrary = async (picked: PickedLibFile[]) => {
+    if (!selected || picked.length === 0) return;
+    if (attachments.length + picked.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const f of picked) {
+        try {
+          const { data: blob, error: dlErr } = await supabase.storage.from("shared-library").download(f.path);
+          if (dlErr || !blob) throw dlErr || new Error("下載失敗");
+          const safeName = f.file_name.replace(/[^\w.\-]+/g, "_");
+          const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACHMENT_BUCKET)
+            .upload(path, blob, { contentType: f.content_type || undefined, upsert: false });
+          if (upErr) throw upErr;
+          uploaded.push({
+            name: f.name,
+            path,
+            size: f.size,
+            contentType: f.content_type || undefined,
+          });
+          // Best-effort: bump usage count
+          (async () => {
+            const { data: row } = await supabase
+              .from("shared_library_files")
+              .select("download_count")
+              .eq("id", f.id)
+              .maybeSingle();
+            await supabase
+              .from("shared_library_files")
+              .update({ download_count: (row?.download_count ?? 0) + 1 })
+              .eq("id", f.id);
+          })().catch(() => {});
+        } catch (e) {
+          toast.error(`從檔案庫加入失敗：${f.name} - ${e instanceof Error ? e.message : "未知錯誤"}`);
+        }
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已從檔案庫加入 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
   const handleSend = async () => {
     if (!selected || !draft.trim() || !subject.trim()) return;
     if (!selected.customer_email) {
@@ -608,20 +659,32 @@ ${draft.trim()}`;
                     accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
                     onChange={(e) => handleAddAttachments(e.target.files)}
                   />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
-                  >
-                    {uploadingFiles ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Paperclip className="w-3.5 h-3.5" />
-                    )}
-                    加入附件
-                  </Button>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                    >
+                      <FolderOpen className="w-3.5 h-3.5" />
+                      檔案庫
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                    >
+                      {uploadingFiles ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Paperclip className="w-3.5 h-3.5" />
+                      )}
+                      上傳
+                    </Button>
+                  </div>
                 </div>
                 {attachments.length > 0 && (
                   <ul className="space-y-1 border rounded p-2 bg-muted/20">
@@ -680,6 +743,12 @@ ${draft.trim()}`;
           </div>
         )}
       </div>
+      <SharedLibraryPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onConfirm={handleAddFromLibrary}
+        maxSelectable={MAX_ATTACHMENTS - attachments.length}
+      />
     </div>
   );
 };

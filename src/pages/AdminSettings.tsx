@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import AiModelSettings from "@/components/admin/AiModelSettings";
 import AttachmentCleanupSettings from "@/components/admin/AttachmentCleanupSettings";
+import SharedLibrarySettings from "@/components/admin/SharedLibrarySettings";
 
 interface Admin {
   id: string;
@@ -422,6 +423,7 @@ const AdminSettings = () => {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* AI Model Settings (super admin only) */}
         {isSuperAdmin && <AiModelSettings />}
+        <SharedLibrarySettings />
         {isSuperAdmin && <AttachmentCleanupSettings />}
 
         {/* Add Admin Form */}
