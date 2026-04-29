@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,7 +139,46 @@ const RmaReplyTab = () => {
     setThreadLoading(false);
   }, []);
 
-  // when selecting, load thread + reset draft + clear unread
+  const deleteThreadAttachment = useCallback(async (
+    messageId: string,
+    attachment: ThreadAttachment,
+    rmaId: string,
+  ) => {
+    if (!attachment.path) {
+      toast.error("此附件沒有有效路徑，無法刪除");
+      return;
+    }
+    if (!confirm(`確定要刪除附件「${attachment.name}」？此動作無法復原。`)) return;
+    try {
+      // Remove from storage
+      const { error: rmErr } = await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .remove([attachment.path]);
+      if (rmErr) throw new Error(`儲存刪除失敗：${rmErr.message}`);
+
+      // Read current attachments, filter, then update
+      const { data: msgRow, error: readErr } = await supabase
+        .from("rma_thread_messages")
+        .select("attachments")
+        .eq("id", messageId)
+        .maybeSingle();
+      if (readErr) throw new Error(`讀取訊息失敗：${readErr.message}`);
+      const current = Array.isArray(msgRow?.attachments)
+        ? (msgRow!.attachments as unknown as ThreadAttachment[])
+        : [];
+      const next = current.filter((a) => a.path !== attachment.path);
+      const { error: updErr } = await supabase
+        .from("rma_thread_messages")
+        .update({ attachments: next as unknown as never })
+        .eq("id", messageId);
+      if (updErr) throw new Error(`更新訊息失敗：${updErr.message}`);
+
+      toast.success("附件已刪除");
+      await loadThread(rmaId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "刪除失敗");
+    }
+  }, [loadThread]);
   useEffect(() => {
     if (!selected) return;
     loadThread(selected.id);
@@ -493,11 +532,21 @@ ${draft.trim()}`;
                       {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-border/40 space-y-1">
                           {m.attachments.map((a, i) => (
-                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground group">
                               <Paperclip className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{a.name}</span>
                               {typeof a.size === "number" && (
                                 <span className="text-[10px]">({formatBytes(a.size)})</span>
+                              )}
+                              {a.path && selected && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteThreadAttachment(m.id, a, selected.id)}
+                                  className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                                  title="刪除附件"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               )}
                             </div>
                           ))}
