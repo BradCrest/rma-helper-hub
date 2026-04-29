@@ -270,6 +270,9 @@ const CustomerEmailTab = () => {
       if (data?.error) throw new Error(data.error);
       setDetail(data);
       emailDetailCache.set(messageId, data);
+      setReplySubject(
+        data?.subject ? (data.subject.startsWith("Re:") ? data.subject : `Re: ${data.subject}`) : "Re: ",
+      );
 
       // Auto mark as read if currently unread
       if (data?.unread) {
