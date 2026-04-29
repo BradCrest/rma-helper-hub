@@ -71,17 +71,26 @@ export function formatNT(amount: number): string {
 }
 
 /**
+ * 公告連結（2025/11/12 保固維修政策調整）
+ */
+export const POLICY_ANNOUNCEMENT_URL =
+  "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update";
+
+/**
  * 產生診斷通知 email 預設文字。
  * - 保固內：免費換整新機
  * - 過保固：列出 ABC 三級價格 + 原錶退回
+ * - Legacy 批次（過保 + isLegacyBatch=true）：開頭多一段政策說明
+ * 所有過保版本最後附上官方政策公告連結。
  */
 export function buildDiagnosisNotificationBody(params: {
   productModel: string | null | undefined;
   serialNumber: string | null | undefined;
   withinWarranty: boolean;
   diagnosis?: string | null;
+  isLegacyBatch?: boolean;
 }): string {
-  const { productModel, serialNumber, withinWarranty, diagnosis } = params;
+  const { productModel, serialNumber, withinWarranty, diagnosis, isLegacyBatch } = params;
   const productLabel = productModel || "您的產品";
   const serialLabel = serialNumber ? `（序號 ${serialNumber}）` : "";
   const diagnosisLine = diagnosis
@@ -99,9 +108,13 @@ CREST 售後服務團隊`;
   }
 
   const prices = getRefurbPrices(productModel);
+  const intro = isLegacyBatch
+    ? `您的 ${productLabel}${serialLabel} 為 2018–2022 生產批次，依本公司 2025/11/12 公告，此批次已不提供原廠維修。我們提供以下特殊換購方案：`
+    : `您的 ${productLabel}${serialLabel} 已完成檢測，非保固範圍。`;
+
   return `您好，
 
-您的 ${productLabel}${serialLabel} 已完成檢測，非保固範圍。
+${intro}
 ${diagnosisLine}
 以下為可選方案，請回覆此信件告知您的選擇：
 
@@ -109,6 +122,8 @@ ${diagnosisLine}
   • B 級整新機：${formatNT(prices.B)}
   • C 級整新機：${formatNT(prices.C)}
   • 原錶退回：免費（僅需負擔回寄運費）
+
+詳細政策請參閱：${POLICY_ANNOUNCEMENT_URL}
 
 CREST 售後服務團隊`;
 }
