@@ -793,7 +793,12 @@ const ReceivingTab = () => {
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => setNotifyDialogOpen(true)}
+                    onClick={() => {
+                      // 開啟前依目前保固狀態初始化文字
+                      setWarrantyOverride(null);
+                      initializeNotifyContent(systemWithinWarranty);
+                      setNotifyDialogOpen(true);
+                    }}
                     disabled={
                       !selectedRma?.customer_email ||
                       !selectedRma?.initial_diagnosis?.trim()
