@@ -70,6 +70,7 @@ interface ThreadMsg {
   body: string;
   created_at: string;
   reply_token_used_at: string | null;
+  attachments: ThreadAttachment[];
 }
 
 const statusLabel: Record<string, string> = {
