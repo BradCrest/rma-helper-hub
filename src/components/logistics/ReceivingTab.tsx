@@ -122,10 +122,10 @@ const ReceivingTab = () => {
       .eq("rma_request_id", rma.id)
       .single();
 
-    // Fetch initial diagnosis from rma_requests
+    // Fetch initial diagnosis + diagnosis_category from rma_requests
     const { data: rmaData } = await supabase
       .from("rma_requests")
-      .select("initial_diagnosis")
+      .select("initial_diagnosis, diagnosis_category")
       .eq("id", rma.id)
       .single();
 
@@ -134,14 +134,21 @@ const ReceivingTab = () => {
       setPlannedMethod(repairData.planned_method || "");
       setInternalReference(repairData.internal_reference || "");
       setEstimatedCost(repairData.estimated_cost?.toString() || "");
+      setActualMethod(repairData.actual_method || "");
+      setReplacementModel(repairData.replacement_model || "");
+      setReplacementSerial(repairData.replacement_serial || "");
     } else {
       setRepairDetail(null);
       setPlannedMethod("");
       setInternalReference("");
       setEstimatedCost("");
+      setActualMethod("");
+      setReplacementModel("");
+      setReplacementSerial("");
     }
 
     setInitialDiagnosis(rmaData?.initial_diagnosis || "");
+    setDiagnosisCategory(rmaData?.diagnosis_category || "");
     setDialogOpen(true);
   };
 
@@ -150,10 +157,13 @@ const ReceivingTab = () => {
     setSaving(true);
 
     try {
-      // Update initial diagnosis in rma_requests
+      // Update initial diagnosis + diagnosis_category in rma_requests
       await supabase
         .from("rma_requests")
-        .update({ initial_diagnosis: initialDiagnosis })
+        .update({
+          initial_diagnosis: initialDiagnosis,
+          diagnosis_category: diagnosisCategory || null,
+        })
         .eq("id", selectedRma.id);
 
       // Upsert repair details
@@ -162,6 +172,9 @@ const ReceivingTab = () => {
         planned_method: plannedMethod || null,
         internal_reference: internalReference || null,
         estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
+        actual_method: actualMethod || null,
+        replacement_model: actualMethod === "換新" ? (replacementModel || null) : null,
+        replacement_serial: actualMethod === "換新" ? (replacementSerial || null) : null,
       };
 
       if (repairDetail?.id) {
@@ -172,6 +185,7 @@ const ReceivingTab = () => {
       } else {
         await supabase.from("rma_repair_details").insert(repairData);
       }
+
 
       toast.success("已儲存檢查記錄");
       setDialogOpen(false);
