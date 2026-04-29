@@ -918,7 +918,7 @@ const ReceivingTab = () => {
                 e.preventDefault();
                 handleSendDiagnosisNotification();
               }}
-              disabled={notifying}
+              disabled={notifying || uploadingFiles || cleaningUp}
             >
               {notifying ? "寄送中..." : "確認寄出"}
             </AlertDialogAction>
