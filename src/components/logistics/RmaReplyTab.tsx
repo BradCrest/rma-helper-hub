@@ -609,7 +609,7 @@ ${draft.trim()}`;
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   存入知識庫
                 </Button>
-                <Button size="sm" onClick={handleSend} disabled={sending || !draft || !subject || !selected.customer_email}>
+                <Button size="sm" onClick={handleSend} disabled={sending || uploadingFiles || !draft || !subject || !selected.customer_email}>
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   寄出回覆
                 </Button>
