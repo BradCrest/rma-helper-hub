@@ -46,6 +46,8 @@ import {
   getRefurbPrices,
   formatNT,
 } from "@/lib/refurbishedPricing";
+import { evaluateWarranty } from "@/lib/warrantyPolicy";
+import WarrantyCalculator from "./WarrantyCalculator";
 
 type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "repairing" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished" | "unknown";
 
