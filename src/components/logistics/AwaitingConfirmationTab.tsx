@@ -44,6 +44,7 @@ import {
   type ActualMethod,
   ACTUAL_METHOD_LABELS,
 } from "@/lib/refurbishedPricing";
+import { evaluateWarranty } from "@/lib/warrantyPolicy";
 
 interface RmaRequest {
   id: string;
@@ -181,9 +182,19 @@ const AwaitingConfirmationTab = () => {
     }
   };
 
-  const systemWithinWarranty = selectedRma
+  const warrantyDecision = selectedRma
+    ? evaluateWarranty({
+        serialNumber: selectedRma.serial_number,
+        productModel: selectedRma.product_model,
+        warrantyDate: selectedRma.warranty_date,
+      })
+    : null;
+  const systemWithinWarranty = warrantyDecision
+    ? warrantyDecision.withinWarranty
+    : selectedRma
     ? isWithinWarranty(selectedRma.warranty_date)
     : false;
+  const isLegacyBatch = warrantyDecision?.isLegacyBatch ?? false;
   const effectiveWithinWarranty =
     warrantyOverride === null ? systemWithinWarranty : warrantyOverride;
 
