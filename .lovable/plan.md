@@ -1,39 +1,111 @@
-## 問題
+## 目標
 
-`/admin/rma-list` 詳細視窗（在 `AdminRmaList.tsx` 內，**不是** `RmaDetailDialog.tsx`）沒有「Email 寄送記錄」區塊，所以即使資料庫有 5 筆 log，admin 也看不到。
+客戶提交 RMA 表單後，自動寄一封確認 Email：
 
-## 解法
+- 列出他填寫的資料 + RMA 單號
+- 提供「查詢進度」連結（`/track`）
+- 提供「填寫寄件資料」連結（`/shipping-form?rma=xxx`）
+- 文案註明：**有需要的 RMA 才需安排寄送**（因為部分 RMA 並非硬體問題）
+- 只對「實作完成後新建立的 RMA」生效（舊 RMA 不補寄）
+- Email 寄送記錄會自動出現在 RMA 詳細資訊的「Email 寄送記錄」區塊（既有邏輯已支援，無需改動）
 
-在 `AdminRmaList.tsx` 的 `handleViewRma()` 同時抓 `email_send_log`，並在詳細視窗的「狀態歷史記錄」與「客戶聯繫記錄」之間插入一個新區塊顯示。
+## 變更
 
-## 變更（僅一個檔案）
+### 1. 新增 Email 模板
 
-**`src/pages/AdminRmaList.tsx`**
+`**supabase/functions/_shared/transactional-email-templates/rma-confirmation.tsx**`
 
-1. **新增 state**：`emailLogs`（去重後每封 email 一筆，最新狀態）。
-2. **`handleViewRma()`** 的 `Promise.all` 加上一個查詢：
-   ```ts
-   supabase
-     .from("email_send_log")
-     .select("*")
-     .eq("recipient_email", rma.customer_email)
-     .order("created_at", { ascending: false })
-   ```
-   取回後依 `message_id` 去重（保留最新一筆 / 沒有 message_id 的也保留）；過濾出與本 RMA 相關的記錄（依 `metadata.rma_number` 比對；沒有 metadata 時 fallback 用 `recipient_email` 全部顯示）。
-3. **新增 UI 區塊**「Email 寄送記錄」插在第 2140 行（狀態歷史記錄結束）與第 2142 行（客戶聯繫記錄開始）之間：
-   - icon + 標題「Email 寄送記錄」
-   - 空狀態：「尚無 Email 寄送記錄」
-   - 列表：每筆顯示
-     - 模板中文名稱（用 `getEmailTemplateLabel`）
-     - 狀態 badge（用 `getEmailStatusLabel`，sent=綠、failed/dlq=紅、suppressed/bounced=黃、pending=灰）
-     - 收件人
-     - 寄送時間（`formatDate`）
-     - 失敗時顯示 `error_message`
-4. **import** `getEmailTemplateLabel`、`getEmailStatusLabel` from `@/lib/emailTemplateLabels`。
+內容區塊：
+
+- 標題：「CREST**保固申請**：已收到您的申請」
+- 客戶姓名問候
+- 資訊框：RMA 編號、商品名稱、型號、序號、故障類型、申請日期
+- 兩個按鈕：
+  - 「查詢申請進度」→ `https://rma-helper-hub.lovable.app/track?rma={rmaNumber}`
+  - 「填寫寄件資訊」→ `https://rma-helper-hub.lovable.app/shipping-form?rma={rmaNumber}`
+- **重要說明區塊**（黃底提示）：
+  > 部分問題（例如使用諮詢、軟體設定）不需要寄回商品。請等候我們審核後通知，**或經客服確認需要寄送後**，再透過上方按鈕填寫寄件資訊。如已確認需寄回，本服務中心地址：242039 新北市新莊區化成路11巷86號1樓（無法接受親送，請務必透過物流寄送）。
+
+樣式沿用 `shipping-reminder.tsx` 的 design tokens（藍色 #3B82F6 按鈕、圓角、PingFang TC 字體）。
+
+### 2. 註冊模板
+
+`**supabase/functions/_shared/transactional-email-templates/registry.ts**`
+
+加入：
+
+```ts
+import { template as rmaConfirmation } from './rma-confirmation.tsx'
+
+export const TEMPLATES = {
+  'shipping-reminder': shippingReminder,
+  'rma-confirmation': rmaConfirmation,
+}
+```
+
+### 3. 新增中文標籤
+
+`**src/lib/emailTemplateLabels.ts**`
+
+```ts
+EMAIL_TEMPLATE_LABELS = {
+  "shipping-reminder": "未寄件提醒",
+  "rma-confirmation": "RMA 申請確認",
+}
+```
+
+### 4. 觸發點：`submit-rma` Edge Function
+
+`**supabase/functions/submit-rma/index.ts**`
+
+每筆 RMA 成功 insert 後（在 Slack 通知附近），新增呼叫：
+
+```ts
+await supabase.functions.invoke('send-transactional-email', {
+  body: {
+    templateName: 'rma-confirmation',
+    recipientEmail: product.customer_email,
+    idempotencyKey: `rma-confirm-${data.rma_number}`,
+    templateData: {
+      customerName: product.customer_name,
+      rmaNumber: data.rma_number,
+      productName: product.product_name,
+      productModel: product.product_model,
+      serialNumber: product.serial_number,
+      issueType: product.issue_type,
+      createdDate: new Date().toLocaleDateString('zh-TW'),
+      trackUrl: `https://rma-helper-hub.lovable.app/track?rma=${data.rma_number}`,
+      shippingUrl: `https://rma-helper-hub.lovable.app/shipping-form?rma=${data.rma_number}`,
+    },
+  },
+});
+```
+
+寄信失敗不阻擋 RMA 建立流程（try/catch 包住，僅 console.error），與 Slack 通知處理方式一致。
+
+### 5. 在 email log metadata 加入 rma_number
+
+為了讓詳細視窗的 Email 記錄能精確過濾到本 RMA，在 invoke 時 `templateData` 之外，傳遞 `metadata` 欄位（若 `send-transactional-email` 支援 metadata 寫入 `email_send_log`）。
+
+**檢查需求**：目前 `send-transactional-email/index.ts` 寫 log 時沒有傳 `metadata`。本次新增：
+
+- 在 `send-transactional-email` 的 request body 接收 `logMetadata`（選填）
+- 寫入 `email_send_log.metadata`（pending、suppressed、failed 三處 insert 都帶上）
+- `submit-rma` 呼叫時帶 `logMetadata: { rma_number, rma_request_id }`
+
+這樣 `AdminRmaList` 已有的 metadata 比對邏輯就能準確顯示這封信。
 
 ## 不變更
 
-- `RmaDetailDialog.tsx`（之前那個改動仍然有效，但這個頁面不用它）
-- `lookup-rma` Edge Function
-- 資料庫結構、RLS（admin 已有 `email_send_log` SELECT 權限）
-- `AdminRmaList` 直接用 `supabase` client 查（admin 登入態，RLS 通過），不需要 lookup-rma。
+- 資料庫 schema（`email_send_log.metadata` 已存在）
+- `AdminRmaList.tsx` 的 Email 寄送記錄 UI（既有邏輯已會抓並顯示）
+- `RmaDetailDialog.tsx`
+- 既有的 `shipping-reminder` 模板與 cron
+
+## 部署
+
+修改完成後自動部署 `submit-rma`、`send-transactional-email` 兩個 Edge Functions。
+
+## 不影響舊資料
+
+只在「新提交」時觸發。已存在的 RMA 不會回補寄送（符合需求）。
