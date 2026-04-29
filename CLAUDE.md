@@ -2,6 +2,54 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚫 Claude Code 禁區（絕對不要修改）
+
+| 檔案 | 原因 |
+|------|------|
+| `src/integrations/supabase/types.ts` | Supabase CLI 自動產生，改了會被覆蓋 |
+| `src/integrations/supabase/client.ts` | Lovable 自動管理 |
+| `supabase/config.toml` | 改 project_id 會導致部署失敗 |
+| `.env` | Lovable Cloud 自動管理 |
+| `supabase/migrations/*.sql`（已執行的）| Migration 不可逆，新增欄位請建新 migration |
+| Edge Functions（`supabase/functions/`）| Lovable 負責，有自動部署流程；Claude 若要 patch 請在 Lovable push 後再改 |
+| DB schema / RLS policy | Lovable 有 migration 審核流程，Claude 改 SQL 容易漏 RLS |
+
+---
+
+## 分工原則（Lovable vs Claude Code）
+
+| 類型 | 負責方 | 原因 |
+|------|--------|------|
+| UI / shadcn 元件 / Tailwind 樣式 | **Lovable** | 即時預覽、視覺回饋快 |
+| 新頁面、表單、Dialog | **Lovable** | 同上 |
+| Edge Functions（Deno）| **Lovable** | 有自動部署，Claude 改完還需手動部署 |
+| DB migration / RLS policy | **Lovable** | 有 migration 審核流程 |
+| 純函式邏輯（csvParser、validator）| **Claude Code** | 最需要單元測試，Claude 寫測試比較細 |
+| Vitest 測試補強 | **Claude Code** | Lovable 預設不主動寫測試 |
+| 文件（README、CLAUDE.md、PR 說明）| **Claude Code** | 不影響 runtime，零風險 |
+| 跨檔案重構 / 抽 hook / 命名統一 | **Claude Code** | 適合 review-driven 流程 |
+| Bug 修復 | 看狀況 | UI bug → Lovable；邏輯 bug → 誰先看到誰修 |
+
+---
+
+## Lovable ↔ Claude Code 協作流程
+
+### Claude Code 開始工作前（必做）
+```bash
+git checkout main
+git pull --rebase origin main
+```
+
+### 衝突時的優先權
+- **UI / 元件 / 樣式檔**：保留 Lovable 版本，Claude 的改動丟棄或重做
+- **測試檔 / 文件 / 純邏輯模組**：保留 Claude 版本（Lovable 通常不動這些）
+- **Edge Functions**：以 Lovable 版本為主，Claude 在其上 patch
+
+### 「Lovable 工作中」暫停規則
+Lovable 做大改動期間，Claude Code 暫停開 PR。等 Lovable push 完畢、執行 `git pull --rebase` 後再繼續。同時有多個 PR 開著容易產生 merge conflict。
+
+---
+
 ## What this project is
 
 A **Return Merchandise Authorization (RMA) warranty management system** for CREST diving computers. Customers submit products for repair, track status, and communicate with support. Admins manage the entire repair lifecycle with AI-assisted email drafting and a RAG-based knowledge base.
