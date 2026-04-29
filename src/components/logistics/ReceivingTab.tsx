@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Search, Eye, CheckCircle, AlertCircle, Mail } from "lucide-react";
+import { Package, Search, Eye, CheckCircle, AlertCircle, Mail, Paperclip, X, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
