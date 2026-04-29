@@ -307,39 +307,41 @@ const ReceivingTab = () => {
     }
   };
 
-  // Build diagnosis notification email from saved values only
-  const buildDiagnosisEmail = () => {
+  // 系統依 warranty_date 判斷是否在保固內
+  const systemWithinWarranty = selectedRma
+    ? isWithinWarranty(selectedRma.warranty_date)
+    : false;
+
+  // 實際生效的保固判斷（含 admin 覆寫）
+  const effectiveWithinWarranty =
+    warrantyOverride === null ? systemWithinWarranty : warrantyOverride;
+
+  // 依保固狀態 + 已儲存的診斷產生預設 email 主旨/內容
+  const buildDefaultDiagnosisEmail = (within: boolean) => {
     if (!selectedRma) return { subject: "", body: "" };
     const subject = `[${selectedRma.rma_number}] 產品檢測結果與處理方式確認`;
-    const productLine = [selectedRma.product_name, selectedRma.product_model]
-      .filter(Boolean)
-      .join(" ");
-    const category = selectedRma.diagnosis_category || "未分類";
-    const diagnosis = selectedRma.initial_diagnosis || "（尚未填寫）";
-    const method =
-      repairDetail?.actual_method ||
-      repairDetail?.planned_method ||
-      "待確認";
-    const cost =
-      repairDetail?.estimated_cost != null
-        ? `NT$ ${repairDetail.estimated_cost}`
-        : "待報價";
-
-    const body = `您好 ${selectedRma.customer_name}，
-
-您的產品 ${productLine} 已完成初步檢測，結果如下：
-
-【診斷分類】${category}
-【診斷描述】${diagnosis}
-【建議處理方式】${method}
-【預估費用】${cost}
-
-請點擊下方「填寫我的回覆」按鈕確認您是否同意進行此處理方式，
-或回覆任何疑問，我們會儘速為您處理。
-
-謝謝您！`;
+    const body = buildDiagnosisNotificationBody({
+      productModel: selectedRma.product_model || selectedRma.product_name,
+      serialNumber: selectedRma.serial_number,
+      withinWarranty: within,
+      diagnosis: selectedRma.initial_diagnosis,
+    });
     return { subject, body };
   };
+
+  // 開啟通知 dialog 時初始化文字（保留 admin 後續手動編輯）
+  const initializeNotifyContent = (within: boolean) => {
+    const { subject, body } = buildDefaultDiagnosisEmail(within);
+    setNotifySubject(subject);
+    setNotifyBody(body);
+  };
+
+  // 切換保固覆寫時自動重產文字（若 admin 尚未編輯過 / 文字仍為某模板的預設值）
+  const handleWarrantyToggle = (treatAsWarranty: boolean) => {
+    setWarrantyOverride(treatAsWarranty);
+    initializeNotifyContent(treatAsWarranty);
+  };
+
 
   const handleAddNotifyAttachments = async (files: FileList | null) => {
     if (!files || files.length === 0 || !selectedRma) return;
