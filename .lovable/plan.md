@@ -1,127 +1,77 @@
-## 目標
+## 通知客戶診斷結果功能
 
-在「後勤管理 → 客戶來信」分頁，AI 完成草稿後，讓管理員可以**直接以 noreply 方式寄出回覆**，並支援：
-- 一次性附件上傳（最多 5 個、單檔 ≤25MB）
-- 從**常用檔案庫**選擇附件（直接連結、不複製檔案）
+### 架構決定
+**不新建 `send-diagnosis-email` Edge Function**。改為複用既有的 `send-rma-reply`，理由：
 
-附件規則、簽名 URL（30 天）、檔案庫 badge、刪除行為，全部沿用 RMA 回覆既有實作。
+- 自動寫入 `rma_thread_messages`，admin 在「RMA 回覆」分頁看得到完整對話
+- 自動產生 30 天 reply token，客戶可用「填寫我的回覆」按鈕回信，回信會自動進系統並標記未讀
+- 沿用 `notify.crestdiving.com` 寄件、suppression list、queue retry 等既有基礎設施
+- 零新 Edge Function、零新 email 範本、零 migration、零部署風險
 
----
+### UI 變更（`src/components/logistics/ReceivingTab.tsx`）
 
-## 與 RMA 回覆的差異
+1. **位置**：在 Dialog 底部「儲存記錄」按鈕旁，新增第三顆按鈕「📧 通知客戶診斷結果」
+   - 條件：僅當 `selectedRma.customer_email` 存在、且**已儲存的** `selectedRma.initial_diagnosis` 非空時啟用
+   - 樣式：使用 `variant="secondary"` + `Mail` icon，與既有設計一致
 
-| 項目 | RMA 回覆 | 客戶來信回覆（新） |
-|---|---|---|
-| 收件人來源 | RMA 紀錄上的 `customer_email` | 直接從 Gmail 信件 `from` 解析 |
-| 主旨預設值 | 管理員自填 | 預設 `Re: {原信主旨}` |
-| 客戶端追蹤連結 | 30 天 reply token，存 `rma_thread_messages` | **不需要**：純單向回信，沒有 thread 追蹤 |
-| RMA 編號 | 必有 | 偵測到才帶（detectedRma） |
-| 附件儲存路徑 | `rma-attachments/rma-replies/{rmaId}/...` | `rma-attachments/email-replies/{gmailMessageId}/...` |
-| 模板 | `rma-reply` | 新增 `customer-email-reply`（簡化版，無 reply CTA） |
+2. **點擊流程**：
+   - 開啟 `AlertDialog` 確認框
+   - **預覽內容直接從 `selectedRma` 與已載入的 `repairDetail` 讀取已儲存值**，不讀表單 local state（`initialDiagnosis` / `actualMethod` 等 useState）
+   - 預覽顯示：收件人 email、主旨、信件正文（純文字呈現），讓 admin 一眼看到實際會寄出的內容
+   - 「取消 / 確認寄出」兩顆按鈕
 
----
+3. **正文組裝（資料來源全部用「已儲存值」）**：
+   ```
+   您好 {selectedRma.customer_name}，
+   
+   您的產品 {selectedRma.product_name} {selectedRma.product_model} 已完成初步檢測，結果如下：
+   
+   【診斷分類】{selectedRma.diagnosis_category || '未分類'}
+   【診斷描述】{selectedRma.initial_diagnosis}
+   【建議處理方式】{repairDetail.actual_method || repairDetail.planned_method || '待確認'}
+   【預估費用】NT$ {repairDetail.estimated_cost ?? '待報價'}
+   
+   請點擊下方「填寫我的回覆」按鈕確認您是否同意進行此處理方式，
+   或回覆任何疑問，我們會儘速為您處理。
+   ```
+   - 主旨：`[{rma_number}] 產品檢測結果與處理方式確認`
 
-## 實作步驟
+4. **送出後**：
+   - 呼叫 `supabase.functions.invoke('send-rma-reply', { body: { rmaRequestId, subject, body, attachments: [] } })`
+   - 成功 toast：「已寄出診斷通知給 xxx@xxx」
+   - 自動將狀態切換到 `contacting`（呼叫既有 `update-rma-status`）
+   - 重新整理列表並關閉 Dialog
 
-### 1. 新增 Edge Function：`send-customer-email-reply`
+5. **重複寄送處理**：每次按按鈕都跳確認 Dialog，不 disable，符合「每次都可重寄」的選擇
 
-直接以 `send-rma-reply` 為藍本複製改寫，重點差異：
-- 入參：`{ gmailMessageId, recipientEmail, recipientName?, subject, body, rmaNumber?, attachments[] }`
-- 驗證身份：admin / super_admin
-- 附件路徑驗證：
-  - `source: "upload"` → 必須在 `email-replies/{gmailMessageId}/` 下
-  - `source: "library"` → 比對 `shared_library_files.path` 確認存在（沿用 RMA 邏輯）
-- 簽名 URL：`upload` 用 `rma-attachments` bucket、`library` 用 `shared-library` bucket，皆 30 天
-- 不寫 `rma_thread_messages`（沒有 reply token / thread）；只透過 `send-transactional-email` 寄送
-- `idempotencyKey`: `customer-email-reply-{gmailMessageId}-{timestamp}`，並在 metadata 寫入 `gmail_message_id` 方便日後追查
+### Dirty state 處理（簡化版）
 
-### 2. 新增 Email 模板：`customer-email-reply.tsx`
+**不偵測表單 dirty state**。理由：
 
-放在 `supabase/functions/_shared/transactional-email-templates/`：
-- Props: `subject`, `customerName`, `replyBody`, `rmaNumber?`, `attachments?: {name,url,size}[]`
-- 排版沿用 `rma-reply.tsx` 的視覺風格（白底、品牌色、附件以下載按鈕呈現）
-- **不含 reply CTA 按鈕**（這封是 noreply 單向回覆）
-- 註冊到 `registry.ts`
+- AlertDialog 預覽內容**只讀已儲存的 `selectedRma` 與 `repairDetail`**，不讀表單 local state
+- Admin 在預覽中看到的就是「目前資料庫裡的版本」，自然能判斷是否需要先儲存
+- 若 admin 改了表單但沒存，預覽會顯示舊值 → admin 自己會發現並先按「儲存記錄」
+- 實作更簡單，零額外 state 追蹤
 
-### 3. 改 `CustomerEmailTab.tsx` 草稿區下方新增「寄出區塊」
+### 邊界情境處理
 
-在現有 `draft` textarea 下方加入：
+- 若已儲存的 `initial_diagnosis` 為空 → 按鈕 disable + tooltip「請先填寫並儲存初步診斷」
+- 若 `customer_email` 為空 → 按鈕 disable + tooltip「此 RMA 沒有客戶 Email」
+- 寄信失敗 → toast 顯示後端錯誤訊息，狀態不變
 
-```text
-┌─ 寄出回覆 ──────────────────────────────┐
-│ 收件人：jane@example.com (Jane Doe)      │
-│ 主旨：[Re: 原主旨............]           │
-│ ─ 附件（最多 5 個） ────────────────     │
-│ [📎 上傳檔案] [📚 從檔案庫選擇]          │
-│ • invoice.pdf  120KB  [檔案庫] [移除]   │
-│ • photo.jpg    2.1MB           [移除]    │
-│ ─────────────────────────────────────    │
-│              [取消]  [📧 以 noreply 寄出] │
-└──────────────────────────────────────────┘
-```
+### 不會新增的檔案
+- ❌ `supabase/functions/send-diagnosis-email/` — 不需要
+- ❌ 新 email 範本 — 沿用 `rma-reply.tsx`
+- ❌ 任何 DB migration — 全部欄位都已存在
 
-行為細節（沿用 RMA 回覆）：
-- 上傳：`supabase.storage.from("rma-attachments").upload("email-replies/{gmailMessageId}/{uuid}-{name}", file)`
-- 從檔案庫選：用既有 `<SharedLibraryPicker>`，加入時只存 reference（`source: "library"`, `libraryFileId`, library `path`），同時 best-effort `increment download_count`
-- 移除：`upload` 來源同步刪 storage；`library` 來源僅從清單移除
-- 大小/數量限制：5 個、單檔 25MB、總和不顯示（與 RMA 一致）
-- UI badge：library 來源顯示藍色 "檔案庫"
-- 寄出按鈕：呼叫 `send-customer-email-reply`，成功後 toast 並把附件清單清空、按鈕鎖定避免重複寄送
+### 唯一變更檔案
+- `src/components/logistics/ReceivingTab.tsx`
 
-可以把 RMA 回覆裡的附件區塊抽成共用 component（`<ReplyAttachmentList>`）以避免重複，或直接複製貼上後續再重構——建議**先複製貼上**完成功能，之後若有第三處再抽。
-
-### 4. 狀態管理
-
-`CustomerEmailTab` 新增 state：
-- `replySubject`（預設 `Re: {detail.subject}`，可編輯）
-- `attachments: UploadedAttachment[]`
-- `uploadingFiles: boolean`
-- `sending: boolean`
-- `libraryPickerOpen: boolean`
-
-選新信件時重置這些 state（在 `loadDetail` 開頭已做 reset 模式，新增到 reset 邏輯中）。
-
-### 5. 不需要的東西
-
-- ❌ 不需要新的 storage bucket（重用 `rma-attachments`，只是路徑前綴改成 `email-replies/`）
-- ❌ 不需要 migration（沒有新表）
-- ❌ 不需要新的 secret
-- ❌ 不需要 reply token / thread 紀錄
-
-### 6. RLS / Storage policy
-
-`rma-attachments` 既有 RLS 應已允許 admin 上傳到任意路徑；新前綴 `email-replies/` 只要 policy 是 `is_admin(auth.uid())` 而非綁 RMA id 就直接適用。實作時會先 `supabase--read_query` 確認，若 policy 寫死了 `rma-replies/` 前綴則需新增一條 policy（最小變動）。
-
-### 7. 自動清理（與既有機制相容）
-
-`cleanup-rma-attachments` Edge Function 目前只清「已 completed 90 天」的 RMA 附件（按 RMA 狀態過濾）。`email-replies/` 下的檔案不在那個清理範圍內，會永久留存。
-
-如果要清理 email-replies 也可加進排程，但**先不做**，等使用後再依量決定（可在後續加一個「90 天前的 email-replies/」周期清理）。
-
----
-
-## 驗收清單
-
-- [ ] AI 草稿產生後，下方出現「寄出回覆」區塊，自動帶入收件人與 Re: 主旨
-- [ ] 可上傳最多 5 個附件，超過上限或大小有清楚錯誤提示
-- [ ] 可從檔案庫挑選，list 顯示「檔案庫」badge，移除不會刪原檔
-- [ ] 點「以 noreply 寄出」收到信，附件下載連結可用、30 天後失效
-- [ ] 客戶端收到的信件 From 為 noreply@notify.crestdiving.com（沿用 transactional 設定），不含 reply CTA
-- [ ] 寄出失敗時 toast 顯示後端錯誤訊息（不要吞錯誤）
-- [ ] 切換到另一封信時，附件清單與寄出狀態會重置
-
----
-
-## 修改的檔案
-
-新增：
-- `supabase/functions/send-customer-email-reply/index.ts`
-- `supabase/functions/_shared/transactional-email-templates/customer-email-reply.tsx`
-
-修改：
-- `supabase/functions/_shared/transactional-email-templates/registry.ts`（註冊新模板）
-- `src/components/logistics/CustomerEmailTab.tsx`（新增寄出區塊與相關 handlers）
-- `mem://features/shared-library`（補一行：客戶來信回覆也支援檔案庫引用）
-
-可選（後續視重複程度再做）：
-- 抽出 `src/components/logistics/ReplyAttachmentList.tsx` 共用元件
+### 驗證步驟
+1. 開啟任一 `inspecting` 狀態的 RMA
+2. 填寫並儲存初步診斷（含分類、處理方式、預估費用）
+3. 按「通知客戶診斷結果」→ 預覽看到的是已儲存的版本 → 確認寄出
+4. 確認 toast 顯示成功、狀態切到「聯繫客戶中」
+5. 客戶信箱應收到信，內容包含診斷與「填寫我的回覆」按鈕
+6. 在「RMA 回覆」分頁確認該封 outbound 訊息已記錄
+7. **驗證 dirty state 行為**：改了表單但不存 → 按通知按鈕 → 預覽顯示的是舊值（未含未存的修改）
