@@ -125,8 +125,20 @@ export const template = {
     customerName: '王小明',
     rmaNumber: 'RC7EA059461',
     replyBody:
-      '您好，您的產品已收到，初步檢測為防水墊圈老化，預計 3 個工作天內完成更換並回寄。',
+      '您好，您的產品已收到，初步檢測為防水墊圈老化，預計 3 個工作天內完成更換並回寄。隨信附上維修報價單供您參考。',
     replyUrl: 'https://rma-helper-hub.lovable.app/rma-reply/sample-token',
+    attachments: [
+      {
+        name: '維修報價單.pdf',
+        url: 'https://example.com/sample-quote.pdf',
+        size: 124000,
+      },
+      {
+        name: '產品檢測照片.jpg',
+        url: 'https://example.com/sample-photo.jpg',
+        size: 856000,
+      },
+    ],
   },
 } satisfies TemplateEntry
 
