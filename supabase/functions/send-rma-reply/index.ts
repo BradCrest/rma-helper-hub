@@ -88,19 +88,46 @@ serve(async (req) => {
     }
     const { rmaRequestId, subject, body, attachments } = parsed.data;
 
-    // Validate attachment paths: must be scoped under rma-replies/{rmaRequestId}/
+    // Validate attachment paths per source:
+    //  - upload  → must be scoped under rma-replies/{rmaRequestId}/
+    //  - library → must exist in shared_library_files (path match)
     const expectedPrefix = `rma-replies/${rmaRequestId}/`;
+    const libraryPaths = attachments
+      .filter((a) => a.source === "library")
+      .map((a) => a.path);
+    let validLibraryPaths = new Set<string>();
+    if (libraryPaths.length > 0) {
+      const { data: libRows } = await admin
+        .from("shared_library_files")
+        .select("path")
+        .in("path", libraryPaths);
+      validLibraryPaths = new Set((libRows ?? []).map((r: any) => r.path));
+    }
     for (const a of attachments) {
-      if (!a.path.startsWith(expectedPrefix)) {
-        return new Response(
-          JSON.stringify({
-            error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+      if (a.source === "library") {
+        if (!validLibraryPaths.has(a.path)) {
+          return new Response(
+            JSON.stringify({
+              error: `檔案庫附件無效：${a.name}（檔案不存在或已刪除）`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+      } else {
+        if (!a.path.startsWith(expectedPrefix)) {
+          return new Response(
+            JSON.stringify({
+              error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
       }
     }
 
