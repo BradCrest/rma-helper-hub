@@ -169,6 +169,8 @@ serve(async (req) => {
       path: a.path,
       size: a.size,
       contentType: a.contentType ?? null,
+      source: a.source ?? "upload",
+      libraryFileId: a.libraryFileId ?? null,
       uploadedAt,
     }));
 
@@ -199,16 +201,18 @@ serve(async (req) => {
       );
     }
 
-    // Generate 30-day signed download URLs for each attachment
+    // Generate 30-day signed download URLs for each attachment.
+    // Library attachments sign against shared-library bucket (no copy made).
     const templateAttachments: Array<{ name: string; url: string; size: number }> = [];
     for (const a of attachments) {
+      const bucket = a.source === "library" ? LIBRARY_BUCKET : ATTACHMENT_BUCKET;
       const { data: signed, error: signErr } = await admin.storage
-        .from(ATTACHMENT_BUCKET)
+        .from(bucket)
         .createSignedUrl(a.path, SIGNED_URL_TTL_SECONDS, {
           download: a.name,
         });
       if (signErr || !signed?.signedUrl) {
-        console.error("signed url err:", a.path, signErr);
+        console.error("signed url err:", bucket, a.path, signErr);
         return new Response(
           JSON.stringify({
             error: `無法產生附件下載連結：${a.name}`,
