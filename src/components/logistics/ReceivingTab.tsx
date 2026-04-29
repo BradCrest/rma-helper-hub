@@ -834,6 +834,65 @@ const ReceivingTab = () => {
 {buildDiagnosisEmail().body}
                 </pre>
               </div>
+              {/* Attachments */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5" />
+                    附件 {notifyAttachments.length > 0 && `(${notifyAttachments.length}/${MAX_ATTACHMENTS})`}
+                  </Label>
+                  <input
+                    ref={notifyFileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                    onChange={(e) => handleAddNotifyAttachments(e.target.files)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => notifyFileInputRef.current?.click()}
+                    disabled={uploadingFiles || notifying || cleaningUp || notifyAttachments.length >= MAX_ATTACHMENTS}
+                  >
+                    {uploadingFiles ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    選擇檔案
+                  </Button>
+                </div>
+                {notifyAttachments.length > 0 && (
+                  <ul className="space-y-1 border rounded p-2 bg-muted/20">
+                    {notifyAttachments.map((a, idx) => (
+                      <li key={a.path} className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                          <span className="truncate">{a.name}</span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            ({formatBytes(a.size)})
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveNotifyAttachment(idx)}
+                          disabled={notifying || cleaningUp}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  最多 {MAX_ATTACHMENTS} 個檔案，單檔上限 25 MB。Email 內以下載連結呈現，30 天內有效。
+                </p>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 寄出後 RMA 狀態將自動切換為「聯繫客戶中」。
               </p>
