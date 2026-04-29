@@ -412,12 +412,13 @@ ${draft.trim()}`;
       const { data: { user } } = await supabase.auth.getUser();
 
       const { error } = await supabase.from("email_knowledge_sources").insert({
-        source_type: "rma_reply",
+        source_type: "email",
         title: `RMA 往來｜${selected.rma_number}｜${selected.customer_name}`,
         content,
         created_by: user?.id,
         metadata: {
           tag: "RMA 往來",
+          origin: "rma_reply",
           rma_number: selected.rma_number,
           rma_request_id: selected.id,
           saved_from: "rma_reply_tab",
