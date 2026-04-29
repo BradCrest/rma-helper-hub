@@ -243,12 +243,19 @@ const CustomerEmailTab = () => {
     setKbJustSaved(false);
     setKbTag("");
     setDraft("");
+    // 重置寄出區塊狀態
+    setAttachments([]);
+    setReplySubject("");
+    setSending(false);
 
     // 先看快取
     const cached = emailDetailCache.get(messageId);
     if (cached) {
       setDetail(cached);
       setDetailLoading(false);
+      setReplySubject(
+        cached.subject ? (cached.subject.startsWith("Re:") ? cached.subject : `Re: ${cached.subject}`) : "Re: ",
+      );
       void checkExistingKnowledge(messageId);
       return;
     }
