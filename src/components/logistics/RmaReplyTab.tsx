@@ -477,6 +477,19 @@ ${draft.trim()}`;
                       </div>
                       {m.subject && <div className="font-medium text-xs mb-1">{m.subject}</div>}
                       <div className="whitespace-pre-wrap">{m.body}</div>
+                      {Array.isArray(m.attachments) && m.attachments.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-border/40 space-y-1">
+                          {m.attachments.map((a, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Paperclip className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{a.name}</span>
+                              {typeof a.size === "number" && (
+                                <span className="text-[10px]">({formatBytes(a.size)})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
