@@ -94,6 +94,10 @@ const ReceivingTab = () => {
   const [replacementModel, setReplacementModel] = useState("");
   const [replacementSerial, setReplacementSerial] = useState("");
 
+  // Notify customer dialog state
+  const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+
   useEffect(() => {
     fetchRmaList();
   }, [statusFilter]);
