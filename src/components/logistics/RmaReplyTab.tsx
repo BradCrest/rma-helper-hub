@@ -103,6 +103,10 @@ const RmaReplyTab = () => {
   const [copied, setCopied] = useState(false);
   const [ragInfo, setRagInfo] = useState<{ model?: string; ragCount?: number } | null>(null);
 
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const selected = rmas.find((r) => r.id === selectedId) || null;
 
   const loadRmas = useCallback(async () => {
