@@ -135,6 +135,10 @@ const ReceivingTab = () => {
   // Notify customer dialog state
   const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [notifyAttachments, setNotifyAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const notifyFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchRmaList();
