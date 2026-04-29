@@ -1021,6 +1021,13 @@ const CustomerEmailTab = () => {
         </div>
       </div>
     </div>
+      <SharedLibraryPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onConfirm={handleAddFromLibrary}
+        maxSelect={MAX_ATTACHMENTS - attachments.length}
+      />
+    </>
   );
 };
 
