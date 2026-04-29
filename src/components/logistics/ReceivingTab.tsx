@@ -329,6 +329,91 @@ const ReceivingTab = () => {
     return { subject, body };
   };
 
+  const handleAddNotifyAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !selectedRma) return;
+    const fileArr = Array.from(files);
+
+    if (notifyAttachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const safeName = sanitizeForKey(file.name);
+        const path = `rma-replies/${selectedRma.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+        });
+      }
+      if (uploaded.length > 0) {
+        setNotifyAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (notifyFileInputRef.current) notifyFileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveNotifyAttachment = async (idx: number) => {
+    const att = notifyAttachments[idx];
+    if (!att) return;
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    setNotifyAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Batch-remove all uploaded notify attachments. Supabase storage.remove accepts
+  // an array of paths — single awaited RPC that deletes all paths together.
+  const clearNotifyAttachments = async () => {
+    const paths = notifyAttachments.map((a) => a.path);
+    if (paths.length === 0) return;
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove(paths).catch(() => {});
+    setNotifyAttachments([]);
+  };
+
+  const handleNotifyDialogChange = async (open: boolean) => {
+    if (open) {
+      setNotifyDialogOpen(true);
+      return;
+    }
+    // Block close while sending, uploading, or cleaning up
+    if (notifying || cleaningUp || uploadingFiles) return;
+    if (notifyAttachments.length > 0) {
+      setCleaningUp(true);
+      try {
+        await clearNotifyAttachments();
+      } finally {
+        setCleaningUp(false);
+      }
+    }
+    setNotifyDialogOpen(false);
+  };
+
   const handleSendDiagnosisNotification = async () => {
     if (!selectedRma) return;
     setNotifying(true);
