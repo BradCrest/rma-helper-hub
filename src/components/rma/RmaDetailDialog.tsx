@@ -25,6 +25,7 @@ import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { isInvalidSerialNumber, INVALID_SERIAL_DESCRIPTION } from "@/lib/serialNumberValidator";
 import { getEmailTemplateLabel, getEmailStatusLabel } from "@/lib/emailTemplateLabels";
+import ShopifyOrdersCard from "@/components/rma/ShopifyOrdersCard";
 
 interface EmailLogEntry {
   message_id: string | null;
@@ -845,6 +846,19 @@ const RmaDetailDialog = ({ rmaNumber, open, onOpenChange }: RmaDetailDialogProps
                   </div>
                 )}
               </div>
+
+              {/* Shopify orders for this customer */}
+              {rmaData.id && rmaData.customer_email && (
+                <ShopifyOrdersCard
+                  rmaId={rmaData.id}
+                  email={rmaData.customer_email}
+                  currentPurchaseDate={rmaData.purchase_date}
+                  serialNumber={rmaData.serial_number}
+                  productModel={rmaData.product_model}
+                  warrantyDate={rmaData.warranty_date}
+                  onPurchaseDateApplied={() => fetchRmaData()}
+                />
+              )}
 
               {/* Issue */}
               <div className="space-y-3">
