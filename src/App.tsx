@@ -88,6 +88,7 @@ const App = () => (
               }
             />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/rma-reply/:token" element={<RmaCustomerReply />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
