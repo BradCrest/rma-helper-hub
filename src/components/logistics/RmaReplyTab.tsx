@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2, FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import SharedLibraryPicker, { type PickedLibFile } from "@/components/admin/SharedLibraryPicker";
 
 const ATTACHMENT_BUCKET = "rma-attachments";
 const MAX_ATTACHMENTS = 5;
