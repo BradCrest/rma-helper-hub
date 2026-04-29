@@ -203,13 +203,72 @@ const RmaReplyTab = () => {
     }
   };
 
+  const handleAddAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !selected) return;
+    const fileArr = Array.from(files);
+
+    if (attachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+        });
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (idx: number) => {
+    const att = attachments[idx];
+    if (!att) return;
+    // Best-effort cleanup; ignore errors
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSend = async () => {
     if (!selected || !draft.trim() || !subject.trim()) return;
     if (!selected.customer_email) {
       toast.error("此 RMA 沒有客戶 Email，無法寄送");
       return;
     }
-    if (!confirm(`確定要寄送回覆給 ${selected.customer_email} 嗎？`)) return;
+    const attachmentNote = attachments.length > 0 ? `（含 ${attachments.length} 個附件）` : "";
+    if (!confirm(`確定要寄送回覆給 ${selected.customer_email} 嗎？${attachmentNote}`)) return;
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-rma-reply", {
@@ -217,6 +276,7 @@ const RmaReplyTab = () => {
           rmaRequestId: selected.id,
           subject: subject.trim(),
           body: draft.trim(),
+          attachments,
         },
       });
       if (error) throw error;
@@ -224,6 +284,7 @@ const RmaReplyTab = () => {
       if (result?.error) throw new Error(result.error);
       toast.success("已寄出回覆");
       setDraft("");
+      setAttachments([]);
       await loadThread(selected.id);
     } catch (e: any) {
       toast.error("寄送失敗：" + (e?.message || ""));
