@@ -1,122 +1,101 @@
 ## 目標
 
-為 RMA 回覆附件加上完整的管理機制：手動刪除、刪除 RMA 時連帶清理、定期自動清理。
+在 `系統設定 > 附件清理` 區塊上方新增「**常用檔案庫**」，讓管理員可以上傳/管理常用檔案（保固政策 PDF、產品說明書、報價單範本…），之後在「RMA 回覆」與「客服 Email」兩處可一鍵插入為附件，免去重複上傳。
 
 ---
 
-## 方案 A — 手動刪除附件
+## 一、資料層
 
-**`src/components/logistics/RmaReplyTab.tsx`** 在「回覆紀錄」列出附件的地方，每個附件右側加一個 🗑️ 按鈕：
+### 1.1 新增 Storage bucket：`shared-library`
+- Private bucket
+- RLS：admin 可 SELECT / INSERT / UPDATE / DELETE；其他角色不可存取
 
-1. 點擊 → AlertDialog 確認「確定要刪除附件 {name}？此動作無法復原」
-2. 確認後：
-   - `supabase.storage.from("rma-attachments").remove([attachment.path])`
-   - 用 `UPDATE rma_thread_messages SET attachments = ?` 把該檔案從 jsonb 陣列中移除（在 client 端先讀取、過濾再 update，因為這是回覆者自己的訊息，admin RLS 允許）
-3. 成功後重新載入 thread
-
-**權限**：admin only（已由 RLS 保證）。
-
----
-
-## 方案 B — 刪除 RMA 時連帶清理
-
-**`src/pages/AdminRmaList.tsx`** 在 `handleDelete` 流程中，於刪 `rma_requests` 之前新增兩步：
-
-1. **刪附件檔案**：列出 `rma-attachments` bucket 裡 `rma-replies/{rmaId}/` 資料夾的所有物件，呼叫 `storage.remove()` 一次刪除全部。
-   ```ts
-   const { data: files } = await supabase.storage
-     .from("rma-attachments")
-     .list(`rma-replies/${rmaToDelete.id}`);
-   if (files?.length) {
-     await supabase.storage
-       .from("rma-attachments")
-       .remove(files.map(f => `rma-replies/${rmaToDelete.id}/${f.name}`));
-   }
-   ```
-2. **刪 thread messages**：
-   ```ts
-   await supabase.from("rma_thread_messages").delete().eq("rma_request_id", rmaToDelete.id);
-   ```
-   （目前刪除流程有遺漏這個表，順便修掉）
-
-兩步失敗都不阻擋整體刪除（toast warning 即可），確保 RMA 主體一定被刪掉。
-
----
-
-## 方案 C — 定期自動清理
-
-### C-1 新表：`rma_attachment_cleanup_logs`（migration）
+### 1.2 新增資料表：`shared_library_files`
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | `id` | uuid PK | |
-| `cleanup_run_at` | timestamptz | 執行時間 |
-| `trigger_source` | text | `'cron'` 或 `'manual'` |
-| `files_deleted` | int | 數量 |
-| `bytes_freed` | bigint | 釋出空間 |
-| `details` | jsonb | 刪除明細 (path, rma_id, age_days) |
-| `error` | text | 失敗訊息（若有）|
+| `name` | text | 顯示名稱（管理員可改） |
+| `file_name` | text | 原始檔名 |
+| `path` | text | storage 路徑 `shared-library/{uuid}-{name}` |
+| `size` | bigint | bytes |
+| `content_type` | text | MIME |
+| `category` | text NULL | 分類標籤（選填，例如：保固、報價、說明書）|
+| `description` | text NULL | 備註說明 |
+| `uploaded_by` | uuid NULL | |
+| `uploaded_by_email` | text NULL | |
+| `download_count` | int | 被插入次數（統計用）|
+| `created_at` / `updated_at` | timestamptz | |
 
-RLS：admin SELECT、service_role INSERT。
-
-### C-2 新 edge function：`cleanup-rma-attachments`
-
-執行邏輯：
-1. 讀取 `rma_thread_messages`（有 `attachments` 且非空）
-2. 對每個 attachment 計算年齡（用 `created_at` 或附件自身的 uploaded_at）
-3. **刪除規則（待您確認，預設用 (iii)）**：
-   - **(iii) 該 RMA `status = 'completed'` 且結案滿 90 天 → 刪除附件**
-   - 其他選項：(i) 上傳滿 90 天、(ii) 上傳滿 180 天
-4. 呼叫 `storage.remove()` 批次刪除
-5. 把該訊息的 `attachments` jsonb 中對應項目移除（保留訊息本文與檔名供記錄查詢）
-6. 寫入 `rma_attachment_cleanup_logs`
-
-`verify_jwt = false`（cron 呼叫），但用 `service_role` key 操作，並可加一個簡單的 secret token 比對防誤觸。
-
-### C-3 排程（用 `supabase--read_query` 旁路、實際用 insert SQL 工具執行 — 內含 anon key 不寫進 migration）
-
-```sql
-SELECT cron.schedule(
-  'cleanup-rma-attachments-weekly',
-  '0 3 * * 0',  -- 每週日 03:00 UTC
-  $$
-  SELECT net.http_post(
-    url := 'https://xrbvyfoewbwywrwocrpf.supabase.co/functions/v1/cleanup-rma-attachments',
-    headers := '{"Content-Type":"application/json","apikey":"<anon>"}'::jsonb,
-    body := '{"trigger":"cron"}'::jsonb
-  );
-  $$
-);
-```
-
-需先確認 `pg_cron` 與 `pg_net` 已啟用，未啟用會於 migration 中啟用。
-
-### C-4 管理 UI（最小）
-
-在 `AdminSettings` 或 admin 設定頁加一個小區塊「附件清理」：
-- 顯示最近 5 筆 cleanup log（時間、刪幾個、釋出多少 MB）
-- 一個「立即執行清理」按鈕（呼叫 edge function 並帶 `trigger=manual`）
+**RLS**：admin 可 SELECT / INSERT / UPDATE / DELETE。
 
 ---
 
-## 待您確認的 1 個問題
+## 二、後端 — 不需要新 edge function
 
-**自動清理的觸發規則** — 我預設使用 **(iii) RMA 已 completed 且結案滿 90 天**（最安全，未結案的附件不會被誤刪）。
+直接用 supabase-js 操作即可：
+- 上傳：`storage.from('shared-library').upload()` + `from('shared_library_files').insert()`
+- 取簽章 URL（用於 RMA 回覆寄信）：`storage.from('shared-library').createSignedUrl(path, 30*86400)`
+- 刪除：`storage.remove()` + `delete()`
 
-如果您要改成：
-- (i) 上傳滿 90 天一律刪
-- (ii) 上傳滿 180 天一律刪
-- 或其他天數
-
-請在批准 plan 時一併告知，否則我就照 (iii) 90 天 completed 實作。
+**插入到 RMA 回覆時的處理**：把該檔案複製到 `rma-attachments/rma-replies/{rmaId}/` 目錄（或直接引用 `shared-library` 路徑），讓現有的 `send-rma-reply` 流程不需改動。**採方案 A：複製檔案**（最簡單、隔離乾淨、不影響日後 cleanup 邏輯）。
 
 ---
 
-## 影響檔案
+## 三、UI
 
-- `src/components/logistics/RmaReplyTab.tsx`（A：附件刪除按鈕）
-- `src/pages/AdminRmaList.tsx`（B：刪 RMA 時清附件 + thread messages）
-- `supabase/migrations/...sql`（C-1：新表、啟用 pg_cron/pg_net）
-- `supabase/functions/cleanup-rma-attachments/index.ts`（C-2：新 edge function）
-- 用 SQL insert 工具排 cron job（C-3）
-- `src/pages/AdminSettings.tsx` 或類似頁面（C-4：清理 log 顯示 + 立即執行按鈕）
+### 3.1 新元件：`src/components/admin/SharedLibrarySettings.tsx`
+位置：`AdminSettings.tsx` 中，**置於 `<AttachmentCleanupSettings />` 之上**。
+
+功能：
+- **上傳區**：拖放 / 點擊選檔（支援多檔），可填分類與備註；單檔上限 25 MB
+- **檔案列表**：表格顯示 名稱 / 分類 / 大小 / 上傳時間 / 使用次數 / 操作（下載、改名、刪除）
+- **搜尋與分類篩選**：依檔名、分類過濾
+- **改名 / 改分類 / 改備註**：inline 編輯或小 dialog
+- **刪除**：確認後刪 storage + DB row
+
+權限：admin 即可查看與管理（與其他清理設定一致）。
+
+### 3.2 在「RMA 回覆」插入功能
+**`src/components/logistics/RmaReplyTab.tsx`** 附件區的「+ 上傳」旁新增「📚 從檔案庫加入」按鈕：
+1. 開啟 dialog 列出檔案庫（含搜尋、分類篩選）
+2. 多選 → 確認
+3. 對每個選中檔案：
+   - 從 `shared-library` 下載 blob
+   - 重新上傳到 `rma-attachments/rma-replies/{rmaId}/{uuid}-{name}`
+   - push 到 `attachments` state（與現有 `UploadedAttachment` 同結構）
+   - 對 `shared_library_files.download_count` +1（背景，失敗不阻擋）
+4. 受現有 `MAX_ATTACHMENTS = 5` 限制
+
+### 3.3 在「客服 Email / 草稿回信」插入功能
+**`src/components/admin/DraftEmailReply.tsx`**（草稿回信元件）— 同樣加一個「從檔案庫加入」按鈕，邏輯與 3.2 類似但目標 bucket 視該元件原本附件流程而定（待實作時對齊既有機制）。
+
+> 若 `DraftEmailReply` 目前沒有附件流程，本期僅在 RMA 回覆加上插入功能，Email 端的整合留待後續（會在實作時再評估，避免擴大範圍）。
+
+---
+
+## 四、影響檔案
+
+**新增**
+- `supabase/migrations/{ts}_shared_library.sql` — bucket + 表 + RLS
+- `src/components/admin/SharedLibrarySettings.tsx`
+- `src/components/admin/SharedLibraryPicker.tsx`（從檔案庫選檔的 dialog，給 RMA 回覆用）
+
+**修改**
+- `src/pages/AdminSettings.tsx` — 在 `<AttachmentCleanupSettings />` 上方掛 `<SharedLibrarySettings />`
+- `src/components/logistics/RmaReplyTab.tsx` — 附件區加「從檔案庫加入」按鈕、整合 picker
+- `src/components/admin/DraftEmailReply.tsx` — 視現況加入或留待後續（實作時決定）
+
+---
+
+## 五、待您確認
+
+1. **權限**：檔案庫管理（上傳 / 改 / 刪）給「所有 admin」就好，還是要限「super_admin」？  
+   → 預設：**所有 admin**（與「附件清理立即執行」按鈕的權限一致）
+
+2. **單檔上限**：預設 **25 MB**（與 RMA 回覆附件一致）；可接受？
+
+3. **DraftEmailReply 整合**：本期一起做，還是先只做 RMA 回覆？  
+   → 預設：**先做 RMA 回覆**，Email 端留待您確認既有附件流程後再補
+
+如無異議，按上述預設執行。

@@ -912,6 +912,54 @@ export type Database = {
           },
         ]
       }
+      shared_library_files: {
+        Row: {
+          category: string | null
+          content_type: string | null
+          created_at: string
+          description: string | null
+          download_count: number
+          file_name: string
+          id: string
+          name: string
+          path: string
+          size: number
+          updated_at: string
+          uploaded_by: string | null
+          uploaded_by_email: string | null
+        }
+        Insert: {
+          category?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          download_count?: number
+          file_name: string
+          id?: string
+          name: string
+          path: string
+          size?: number
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_email?: string | null
+        }
+        Update: {
+          category?: string | null
+          content_type?: string | null
+          created_at?: string
+          description?: string | null
+          download_count?: number
+          file_name?: string
+          id?: string
+          name?: string
+          path?: string
+          size?: number
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_email?: string | null
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
