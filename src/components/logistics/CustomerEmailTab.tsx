@@ -154,6 +154,14 @@ const CustomerEmailTab = () => {
   const [kbExistingId, setKbExistingId] = useState<string | null>(null);
   const [kbJustSaved, setKbJustSaved] = useState(false);
 
+  // 寄出回覆相關狀態
+  const [replySubject, setReplySubject] = useState("");
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const buildQuery = useCallback(() => {
     const parts: string[] = ["in:inbox"];
     if (filter === "unread") parts.push("is:unread");
