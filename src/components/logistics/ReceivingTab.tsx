@@ -559,9 +559,28 @@ const ReceivingTab = () => {
                 </div>
 
 
-                <div className="flex justify-end gap-3 pt-4">
+                <div className="flex flex-wrap justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     取消
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setNotifyDialogOpen(true)}
+                    disabled={
+                      !selectedRma?.customer_email ||
+                      !selectedRma?.initial_diagnosis?.trim()
+                    }
+                    title={
+                      !selectedRma?.customer_email
+                        ? "此 RMA 沒有客戶 Email"
+                        : !selectedRma?.initial_diagnosis?.trim()
+                        ? "請先填寫並儲存初步診斷"
+                        : "寄送診斷結果給客戶"
+                    }
+                    className="gap-1"
+                  >
+                    <Mail className="w-4 h-4" />
+                    通知客戶診斷結果
                   </Button>
                   <Button onClick={handleSaveRepairDetail} disabled={saving}>
                     {saving ? "儲存中..." : "儲存記錄"}
