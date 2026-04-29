@@ -532,11 +532,21 @@ ${draft.trim()}`;
                       {Array.isArray(m.attachments) && m.attachments.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-border/40 space-y-1">
                           {m.attachments.map((a, i) => (
-                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground group">
                               <Paperclip className="w-3 h-3 flex-shrink-0" />
                               <span className="truncate">{a.name}</span>
                               {typeof a.size === "number" && (
                                 <span className="text-[10px]">({formatBytes(a.size)})</span>
+                              )}
+                              {a.path && selected && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteThreadAttachment(m.id, a, selected.id)}
+                                  className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive/80"
+                                  title="刪除附件"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                               )}
                             </div>
                           ))}
