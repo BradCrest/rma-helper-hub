@@ -680,6 +680,7 @@ const AwaitingConfirmationTab = () => {
                       subtitle="客戶不購買，原錶寄回"
                     />
                   </div>
+                  </>
                 )}
 
                 {/* 金額覆寫 */}
