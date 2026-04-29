@@ -690,6 +690,29 @@ const ReceivingTab = () => {
                 )}
               </div>
 
+              {/* Warranty Calculator — 序號自動解析批次 + 保固到期 */}
+              <WarrantyCalculator
+                serialNumber={selectedRma.serial_number}
+                productModel={selectedRma.product_model}
+                warrantyDate={selectedRma.warranty_date}
+                onApply={async (decision) => {
+                  if (!decision.expiry) return;
+                  try {
+                    const expiryStr = decision.expiry.toISOString().slice(0, 10);
+                    await supabase
+                      .from("rma_requests")
+                      .update({ warranty_date: expiryStr })
+                      .eq("id", selectedRma.id);
+                    toast.success(`已套用保固到期日：${expiryStr}`);
+                    setSelectedRma({ ...selectedRma, warranty_date: expiryStr });
+                    fetchRmaList();
+                  } catch (err) {
+                    console.error(err);
+                    toast.error("套用失敗");
+                  }
+                }}
+              />
+
               {/* Inspection Form */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
