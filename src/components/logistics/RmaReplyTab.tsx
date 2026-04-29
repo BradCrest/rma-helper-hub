@@ -687,6 +687,14 @@ ${draft.trim()}`;
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
                           <span className="truncate">{a.name}</span>
+                          {a.source === "library" && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 flex-shrink-0"
+                              title="來自檔案庫，Email 連結直接指向原檔（30 天內有效）"
+                            >
+                              檔案庫
+                            </span>
+                          )}
                           <span className="text-[10px] text-muted-foreground flex-shrink-0">
                             ({formatBytes(a.size)})
                           </span>
