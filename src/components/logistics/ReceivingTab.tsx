@@ -309,10 +309,23 @@ const ReceivingTab = () => {
     }
   };
 
-  // 系統依 warranty_date 判斷是否在保固內
-  const systemWithinWarranty = selectedRma
+  // 完整保固評估（序號 + warranty_date 綜合）
+  const warrantyDecision = selectedRma
+    ? evaluateWarranty({
+        serialNumber: selectedRma.serial_number,
+        productModel: selectedRma.product_model,
+        warrantyDate: selectedRma.warranty_date,
+      })
+    : null;
+
+  // 系統依完整評估判斷是否在保固內（優先使用 warrantyPolicy 模組結果）
+  const systemWithinWarranty = warrantyDecision
+    ? warrantyDecision.withinWarranty
+    : selectedRma
     ? isWithinWarranty(selectedRma.warranty_date)
     : false;
+
+  const isLegacyBatch = warrantyDecision?.isLegacyBatch ?? false;
 
   // 實際生效的保固判斷（含 admin 覆寫）
   const effectiveWithinWarranty =
@@ -327,6 +340,7 @@ const ReceivingTab = () => {
       serialNumber: selectedRma.serial_number,
       withinWarranty: within,
       diagnosis: selectedRma.initial_diagnosis,
+      isLegacyBatch,
     });
     return { subject, body };
   };
