@@ -28,6 +28,8 @@ interface UploadedAttachment {
   path: string;
   size: number;
   contentType?: string;
+  source?: "upload" | "library";
+  libraryFileId?: string;
 }
 
 interface ThreadAttachment {
@@ -310,8 +312,11 @@ const RmaReplyTab = () => {
   const handleRemoveAttachment = async (idx: number) => {
     const att = attachments[idx];
     if (!att) return;
-    // Best-effort cleanup; ignore errors
-    await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    // Only delete physical file for upload-source attachments. Library references
+    // must NOT delete the original file in the shared-library bucket.
+    if (att.source !== "library") {
+      await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    }
     setAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
@@ -321,49 +326,35 @@ const RmaReplyTab = () => {
       toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
       return;
     }
-    setUploadingFiles(true);
-    const uploaded: UploadedAttachment[] = [];
-    try {
-      for (const f of picked) {
-        try {
-          const { data: blob, error: dlErr } = await supabase.storage.from("shared-library").download(f.path);
-          if (dlErr || !blob) throw dlErr || new Error("下載失敗");
-          const safeName = f.file_name.replace(/[^\w.\-]+/g, "_");
-          const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from(ATTACHMENT_BUCKET)
-            .upload(path, blob, { contentType: f.content_type || undefined, upsert: false });
-          if (upErr) throw upErr;
-          uploaded.push({
-            name: f.name,
-            path,
-            size: f.size,
-            contentType: f.content_type || undefined,
-          });
-          // Best-effort: bump usage count
-          (async () => {
-            const { data: row } = await supabase
-              .from("shared_library_files")
-              .select("download_count")
-              .eq("id", f.id)
-              .maybeSingle();
-            await supabase
-              .from("shared_library_files")
-              .update({ download_count: (row?.download_count ?? 0) + 1 })
-              .eq("id", f.id);
-          })().catch(() => {});
-        } catch (e) {
-          toast.error(`從檔案庫加入失敗：${f.name} - ${e instanceof Error ? e.message : "未知錯誤"}`);
-        }
-      }
-      if (uploaded.length > 0) {
-        setAttachments((prev) => [...prev, ...uploaded]);
-        toast.success(`已從檔案庫加入 ${uploaded.length} 個附件`);
-      }
-    } finally {
-      setUploadingFiles(false);
+    // Library files are referenced by path — no copy/upload needed. The backend
+    // will issue a 30-day signed URL pointing to the original shared-library file.
+    const added: UploadedAttachment[] = picked.map((f) => ({
+      name: f.name,
+      path: f.path,
+      size: f.size,
+      contentType: f.content_type || undefined,
+      source: "library",
+      libraryFileId: f.id,
+    }));
+    setAttachments((prev) => [...prev, ...added]);
+    toast.success(`已從檔案庫加入 ${added.length} 個附件`);
+
+    // Best-effort: bump usage count for each picked file
+    for (const f of picked) {
+      (async () => {
+        const { data: row } = await supabase
+          .from("shared_library_files")
+          .select("download_count")
+          .eq("id", f.id)
+          .maybeSingle();
+        await supabase
+          .from("shared_library_files")
+          .update({ download_count: (row?.download_count ?? 0) + 1 })
+          .eq("id", f.id);
+      })().catch(() => {});
     }
   };
+
   const handleSend = async () => {
     if (!selected || !draft.trim() || !subject.trim()) return;
     if (!selected.customer_email) {
@@ -696,6 +687,14 @@ ${draft.trim()}`;
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                           <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
                           <span className="truncate">{a.name}</span>
+                          {a.source === "library" && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 flex-shrink-0"
+                              title="來自檔案庫，Email 連結直接指向原檔（30 天內有效）"
+                            >
+                              檔案庫
+                            </span>
+                          )}
                           <span className="text-[10px] text-muted-foreground flex-shrink-0">
                             ({formatBytes(a.size)})
                           </span>

@@ -11,12 +11,15 @@ const corsHeaders = {
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
 const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const ATTACHMENT_BUCKET = "rma-attachments";
+const LIBRARY_BUCKET = "shared-library";
 
 const AttachmentSchema = z.object({
   name: z.string().min(1).max(255),
   path: z.string().min(1).max(500),
   size: z.number().int().nonnegative().max(MAX_ATTACHMENT_SIZE),
   contentType: z.string().max(200).optional(),
+  source: z.enum(["upload", "library"]).default("upload"),
+  libraryFileId: z.string().uuid().optional(),
 });
 
 const BodySchema = z.object({
@@ -85,19 +88,46 @@ serve(async (req) => {
     }
     const { rmaRequestId, subject, body, attachments } = parsed.data;
 
-    // Validate attachment paths: must be scoped under rma-replies/{rmaRequestId}/
+    // Validate attachment paths per source:
+    //  - upload  → must be scoped under rma-replies/{rmaRequestId}/
+    //  - library → must exist in shared_library_files (path match)
     const expectedPrefix = `rma-replies/${rmaRequestId}/`;
+    const libraryPaths = attachments
+      .filter((a) => a.source === "library")
+      .map((a) => a.path);
+    let validLibraryPaths = new Set<string>();
+    if (libraryPaths.length > 0) {
+      const { data: libRows } = await admin
+        .from("shared_library_files")
+        .select("path")
+        .in("path", libraryPaths);
+      validLibraryPaths = new Set((libRows ?? []).map((r: any) => r.path));
+    }
     for (const a of attachments) {
-      if (!a.path.startsWith(expectedPrefix)) {
-        return new Response(
-          JSON.stringify({
-            error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+      if (a.source === "library") {
+        if (!validLibraryPaths.has(a.path)) {
+          return new Response(
+            JSON.stringify({
+              error: `檔案庫附件無效：${a.name}（檔案不存在或已刪除）`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
+      } else {
+        if (!a.path.startsWith(expectedPrefix)) {
+          return new Response(
+            JSON.stringify({
+              error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            },
+          );
+        }
       }
     }
 
@@ -139,6 +169,8 @@ serve(async (req) => {
       path: a.path,
       size: a.size,
       contentType: a.contentType ?? null,
+      source: a.source ?? "upload",
+      libraryFileId: a.libraryFileId ?? null,
       uploadedAt,
     }));
 
@@ -169,16 +201,18 @@ serve(async (req) => {
       );
     }
 
-    // Generate 30-day signed download URLs for each attachment
+    // Generate 30-day signed download URLs for each attachment.
+    // Library attachments sign against shared-library bucket (no copy made).
     const templateAttachments: Array<{ name: string; url: string; size: number }> = [];
     for (const a of attachments) {
+      const bucket = a.source === "library" ? LIBRARY_BUCKET : ATTACHMENT_BUCKET;
       const { data: signed, error: signErr } = await admin.storage
-        .from(ATTACHMENT_BUCKET)
+        .from(bucket)
         .createSignedUrl(a.path, SIGNED_URL_TTL_SECONDS, {
           download: a.name,
         });
       if (signErr || !signed?.signedUrl) {
-        console.error("signed url err:", a.path, signErr);
+        console.error("signed url err:", bucket, a.path, signErr);
         return new Response(
           JSON.stringify({
             error: `無法產生附件下載連結：${a.name}`,
