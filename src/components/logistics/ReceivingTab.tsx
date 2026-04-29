@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Search, Eye, CheckCircle, AlertCircle, Mail } from "lucide-react";
+import { Package, Search, Eye, CheckCircle, AlertCircle, Mail, Paperclip, X, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +74,44 @@ interface RepairDetail {
 const DIAGNOSIS_CATEGORIES = ["外觀損壞", "功能異常", "保固問題", "使用者疏失"];
 const ACTUAL_METHODS = ["維修", "換新", "退款", "不在保固內"];
 
+// Attachment config — must match send-rma-reply backend validation (rma-replies/{rmaId}/ prefix required)
+const ATTACHMENT_BUCKET = "rma-attachments";
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_EXTENSIONS = [
+  "jpg", "jpeg", "png", "heic", "webp",
+  "pdf", "doc", "docx", "xls", "xlsx", "zip",
+];
+
+interface UploadedAttachment {
+  name: string;
+  path: string;
+  size: number;
+  contentType?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx + 1).toLowerCase();
+}
+
+function sanitizeForKey(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const safeBase =
+    base.replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "file";
+  const safeExt = ext.replace(/[^\w.]+/g, "");
+  return `${safeBase}${safeExt}`.slice(0, 120);
+}
+
 const ReceivingTab = () => {
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +135,10 @@ const ReceivingTab = () => {
   // Notify customer dialog state
   const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [notifyAttachments, setNotifyAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const notifyFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     fetchRmaList();
@@ -287,6 +329,91 @@ const ReceivingTab = () => {
     return { subject, body };
   };
 
+  const handleAddNotifyAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !selectedRma) return;
+    const fileArr = Array.from(files);
+
+    if (notifyAttachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const safeName = sanitizeForKey(file.name);
+        const path = `rma-replies/${selectedRma.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+        });
+      }
+      if (uploaded.length > 0) {
+        setNotifyAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (notifyFileInputRef.current) notifyFileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveNotifyAttachment = async (idx: number) => {
+    const att = notifyAttachments[idx];
+    if (!att) return;
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    setNotifyAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Batch-remove all uploaded notify attachments. Supabase storage.remove accepts
+  // an array of paths — single awaited RPC that deletes all paths together.
+  const clearNotifyAttachments = async () => {
+    const paths = notifyAttachments.map((a) => a.path);
+    if (paths.length === 0) return;
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove(paths).catch(() => {});
+    setNotifyAttachments([]);
+  };
+
+  const handleNotifyDialogChange = async (open: boolean) => {
+    if (open) {
+      setNotifyDialogOpen(true);
+      return;
+    }
+    // Block close while sending, uploading, or cleaning up
+    if (notifying || cleaningUp || uploadingFiles) return;
+    if (notifyAttachments.length > 0) {
+      setCleaningUp(true);
+      try {
+        await clearNotifyAttachments();
+      } finally {
+        setCleaningUp(false);
+      }
+    }
+    setNotifyDialogOpen(false);
+  };
+
   const handleSendDiagnosisNotification = async () => {
     if (!selectedRma) return;
     setNotifying(true);
@@ -297,7 +424,7 @@ const ReceivingTab = () => {
           rmaRequestId: selectedRma.id,
           subject,
           body,
-          attachments: [],
+          attachments: notifyAttachments,
         },
       });
       if (error) throw error;
@@ -328,6 +455,8 @@ const ReceivingTab = () => {
         console.error("Status update failed:", statusErr);
       }
 
+      // Email sent — clear local state but DO NOT delete files (cleanup cron will handle)
+      setNotifyAttachments([]);
       setNotifyDialogOpen(false);
       setDialogOpen(false);
       fetchRmaList();
@@ -679,7 +808,7 @@ const ReceivingTab = () => {
       </Dialog>
 
       {/* Notify Customer Diagnosis Dialog */}
-      <AlertDialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
+      <AlertDialog open={notifyDialogOpen} onOpenChange={handleNotifyDialogChange}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -705,6 +834,65 @@ const ReceivingTab = () => {
 {buildDiagnosisEmail().body}
                 </pre>
               </div>
+              {/* Attachments */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5" />
+                    附件 {notifyAttachments.length > 0 && `(${notifyAttachments.length}/${MAX_ATTACHMENTS})`}
+                  </Label>
+                  <input
+                    ref={notifyFileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                    onChange={(e) => handleAddNotifyAttachments(e.target.files)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => notifyFileInputRef.current?.click()}
+                    disabled={uploadingFiles || notifying || cleaningUp || notifyAttachments.length >= MAX_ATTACHMENTS}
+                  >
+                    {uploadingFiles ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5 mr-1" />
+                    )}
+                    選擇檔案
+                  </Button>
+                </div>
+                {notifyAttachments.length > 0 && (
+                  <ul className="space-y-1 border rounded p-2 bg-muted/20">
+                    {notifyAttachments.map((a, idx) => (
+                      <li key={a.path} className="flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                          <span className="truncate">{a.name}</span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            ({formatBytes(a.size)})
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveNotifyAttachment(idx)}
+                          disabled={notifying || cleaningUp}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  最多 {MAX_ATTACHMENTS} 個檔案，單檔上限 25 MB。Email 內以下載連結呈現，30 天內有效。
+                </p>
+              </div>
+
               <p className="text-xs text-muted-foreground">
                 寄出後 RMA 狀態將自動切換為「聯繫客戶中」。
               </p>
@@ -712,13 +900,25 @@ const ReceivingTab = () => {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={notifying}>取消</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={notifying || cleaningUp || uploadingFiles}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNotifyDialogChange(false);
+              }}
+            >
+              {cleaningUp ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />清理中...</>
+              ) : (
+                "取消"
+              )}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
                 handleSendDiagnosisNotification();
               }}
-              disabled={notifying}
+              disabled={notifying || uploadingFiles || cleaningUp}
             >
               {notifying ? "寄送中..." : "確認寄出"}
             </AlertDialogAction>
