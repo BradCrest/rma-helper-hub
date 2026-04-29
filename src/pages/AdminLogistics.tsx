@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { LogOut, Home, Package, Phone, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail } from "lucide-react";
+import { LogOut, Home, Package, Phone, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
 import CustomerHandlingTab from "@/components/logistics/CustomerHandlingTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
+import RmaReplyTab from "@/components/logistics/RmaReplyTab";
 
 const AdminLogistics = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("email");
+  const [activeTab, setActiveTab] = useState("rma-reply");
 
   const handleSignOut = async () => {
     await signOut();
@@ -18,6 +19,7 @@ const AdminLogistics = () => {
   };
 
   const tabs = [
+    { id: "rma-reply", label: "RMA 回覆", icon: MessageSquareReply },
     { id: "email", label: "客戶來信", icon: Mail },
     { id: "receiving", label: "收件處理", icon: Package },
     { id: "customer", label: "客戶處理", icon: Phone },
@@ -71,6 +73,10 @@ const AdminLogistics = () => {
               </TabsTrigger>
             ))}
           </TabsList>
+
+          <TabsContent value="rma-reply" className="mt-0">
+            <RmaReplyTab />
+          </TabsContent>
 
           <TabsContent value="email" className="mt-0">
             <CustomerEmailTab />

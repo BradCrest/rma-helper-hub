@@ -88,3 +88,13 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+[functions.send-rma-reply]
+verify_jwt = true
+
+[functions.lookup-rma-reply-thread]
+verify_jwt = false
+
+[functions.submit-customer-reply]
+verify_jwt = false
+

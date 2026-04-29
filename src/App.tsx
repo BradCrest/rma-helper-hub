@@ -19,6 +19,7 @@ import AdminEmailKnowledge from "./pages/AdminEmailKnowledge";
 import RmaConfirmation from "./pages/RmaConfirmation";
 import RmaMultiConfirmation from "./pages/RmaMultiConfirmation";
 import Unsubscribe from "./pages/Unsubscribe";
+import RmaCustomerReply from "./pages/RmaCustomerReply";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -87,6 +88,7 @@ const App = () => (
               }
             />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/rma-reply/:token" element={<RmaCustomerReply />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
