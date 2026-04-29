@@ -1,75 +1,127 @@
 ## 目標
 
-Email 中從**檔案庫選擇**的附件改為「**直接連結存取**」（簽名 URL，有時效），不再複製到 `rma-attachments`。手動上傳的一次性附件維持原本流程。
+在「後勤管理 → 客戶來信」分頁，AI 完成草稿後，讓管理員可以**直接以 noreply 方式寄出回覆**，並支援：
+- 一次性附件上傳（最多 5 個、單檔 ≤25MB）
+- 從**常用檔案庫**選擇附件（直接連結、不複製檔案）
+
+附件規則、簽名 URL（30 天）、檔案庫 badge、刪除行為，全部沿用 RMA 回覆既有實作。
 
 ---
 
-## 現況回顧
+## 與 RMA 回覆的差異
 
-目前在 `RmaReplyTab.tsx`，使用者按「檔案庫」選擇檔案後：
-1. 從 `shared-library` bucket 下載 Blob
-2. 重新上傳一份到 `rma-attachments/rma-replies/{rmaId}/`
-3. `send-rma-reply` 為這份複本產生 30 天簽名 URL，寫入 email
-
-問題：
-- 檔案被複製多份，浪費儲存空間
-- 90 天清理機制會把複本刪掉，但**原檔還在檔案庫**，造成重複管理
-- 大檔案上傳/下載一次很慢
-
----
-
-## 新行為（區分兩種附件）
-
-| 類型 | Source | Email 連結 | 儲存位置 | 過期後 |
-|---|---|---|---|---|
-| 一次性上傳 | `rma-attachments` | 30 天簽名 URL | `rma-replies/{rmaId}/` | 連結失效，檔案待 90 天自動清 |
-| 檔案庫引用 | `shared-library` | 30 天簽名 URL（指向原檔） | `shared-library/`（原位） | 連結失效，原檔保留 |
-
-兩者**對客戶體驗一致**：點連結即下載；過期則需請管理員重發 email。差別僅在後端不複製。
+| 項目 | RMA 回覆 | 客戶來信回覆（新） |
+|---|---|---|
+| 收件人來源 | RMA 紀錄上的 `customer_email` | 直接從 Gmail 信件 `from` 解析 |
+| 主旨預設值 | 管理員自填 | 預設 `Re: {原信主旨}` |
+| 客戶端追蹤連結 | 30 天 reply token，存 `rma_thread_messages` | **不需要**：純單向回信，沒有 thread 追蹤 |
+| RMA 編號 | 必有 | 偵測到才帶（detectedRma） |
+| 附件儲存路徑 | `rma-attachments/rma-replies/{rmaId}/...` | `rma-attachments/email-replies/{gmailMessageId}/...` |
+| 模板 | `rma-reply` | 新增 `customer-email-reply`（簡化版，無 reply CTA） |
 
 ---
 
 ## 實作步驟
 
-### 1. 前端 `RmaReplyTab.tsx` — 改寫「檔案庫」插入邏輯
-- 移除 download → re-upload 流程
-- 直接把選中的檔案以「library reference」型別加進附件清單，attachment 物件新增 `source: "library"` + `libraryFileId`、`path` 改填 library 路徑（例如 `library:{path}`）
-- UI 上以 badge 標示「檔案庫」以便管理員識別（hover 時提示「過期後仍可重新寄送」）
-- 仍呼叫 `increment download_count`（best-effort）
+### 1. 新增 Edge Function：`send-customer-email-reply`
 
-### 2. 後端 `send-rma-reply/index.ts` — 支援雙來源簽名
-- 擴充 `AttachmentSchema`：新增 `source: z.enum(["upload", "library"]).default("upload")`
-- 路徑驗證分流：
-  - `source === "upload"` → 必須 `rma-replies/{rmaRequestId}/...`（維持現狀）
-  - `source === "library"` → 比對 `shared_library_files` 表中存在該路徑（防止偽造）
-- 簽名 URL 產生：
-  - upload → `admin.storage.from("rma-attachments").createSignedUrl(...)`
-  - library → `admin.storage.from("shared-library").createSignedUrl(path, 30天, { download: name })`
-- `attachments` JSONB 寫入時把 `source` 一併保存，方便日後 UI 顯示與重發
+直接以 `send-rma-reply` 為藍本複製改寫，重點差異：
+- 入參：`{ gmailMessageId, recipientEmail, recipientName?, subject, body, rmaNumber?, attachments[] }`
+- 驗證身份：admin / super_admin
+- 附件路徑驗證：
+  - `source: "upload"` → 必須在 `email-replies/{gmailMessageId}/` 下
+  - `source: "library"` → 比對 `shared_library_files.path` 確認存在（沿用 RMA 邏輯）
+- 簽名 URL：`upload` 用 `rma-attachments` bucket、`library` 用 `shared-library` bucket，皆 30 天
+- 不寫 `rma_thread_messages`（沒有 reply token / thread）；只透過 `send-transactional-email` 寄送
+- `idempotencyKey`: `customer-email-reply-{gmailMessageId}-{timestamp}`，並在 metadata 寫入 `gmail_message_id` 方便日後追查
 
-### 3. 清理機制不需動
-- `cleanup-rma-attachments` 僅針對 `rma-attachments` bucket，library 引用本來就不會被誤刪
-- 唯一注意：若管理員從檔案庫**刪除原檔**，舊 email 連結會失效。這是預期行為（與檔案被刪除的語意一致）。可在 `SharedLibrarySettings` 刪除前加提示：「此檔案可能被歷史 RMA email 引用，刪除後相關連結將失效」
+### 2. 新增 Email 模板：`customer-email-reply.tsx`
 
-### 4. UI 細節
-- `RmaReplyTab` 附件清單：library 來源以藍色 badge `檔案庫`；upload 來源無 badge
-- 附件移除：library 來源「移除」只是從這封 email 移除引用，不會刪原檔；upload 來源維持現有行為
-- Reply 歷史顯示：library 附件一樣可下載（透過簽名 URL，過期後顯示「連結已過期」）
+放在 `supabase/functions/_shared/transactional-email-templates/`：
+- Props: `subject`, `customerName`, `replyBody`, `rmaNumber?`, `attachments?: {name,url,size}[]`
+- 排版沿用 `rma-reply.tsx` 的視覺風格（白底、品牌色、附件以下載按鈕呈現）
+- **不含 reply CTA 按鈕**（這封是 noreply 單向回覆）
+- 註冊到 `registry.ts`
+
+### 3. 改 `CustomerEmailTab.tsx` 草稿區下方新增「寄出區塊」
+
+在現有 `draft` textarea 下方加入：
+
+```text
+┌─ 寄出回覆 ──────────────────────────────┐
+│ 收件人：jane@example.com (Jane Doe)      │
+│ 主旨：[Re: 原主旨............]           │
+│ ─ 附件（最多 5 個） ────────────────     │
+│ [📎 上傳檔案] [📚 從檔案庫選擇]          │
+│ • invoice.pdf  120KB  [檔案庫] [移除]   │
+│ • photo.jpg    2.1MB           [移除]    │
+│ ─────────────────────────────────────    │
+│              [取消]  [📧 以 noreply 寄出] │
+└──────────────────────────────────────────┘
+```
+
+行為細節（沿用 RMA 回覆）：
+- 上傳：`supabase.storage.from("rma-attachments").upload("email-replies/{gmailMessageId}/{uuid}-{name}", file)`
+- 從檔案庫選：用既有 `<SharedLibraryPicker>`，加入時只存 reference（`source: "library"`, `libraryFileId`, library `path`），同時 best-effort `increment download_count`
+- 移除：`upload` 來源同步刪 storage；`library` 來源僅從清單移除
+- 大小/數量限制：5 個、單檔 25MB、總和不顯示（與 RMA 一致）
+- UI badge：library 來源顯示藍色 "檔案庫"
+- 寄出按鈕：呼叫 `send-customer-email-reply`，成功後 toast 並把附件清單清空、按鈕鎖定避免重複寄送
+
+可以把 RMA 回覆裡的附件區塊抽成共用 component（`<ReplyAttachmentList>`）以避免重複，或直接複製貼上後續再重構——建議**先複製貼上**完成功能，之後若有第三處再抽。
+
+### 4. 狀態管理
+
+`CustomerEmailTab` 新增 state：
+- `replySubject`（預設 `Re: {detail.subject}`，可編輯）
+- `attachments: UploadedAttachment[]`
+- `uploadingFiles: boolean`
+- `sending: boolean`
+- `libraryPickerOpen: boolean`
+
+選新信件時重置這些 state（在 `loadDetail` 開頭已做 reset 模式，新增到 reset 邏輯中）。
+
+### 5. 不需要的東西
+
+- ❌ 不需要新的 storage bucket（重用 `rma-attachments`，只是路徑前綴改成 `email-replies/`）
+- ❌ 不需要 migration（沒有新表）
+- ❌ 不需要新的 secret
+- ❌ 不需要 reply token / thread 紀錄
+
+### 6. RLS / Storage policy
+
+`rma-attachments` 既有 RLS 應已允許 admin 上傳到任意路徑；新前綴 `email-replies/` 只要 policy 是 `is_admin(auth.uid())` 而非綁 RMA id 就直接適用。實作時會先 `supabase--read_query` 確認，若 policy 寫死了 `rma-replies/` 前綴則需新增一條 policy（最小變動）。
+
+### 7. 自動清理（與既有機制相容）
+
+`cleanup-rma-attachments` Edge Function 目前只清「已 completed 90 天」的 RMA 附件（按 RMA 狀態過濾）。`email-replies/` 下的檔案不在那個清理範圍內，會永久留存。
+
+如果要清理 email-replies 也可加進排程，但**先不做**，等使用後再依量決定（可在後續加一個「90 天前的 email-replies/」周期清理）。
 
 ---
 
-## 需要修改的檔案
+## 驗收清單
 
-- `src/components/logistics/RmaReplyTab.tsx` — 改寫檔案庫插入流程、UI badge
-- `src/components/admin/SharedLibrarySettings.tsx` — 刪除前警告
-- `supabase/functions/send-rma-reply/index.ts` — schema、雙來源簽名
-
-不需要新的 migration、不需要新的 bucket、不需要新的 secret。
+- [ ] AI 草稿產生後，下方出現「寄出回覆」區塊，自動帶入收件人與 Re: 主旨
+- [ ] 可上傳最多 5 個附件，超過上限或大小有清楚錯誤提示
+- [ ] 可從檔案庫挑選，list 顯示「檔案庫」badge，移除不會刪原檔
+- [ ] 點「以 noreply 寄出」收到信，附件下載連結可用、30 天後失效
+- [ ] 客戶端收到的信件 From 為 noreply@notify.crestdiving.com（沿用 transactional 設定），不含 reply CTA
+- [ ] 寄出失敗時 toast 顯示後端錯誤訊息（不要吞錯誤）
+- [ ] 切換到另一封信時，附件清單與寄出狀態會重置
 
 ---
 
-## 風險與權衡
+## 修改的檔案
 
-- **優點**：節省儲存、上傳快、檔案庫成為單一真實來源
-- **限制**：管理員若刪除 library 原檔，過往 email 連結會失效（會在 UI 加警告）
-- **安全**：簽名 URL 仍有 30 天時效；後端會驗證 library 路徑確實存在於 `shared_library_files`，避免被偽造任意 storage 路徑
+新增：
+- `supabase/functions/send-customer-email-reply/index.ts`
+- `supabase/functions/_shared/transactional-email-templates/customer-email-reply.tsx`
+
+修改：
+- `supabase/functions/_shared/transactional-email-templates/registry.ts`（註冊新模板）
+- `src/components/logistics/CustomerEmailTab.tsx`（新增寄出區塊與相關 handlers）
+- `mem://features/shared-library`（補一行：客戶來信回覆也支援檔案庫引用）
+
+可選（後續視重複程度再做）：
+- 抽出 `src/components/logistics/ReplyAttachmentList.tsx` 共用元件
