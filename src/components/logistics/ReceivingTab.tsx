@@ -253,6 +253,91 @@ const ReceivingTab = () => {
     }
   };
 
+  // Build diagnosis notification email from saved values only
+  const buildDiagnosisEmail = () => {
+    if (!selectedRma) return { subject: "", body: "" };
+    const subject = `[${selectedRma.rma_number}] 產品檢測結果與處理方式確認`;
+    const productLine = [selectedRma.product_name, selectedRma.product_model]
+      .filter(Boolean)
+      .join(" ");
+    const category = selectedRma.diagnosis_category || "未分類";
+    const diagnosis = selectedRma.initial_diagnosis || "（尚未填寫）";
+    const method =
+      repairDetail?.actual_method ||
+      repairDetail?.planned_method ||
+      "待確認";
+    const cost =
+      repairDetail?.estimated_cost != null
+        ? `NT$ ${repairDetail.estimated_cost}`
+        : "待報價";
+
+    const body = `您好 ${selectedRma.customer_name}，
+
+您的產品 ${productLine} 已完成初步檢測，結果如下：
+
+【診斷分類】${category}
+【診斷描述】${diagnosis}
+【建議處理方式】${method}
+【預估費用】${cost}
+
+請點擊下方「填寫我的回覆」按鈕確認您是否同意進行此處理方式，
+或回覆任何疑問，我們會儘速為您處理。
+
+謝謝您！`;
+    return { subject, body };
+  };
+
+  const handleSendDiagnosisNotification = async () => {
+    if (!selectedRma) return;
+    setNotifying(true);
+    try {
+      const { subject, body } = buildDiagnosisEmail();
+      const { data, error } = await supabase.functions.invoke("send-rma-reply", {
+        body: {
+          rmaRequestId: selectedRma.id,
+          subject,
+          body,
+          attachments: [],
+        },
+      });
+      if (error) throw error;
+      const result = data as any;
+      if (result?.error) throw new Error(result.error);
+      toast.success(`已寄出診斷通知給 ${selectedRma.customer_email}`);
+
+      // Auto-update status to contacting
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-rma-status`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                rma_id: selectedRma.id,
+                new_status: "contacting",
+              }),
+            }
+          );
+        }
+      } catch (statusErr) {
+        console.error("Status update failed:", statusErr);
+      }
+
+      setNotifyDialogOpen(false);
+      setDialogOpen(false);
+      fetchRmaList();
+    } catch (e: any) {
+      toast.error("寄送失敗：" + (e?.message || ""));
+    } finally {
+      setNotifying(false);
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
       shipped: "已寄出",
