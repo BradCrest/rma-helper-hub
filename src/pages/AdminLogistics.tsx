@@ -7,6 +7,7 @@ import ReceivingTab from "@/components/logistics/ReceivingTab";
 import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmationTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 import RmaReplyTab from "@/components/logistics/RmaReplyTab";
+import StatusMapDialog from "@/components/logistics/StatusMapDialog";
 
 const AdminLogistics = () => {
   const { user, signOut } = useAuth();
@@ -44,6 +45,7 @@ const AdminLogistics = () => {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">{user?.email}</span>
+              <StatusMapDialog />
               <Link to="/" className="rma-btn-secondary text-sm">
                 <Home className="w-4 h-4" />
                 首頁
