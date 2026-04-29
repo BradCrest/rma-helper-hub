@@ -563,6 +563,7 @@ export type Database = {
           customer_phone: string
           customer_type: string | null
           diagnosis_category: string | null
+          has_unread_customer_reply: boolean
           id: string
           initial_diagnosis: string | null
           issue_description: string
@@ -595,6 +596,7 @@ export type Database = {
           customer_phone: string
           customer_type?: string | null
           diagnosis_category?: string | null
+          has_unread_customer_reply?: boolean
           id?: string
           initial_diagnosis?: string | null
           issue_description: string
@@ -627,6 +629,7 @@ export type Database = {
           customer_phone?: string
           customer_type?: string | null
           diagnosis_category?: string | null
+          has_unread_customer_reply?: boolean
           id?: string
           initial_diagnosis?: string | null
           issue_description?: string
@@ -800,6 +803,75 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "rma_supplier_repairs_rma_request_id_fkey"
+            columns: ["rma_request_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rma_thread_messages: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          direction: string
+          from_email: string | null
+          from_name: string | null
+          gmail_message_id: string | null
+          id: string
+          parent_message_id: string | null
+          read_by_admin_at: string | null
+          reply_token: string | null
+          reply_token_expires_at: string | null
+          reply_token_used_at: string | null
+          rma_request_id: string
+          subject: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          direction: string
+          from_email?: string | null
+          from_name?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          parent_message_id?: string | null
+          read_by_admin_at?: string | null
+          reply_token?: string | null
+          reply_token_expires_at?: string | null
+          reply_token_used_at?: string | null
+          rma_request_id: string
+          subject?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          direction?: string
+          from_email?: string | null
+          from_name?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          parent_message_id?: string | null
+          read_by_admin_at?: string | null
+          reply_token?: string | null
+          reply_token_expires_at?: string | null
+          reply_token_used_at?: string | null
+          rma_request_id?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_thread_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "rma_thread_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rma_thread_messages_rma_request_id_fkey"
             columns: ["rma_request_id"]
             isOneToOne: false
             referencedRelation: "rma_requests"
