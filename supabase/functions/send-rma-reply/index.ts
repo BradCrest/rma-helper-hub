@@ -11,12 +11,15 @@ const corsHeaders = {
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
 const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const ATTACHMENT_BUCKET = "rma-attachments";
+const LIBRARY_BUCKET = "shared-library";
 
 const AttachmentSchema = z.object({
   name: z.string().min(1).max(255),
   path: z.string().min(1).max(500),
   size: z.number().int().nonnegative().max(MAX_ATTACHMENT_SIZE),
   contentType: z.string().max(200).optional(),
+  source: z.enum(["upload", "library"]).default("upload"),
+  libraryFileId: z.string().uuid().optional(),
 });
 
 const BodySchema = z.object({
