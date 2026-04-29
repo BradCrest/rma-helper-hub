@@ -16,11 +16,25 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'CREST 保固服務'
 
+interface AttachmentEntry {
+  name: string
+  url: string
+  size?: number
+}
+
 interface RmaReplyProps {
   customerName?: string
   rmaNumber?: string
   replyBody?: string
   replyUrl?: string
+  attachments?: AttachmentEntry[]
+}
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const RmaReplyEmail = ({
@@ -28,6 +42,7 @@ const RmaReplyEmail = ({
   rmaNumber = '',
   replyBody = '',
   replyUrl = '',
+  attachments = [],
 }: RmaReplyProps) => (
   <Html lang="zh-Hant" dir="ltr">
     <Head />
