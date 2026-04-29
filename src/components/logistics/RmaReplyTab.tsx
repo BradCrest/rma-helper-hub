@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,42 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+const ATTACHMENT_BUCKET = "rma-attachments";
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_EXTENSIONS = [
+  "jpg", "jpeg", "png", "heic", "webp",
+  "pdf", "doc", "docx", "xls", "xlsx", "zip",
+];
+
+interface UploadedAttachment {
+  name: string;
+  path: string;
+  size: number;
+  contentType?: string;
+}
+
+interface ThreadAttachment {
+  name: string;
+  path?: string;
+  size?: number;
+  contentType?: string | null;
+  uploadedAt?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx + 1).toLowerCase();
+}
+
 
 interface RmaRow {
   id: string;
@@ -34,6 +70,7 @@ interface ThreadMsg {
   body: string;
   created_at: string;
   reply_token_used_at: string | null;
+  attachments: ThreadAttachment[];
 }
 
 const statusLabel: Record<string, string> = {
@@ -66,6 +103,10 @@ const RmaReplyTab = () => {
   const [copied, setCopied] = useState(false);
   const [ragInfo, setRagInfo] = useState<{ model?: string; ragCount?: number } | null>(null);
 
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const selected = rmas.find((r) => r.id === selectedId) || null;
 
   const loadRmas = useCallback(async () => {
@@ -90,11 +131,11 @@ const RmaReplyTab = () => {
     setThreadLoading(true);
     const { data, error } = await supabase
       .from("rma_thread_messages")
-      .select("id, direction, subject, body, created_at, reply_token_used_at")
+      .select("id, direction, subject, body, created_at, reply_token_used_at, attachments")
       .eq("rma_request_id", rmaId)
       .order("created_at", { ascending: true });
     if (error) toast.error("讀取對話失敗：" + error.message);
-    else setThread((data || []) as ThreadMsg[]);
+    else setThread((data || []) as unknown as ThreadMsg[]);
     setThreadLoading(false);
   }, []);
 
@@ -105,6 +146,7 @@ const RmaReplyTab = () => {
     setSubject(`Re: [${selected.rma_number}] 您的維修申請進度回覆`);
     setDraft("");
     setRagInfo(null);
+    setAttachments([]);
 
     if (selected.has_unread_customer_reply) {
       supabase
@@ -161,13 +203,72 @@ const RmaReplyTab = () => {
     }
   };
 
+  const handleAddAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !selected) return;
+    const fileArr = Array.from(files);
+
+    if (attachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+        });
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (idx: number) => {
+    const att = attachments[idx];
+    if (!att) return;
+    // Best-effort cleanup; ignore errors
+    await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSend = async () => {
     if (!selected || !draft.trim() || !subject.trim()) return;
     if (!selected.customer_email) {
       toast.error("此 RMA 沒有客戶 Email，無法寄送");
       return;
     }
-    if (!confirm(`確定要寄送回覆給 ${selected.customer_email} 嗎？`)) return;
+    const attachmentNote = attachments.length > 0 ? `（含 ${attachments.length} 個附件）` : "";
+    if (!confirm(`確定要寄送回覆給 ${selected.customer_email} 嗎？${attachmentNote}`)) return;
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("send-rma-reply", {
@@ -175,6 +276,7 @@ const RmaReplyTab = () => {
           rmaRequestId: selected.id,
           subject: subject.trim(),
           body: draft.trim(),
+          attachments,
         },
       });
       if (error) throw error;
@@ -182,6 +284,7 @@ const RmaReplyTab = () => {
       if (result?.error) throw new Error(result.error);
       toast.success("已寄出回覆");
       setDraft("");
+      setAttachments([]);
       await loadThread(selected.id);
     } catch (e: any) {
       toast.error("寄送失敗：" + (e?.message || ""));
@@ -374,6 +477,19 @@ ${draft.trim()}`;
                       </div>
                       {m.subject && <div className="font-medium text-xs mb-1">{m.subject}</div>}
                       <div className="whitespace-pre-wrap">{m.body}</div>
+                      {Array.isArray(m.attachments) && m.attachments.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-border/40 space-y-1">
+                          {m.attachments.map((a, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Paperclip className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{a.name}</span>
+                              {typeof a.size === "number" && (
+                                <span className="text-[10px]">({formatBytes(a.size)})</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -415,6 +531,68 @@ ${draft.trim()}`;
                 className="font-mono text-sm"
               />
 
+              {/* Attachments */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5" />
+                    附件 {attachments.length > 0 && `(${attachments.length}/${MAX_ATTACHMENTS})`}
+                  </Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                    onChange={(e) => handleAddAttachments(e.target.files)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                  >
+                    {uploadingFiles ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5" />
+                    )}
+                    加入附件
+                  </Button>
+                </div>
+                {attachments.length > 0 && (
+                  <ul className="space-y-1 border rounded p-2 bg-muted/20">
+                    {attachments.map((a, idx) => (
+                      <li
+                        key={a.path}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                          <span className="truncate">{a.name}</span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            ({formatBytes(a.size)})
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveAttachment(idx)}
+                          disabled={sending}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  最多 {MAX_ATTACHMENTS} 個檔案，單檔上限 25 MB。Email 內以下載連結呈現，30 天內有效。
+                </p>
+              </div>
+
               {!selected.customer_email && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
                   <AlertCircle className="w-4 h-4" />
@@ -431,7 +609,7 @@ ${draft.trim()}`;
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   存入知識庫
                 </Button>
-                <Button size="sm" onClick={handleSend} disabled={sending || !draft || !subject || !selected.customer_email}>
+                <Button size="sm" onClick={handleSend} disabled={sending || uploadingFiles || !draft || !subject || !selected.customer_email}>
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   寄出回覆
                 </Button>

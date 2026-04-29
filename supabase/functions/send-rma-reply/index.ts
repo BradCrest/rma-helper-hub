@@ -8,10 +8,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const ATTACHMENT_BUCKET = "rma-attachments";
+
+const AttachmentSchema = z.object({
+  name: z.string().min(1).max(255),
+  path: z.string().min(1).max(500),
+  size: z.number().int().nonnegative().max(MAX_ATTACHMENT_SIZE),
+  contentType: z.string().max(200).optional(),
+});
+
 const BodySchema = z.object({
   rmaRequestId: z.string().uuid(),
   subject: z.string().min(1).max(500),
   body: z.string().min(1).max(20000),
+  attachments: z.array(AttachmentSchema).max(5).default([]),
 });
 
 // Always use the published public domain so the reply link is not gated
@@ -71,7 +83,23 @@ serve(async (req) => {
         },
       );
     }
-    const { rmaRequestId, subject, body } = parsed.data;
+    const { rmaRequestId, subject, body, attachments } = parsed.data;
+
+    // Validate attachment paths: must be scoped under rma-replies/{rmaRequestId}/
+    const expectedPrefix = `rma-replies/${rmaRequestId}/`;
+    for (const a of attachments) {
+      if (!a.path.startsWith(expectedPrefix)) {
+        return new Response(
+          JSON.stringify({
+            error: `附件路徑無效：${a.name}（必須屬於本筆 RMA）`,
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
 
     // Fetch RMA
     const { data: rma, error: rmaErr } = await admin
@@ -104,6 +132,16 @@ serve(async (req) => {
     ).toISOString();
     const replyUrl = `${PUBLIC_BASE_URL}/rma-reply/${replyToken}`;
 
+    // Build attachment metadata to persist (without signed URLs — those expire)
+    const uploadedAt = new Date().toISOString();
+    const attachmentMetadata = attachments.map((a) => ({
+      name: a.name,
+      path: a.path,
+      size: a.size,
+      contentType: a.contentType ?? null,
+      uploadedAt,
+    }));
+
     // Insert thread message FIRST so we have an id for idempotency
     const { data: inserted, error: insErr } = await admin
       .from("rma_thread_messages")
@@ -116,6 +154,7 @@ serve(async (req) => {
         reply_token_expires_at: expiresAt,
         created_by: user.id,
         from_email: user.email,
+        attachments: attachmentMetadata,
       })
       .select("id")
       .single();
@@ -129,6 +168,34 @@ serve(async (req) => {
         },
       );
     }
+
+    // Generate 30-day signed download URLs for each attachment
+    const templateAttachments: Array<{ name: string; url: string; size: number }> = [];
+    for (const a of attachments) {
+      const { data: signed, error: signErr } = await admin.storage
+        .from(ATTACHMENT_BUCKET)
+        .createSignedUrl(a.path, SIGNED_URL_TTL_SECONDS, {
+          download: a.name,
+        });
+      if (signErr || !signed?.signedUrl) {
+        console.error("signed url err:", a.path, signErr);
+        return new Response(
+          JSON.stringify({
+            error: `無法產生附件下載連結：${a.name}`,
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+      templateAttachments.push({
+        name: a.name,
+        url: signed.signedUrl,
+        size: a.size,
+      });
+    }
+
 
     // Send via the transactional email system (noreply@notify.crestdiving.com)
     // Call via fetch directly so we can forward the user's JWT (admin.functions.invoke
@@ -152,6 +219,7 @@ serve(async (req) => {
             rmaNumber: rma.rma_number,
             replyBody: body,
             replyUrl,
+            attachments: templateAttachments,
           },
         }),
       },

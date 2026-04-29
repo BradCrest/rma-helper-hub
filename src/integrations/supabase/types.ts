@@ -812,6 +812,7 @@ export type Database = {
       }
       rma_thread_messages: {
         Row: {
+          attachments: Json
           body: string
           created_at: string
           created_by: string | null
@@ -829,6 +830,7 @@ export type Database = {
           subject: string | null
         }
         Insert: {
+          attachments?: Json
           body: string
           created_at?: string
           created_by?: string | null
@@ -846,6 +848,7 @@ export type Database = {
           subject?: string | null
         }
         Update: {
+          attachments?: Json
           body?: string
           created_at?: string
           created_by?: string | null

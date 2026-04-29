@@ -16,11 +16,25 @@ import type { TemplateEntry } from './registry.ts'
 
 const SITE_NAME = 'CREST 保固服務'
 
+interface AttachmentEntry {
+  name: string
+  url: string
+  size?: number
+}
+
 interface RmaReplyProps {
   customerName?: string
   rmaNumber?: string
   replyBody?: string
   replyUrl?: string
+  attachments?: AttachmentEntry[]
+}
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const RmaReplyEmail = ({
@@ -28,6 +42,7 @@ const RmaReplyEmail = ({
   rmaNumber = '',
   replyBody = '',
   replyUrl = '',
+  attachments = [],
 }: RmaReplyProps) => (
   <Html lang="zh-Hant" dir="ltr">
     <Head />
@@ -46,6 +61,27 @@ const RmaReplyEmail = ({
         <Section style={replyBox}>
           <Text style={replyText}>{replyBody}</Text>
         </Section>
+
+        {attachments && attachments.length > 0 ? (
+          <Section style={attachmentBox}>
+            <Text style={attachmentTitle}>
+              📎 附件（{attachments.length}）
+            </Text>
+            {attachments.map((a, idx) => (
+              <Section key={idx} style={attachmentRow}>
+                <Link href={a.url} style={attachmentLink}>
+                  📄 {a.name}
+                </Link>
+                {a.size ? (
+                  <Text style={attachmentSize}>{formatBytes(a.size)}</Text>
+                ) : null}
+              </Section>
+            ))}
+            <Text style={attachmentNote}>
+              附件下載連結 30 天內有效。
+            </Text>
+          </Section>
+        ) : null}
 
         {replyUrl ? (
           <>
@@ -89,8 +125,20 @@ export const template = {
     customerName: '王小明',
     rmaNumber: 'RC7EA059461',
     replyBody:
-      '您好，您的產品已收到，初步檢測為防水墊圈老化，預計 3 個工作天內完成更換並回寄。',
+      '您好，您的產品已收到，初步檢測為防水墊圈老化，預計 3 個工作天內完成更換並回寄。隨信附上維修報價單供您參考。',
     replyUrl: 'https://rma-helper-hub.lovable.app/rma-reply/sample-token',
+    attachments: [
+      {
+        name: '維修報價單.pdf',
+        url: 'https://example.com/sample-quote.pdf',
+        size: 124000,
+      },
+      {
+        name: '產品檢測照片.jpg',
+        url: 'https://example.com/sample-photo.jpg',
+        size: 856000,
+      },
+    ],
   },
 } satisfies TemplateEntry
 
@@ -152,3 +200,34 @@ const smallText = {
 const hr = { border: 'none', borderTop: '1px solid #e5e7eb', margin: '24px 0' }
 const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px' }
 const footer = { fontSize: '13px', color: '#6b7280', margin: '8px 0 0' }
+const attachmentBox = {
+  background: '#f1f5f9',
+  border: '1px solid #e2e8f0',
+  padding: '14px 18px',
+  margin: '0 0 24px',
+  borderRadius: '6px',
+}
+const attachmentTitle = {
+  fontSize: '13px',
+  fontWeight: 600 as const,
+  color: '#0f172a',
+  margin: '0 0 10px',
+}
+const attachmentRow = { margin: '0 0 6px' }
+const attachmentLink = {
+  fontSize: '14px',
+  color: '#3B82F6',
+  textDecoration: 'none',
+  fontWeight: 500 as const,
+  wordBreak: 'break-all' as const,
+}
+const attachmentSize = {
+  fontSize: '11px',
+  color: '#94a3b8',
+  margin: '2px 0 0 20px',
+}
+const attachmentNote = {
+  fontSize: '11px',
+  color: '#94a3b8',
+  margin: '8px 0 0',
+}
