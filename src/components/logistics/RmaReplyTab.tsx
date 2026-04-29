@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Search, RefreshCw, Sparkles, Send, Save, Copy, Check,
-  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText,
+  Loader2, MailOpen, Inbox, AlertCircle, Paperclip, X, FileText, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
