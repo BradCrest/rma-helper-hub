@@ -676,6 +676,54 @@ const ReceivingTab = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Notify Customer Diagnosis Dialog */}
+      <AlertDialog open={notifyDialogOpen} onOpenChange={setNotifyDialogOpen}>
+        <AlertDialogContent className="max-w-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              寄送診斷通知給客戶
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              以下內容讀取自<strong>已儲存</strong>的資料。如有修改未儲存，請先取消並按「儲存記錄」。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {selectedRma && (
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-[80px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
+                <span className="text-muted-foreground">收件人</span>
+                <span className="font-mono">{selectedRma.customer_email}</span>
+                <span className="text-muted-foreground">主旨</span>
+                <span className="font-medium">{buildDiagnosisEmail().subject}</span>
+              </div>
+              <div>
+                <p className="text-muted-foreground mb-1">信件內容預覽</p>
+                <pre className="whitespace-pre-wrap text-xs p-3 bg-muted/30 rounded-lg border border-border max-h-64 overflow-y-auto font-sans">
+{buildDiagnosisEmail().body}
+                </pre>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                寄出後 RMA 狀態將自動切換為「聯繫客戶中」。
+              </p>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={notifying}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleSendDiagnosisNotification();
+              }}
+              disabled={notifying}
+            >
+              {notifying ? "寄送中..." : "確認寄出"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
