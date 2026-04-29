@@ -364,8 +364,7 @@ const RmaReplyTab = () => {
       setUploadingFiles(false);
     }
   };
-
-
+  const handleSend = async () => {
     if (!selected || !draft.trim() || !subject.trim()) return;
     if (!selected.customer_email) {
       toast.error("此 RMA 沒有客戶 Email，無法寄送");
