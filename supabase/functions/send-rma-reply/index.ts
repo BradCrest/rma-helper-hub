@@ -127,8 +127,10 @@ serve(async (req) => {
     const replyToken = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const origin = req.headers.get("origin") || "https://rma-helper-hub.lovable.app";
-    const replyUrl = `${origin}/rma-reply/${replyToken}`;
+    // Always use the published public domain so the link is not gated behind
+    // Lovable's preview-environment login. (Update if a custom domain is set.)
+    const PUBLIC_BASE_URL = "https://rma-helper-hub.lovable.app";
+    const replyUrl = `${PUBLIC_BASE_URL}/rma-reply/${replyToken}`;
 
     const customerName = rma.customer_name || "客戶";
     const textBody =
@@ -139,7 +141,7 @@ serve(async (req) => {
 ${body}
 
 ——
-若您想針對這個回覆做出進一步說明或追問，請點擊下方連結填寫：
+若您針對這個回覆有進一步的疑問或說明，請點擊下方連結填寫：
 ${replyUrl}
 （連結 30 天內有效，僅可使用一次）
 
@@ -150,7 +152,7 @@ CREST 客服團隊`;
 <p>您好 ${escapeHtml(customerName)}，</p>
 <p>關於您的維修申請 <strong>${escapeHtml(rma.rma_number)}</strong>，我們的回覆如下：</p>
 <div style="background:#f9fafb;border-left:4px solid #3b82f6;padding:16px 20px;margin:16px 0;white-space:pre-wrap;">${escapeHtml(body)}</div>
-<p style="margin-top:24px;">若您想針對這個回覆做出進一步說明或追問，請點擊下方按鈕：</p>
+<p style="margin-top:24px;">若您針對這個回覆有進一步的疑問或說明，請點擊下方按鈕：</p>
 <p style="text-align:center;margin:24px 0;">
   <a href="${replyUrl}" style="display:inline-block;background:#3b82f6;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;">填寫我的回覆</a>
 </p>
