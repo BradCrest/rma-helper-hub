@@ -331,8 +331,9 @@ const ReceivingTab = () => {
       setNotifyDialogOpen(false);
       setDialogOpen(false);
       fetchRmaList();
-    } catch (e: any) {
-      toast.error("寄送失敗：" + (e?.message || ""));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error("寄送失敗：" + msg);
     } finally {
       setNotifying(false);
     }
