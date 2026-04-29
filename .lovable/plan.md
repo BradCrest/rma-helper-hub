@@ -1,113 +1,132 @@
-## 目標
 
-整理 16 種 `rma_status` 與後勤管理各分頁／Dashboard 的對應關係，並在管理介面新增一個「狀態 ↔ 分頁對照表」的快速查看 UI，讓管理員一眼看到每個狀態目前會在哪個分頁出現。
+# Phase 1：RMA 詳情頁整合 Shopify 訂單
 
----
+## 範圍與非範圍
 
-## 一、Status ↔ 分頁／Dashboard 對應總表（從程式碼盤點所得）
+**做：**
+- Admin 在 `RmaDetailDialog` 內看到該 RMA email 對應的 Shopify 最近 5 筆訂單
+- 每筆訂單顯示：訂單號、日期、商品（標題 + SKU）、金額、狀態
+- 「使用此訂單日為購買日」按鈕，一鍵帶入 `purchase_date` 並用 `warrantyPolicy.ts` 重算 `warranty_date`
+- 純 admin 後台功能，客戶端完全不變
 
-來源：
-- `src/components/logistics/ReceivingTab.tsx` line 171
-- `src/components/logistics/AwaitingConfirmationTab.tsx` line 111（只看 `contacting`）
-- `src/components/logistics/CustomerHandlingTab.tsx` line 96（舊版「客戶處理」分頁，目前未掛在 AdminLogistics tabs 上）
-- `src/pages/AdminDashboard.tsx` line 25–58（首頁三個統計卡）
-- `src/pages/AdminRmaList.tsx` 用 `statusFilter` 任選
+**不做（明確排除）：**
+- 不做購物車、結帳、Storefront 任何 e-commerce UI
+- 不同步 Shopify 訂單到我們的 DB（每次即時呼叫 Admin API）
+- 不改 RMA 申請流程、不在客戶端加訂單欄位（留待 Phase 2）
+- 不改既有 `warrantyPolicy.ts` / `WarrantyCalculator` 邏輯
 
-| status | 中文標籤 | 收件處理 | 待客戶確認 | 客戶處理（舊） | Dashboard 待處理 | Dashboard 處理中 | Dashboard 已完成 | RMA 列表 |
-|---|---|---|---|---|---|---|---|---|
-| `registered` | 已登錄 | | | | ✅ | | | ✅ |
-| `shipped` | 已寄出（客→公司） | ✅ | | | | ✅ | | ✅ |
-| `received` | 已收到 | ✅ | | | | ✅ | | ✅ |
-| `inspecting` | 檢測中 | ✅ | | | | ✅ | | ✅ |
-| `contacting` | 聯繫客戶中 | | ✅ | ✅ | | ✅ | | ✅ |
-| `quote_confirmed` | 已確認方案 | | | ✅ | | ✅ | | ✅ |
-| `paid` | 已付款 | | | ✅ | | ✅ | | ✅ |
-| `no_repair` | 不維修 | | | | | | | ✅ |
-| `repairing` | 處理中 | | | | | ✅ | | ✅ |
-| `shipped_back` | 已寄回（舊） | | | | | | | ✅ |
-| `shipped_back_new` | 寄回新品 | | | | | | | ✅ |
-| `shipped_back_refurbished` | 寄回整新機 | | | | | | | ✅ |
-| `shipped_back_original` | 寄回原機 | | | | | | | ✅ |
-| `follow_up` | 後續追蹤 | | | | | | | ✅ |
-| `closed` | 已結案 | | | | | | ✅ | ✅ |
-| `unknown` | 未知 | | | | | | | ✅ |
+## 整體流程
 
-### 觀察到的缺口（會在 UI 上以警示標出，不在這個 PR 修）
-1. `no_repair`、`shipped_back*`、`follow_up` 三組狀態目前不在任何後勤分頁的預設視窗，只能去「RMA 列表」用篩選找。
-2. `contacting` 同時出現在「待客戶確認」和舊「客戶處理」兩處（CustomerHandlingTab 仍在 codebase 但未掛上 tabs）。
-3. Dashboard 的「處理中」桶包含 7 種狀態，但「已完成」只算 `closed`，`shipped_back*` 沒被歸進完成統計。
-
----
-
-## 二、新增的 UI
-
-### 1. 共用資料模組：`src/lib/rmaStatusMap.ts`（新檔，純資料）
-
-匯出三件東西，供本次 UI 與未來各分頁/列表共用，避免再到處硬編碼：
-
-```ts
-export const RMA_STATUS_LABELS: Record<RmaStatus, string> = { ... };
-// 每個 status 出現在哪些「位置」
-export const RMA_STATUS_LOCATIONS: Record<RmaStatus, Location[]>;
-// 反過來：每個分頁/桶包含哪些 status（從上面表格直接複製）
-export const TAB_STATUS_BUCKETS = {
-  receiving: ["shipped", "received", "inspecting"],
-  awaitingConfirmation: ["contacting"],
-  customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
-  dashboardPending: ["registered"],
-  dashboardInProgress: ["shipped","received","inspecting","contacting","quote_confirmed","paid","repairing"],
-  dashboardCompleted: ["closed"],
-};
+```text
+RmaDetailDialog 開啟
+  → 自動 invoke("shopify-find-orders-by-email", { email })
+    → Edge Function 驗證 admin role
+    → 呼叫 Shopify Admin API GraphQL: customers + orders
+    → 回傳最近 5 筆訂單（含商品、日期、金額）
+  → 顯示「Shopify 訂單記錄」摺疊卡片
+  → admin 點「使用此訂單日為購買日」
+    → 更新 rma_requests.purchase_date
+    → 用 warrantyPolicy.calcWarrantyExpiry(batch, purchaseDate) 重算 warranty_date
+    → 透過 update-rma-status edge function 寫入 DB
+  → 顯示成功 toast，重新載入 RMA 詳情
 ```
 
-> 重要：這份資料只在新元件使用。**不**改 ReceivingTab / AwaitingConfirmationTab / Dashboard 既有 query，避免影響行為。後續若要逐步重構讓它們改吃這份 map，再分開做。
+## 技術細節
 
-### 2. 新元件：`src/components/logistics/StatusMapDialog.tsx`
+### 1. 新增 Edge Function `shopify-find-orders-by-email`
 
-一個用 `Dialog` 包起來的對照表：
+- 路徑：`supabase/functions/shopify-find-orders-by-email/index.ts`
+- `verify_jwt = true`（admin only）
+- 在函式內額外檢查 `user_roles` 確認是 admin / super_admin
+- 輸入：`{ email: string }`，用 zod 驗證
+- 呼叫 Shopify Admin GraphQL API：
+  - 環境變數使用 Shopify enable 自動注入的 `SHOPIFY_STORE_PERMANENT_DOMAIN` 與 admin token（具體變數名稱以 `fetch_secrets` 確認後使用）
+  - API version：`2025-07`
+  - Endpoint：`https://{shop}/admin/api/2025-07/graphql.json`
+  - GraphQL：`customers(first: 5, query: "email:xxx")` → 取得 customer.id → `orders(first: 5, sortKey: PROCESSED_AT, reverse: true)` 帶 `lineItems`、`processedAt`、`name`(訂單號)、`totalPriceSet`、`displayFinancialStatus`、`displayFulfillmentStatus`
+- 輸出：精簡後的訂單陣列，只回傳 UI 需要的欄位（不要把整個 GraphQL response 丟回前端）
+- 速率限制：簡易 in-memory rate limit（同一 admin 每分鐘最多 30 次），warning 註明非 production-grade
+- CORS、錯誤處理依照專案標準範式
 
-- **Trigger**：在 `AdminLogistics.tsx` header 右側、「首頁」按鈕左邊新增一顆 outline 按鈕「狀態對照表」（icon `Map` 或 `TableProperties`）。
-- **內容**：
-  - 上方一段說明文字：「每筆 RMA 依 `status` 自動進入對應分頁。下表整理目前各分頁的篩選範圍。」
-  - 第一張表（主視角）：**Status → 出現位置**
-    - 欄位：狀態 badge｜中文標籤｜後勤分頁｜Dashboard 統計｜備註
-    - 用 `<Badge>` 標示位置，多個就並列
-    - `unknown` / `no_repair` / `shipped_back*` / `follow_up` 顯示淡黃 badge「⚠ 僅在 RMA 列表」
-  - 第二張表（反視角，可摺疊）：**分頁 → 包含哪些 status**
-    - 每個分頁一列，右邊把 status badge 全列出
-  - 底部小字注記：上面提到的三個觀察缺口，純資訊揭露。
+### 2. 新增前端元件 `ShopifyOrdersCard.tsx`
 
-### 3. 主畫面位置
+- 路徑：`src/components/rma/ShopifyOrdersCard.tsx`
+- Props：`{ email: string, rmaId: string, currentPurchaseDate?: string, onPurchaseDateApplied: () => void }`
+- 內部狀態：`useQuery(["shopify-orders", email], …)` 透過 React Query 快取 5 分鐘
+- 顯示：
+  - 載入中：skeleton
+  - 無訂單：「此 email 在 Shopify 找不到訂單記錄」灰色提示，不顯示錯誤
+  - 有訂單：每筆訂單一張小卡，顯示訂單號、日期、商品 list、總金額
+  - 每張卡右側「使用此訂單日為購買日」按鈕（若已等於目前 purchase_date 則 disabled 顯示「目前使用中」）
+  - 連結到 Shopify admin 的訂單詳情（外開新分頁）
+- 使用既有 `Card`、`Button`、`Badge`、`Collapsible` shadcn 元件
+- 樣式遵循專案既有設計（淡灰藍底、白卡、藍色 primary）
 
-只動 `AdminLogistics.tsx`：
-- 在 header 的 buttons 區（`<span>{user?.email}</span>` 後）插入 `<StatusMapDialog />`。
-- 不動 tabs 結構、不動既有分頁元件。
+### 3. 整合到 `RmaDetailDialog.tsx`
 
----
+- 在現有區塊之間插入 `<ShopifyOrdersCard … />`，預設摺疊
+- 標題列加 Shopify icon（lucide `ShoppingBag`）+ 「Shopify 訂單記錄」+ 訂單數量 badge
 
-## 三、檔案異動清單
+### 4. 「一鍵帶入購買日」處理
 
-| 動作 | 檔案 |
+- 點擊按鈕 → 呼叫既有 `update-rma-status` edge function（或為了降低耦合新增 `update-rma-purchase-date`，視 update-rma-status 是否支援自訂欄位而定，實作時確認）
+- 更新欄位：`purchase_date` + 重算後的 `warranty_date`
+- 重算用 `src/lib/warrantyPolicy.ts` 既有的 `calcWarrantyExpiry(batch, purchaseDate)`
+- 批次來源：使用該 RMA 現有的 batch 判定（不在這一步重新偵測批次）
+- 成功後 invalidate React Query cache，RMA 詳情自動 refresh
+- 在 `rma_customer_contacts` 加一筆記錄：「Admin 從 Shopify 訂單 #xxxx 帶入購買日 yyyy-mm-dd」（reuse 既有 contact log 機制）
+
+### 5. 不改動的部分
+
+- `src/lib/warrantyPolicy.ts`、`WarrantyCalculator.tsx`：完全沿用
+- 資料庫 schema：不新增欄位（`shopify_order_id` 留待 Phase 2 評估）
+- 客戶端 RMA 申請流程：不動
+- `supabase/config.toml`：只新增 `[functions.shopify-find-orders-by-email] verify_jwt = true` 區塊
+
+## 安全與權限
+
+- Edge Function 驗證 JWT + 二次檢查 `user_roles` 是 admin
+- Shopify token 只存在於 Edge Function 環境變數，不暴露到前端
+- email 參數用 zod 驗證為合法 email 格式
+- 回傳資料不包含 Shopify 客戶的其他 PII（電話、地址）—— 只回訂單必要欄位
+- Rate limit 防止 admin 帳號被濫用大量打 Shopify API
+
+## 邊界情況
+
+| 情境 | 處理 |
 |---|---|
-| 新增 | `src/lib/rmaStatusMap.ts` |
-| 新增 | `src/components/logistics/StatusMapDialog.tsx` |
-| 編輯 | `src/pages/AdminLogistics.tsx`（header 加按鈕） |
+| email 在 Shopify 找不到客戶 | 顯示「找不到訂單記錄」，不視為錯誤 |
+| Shopify API 回傳錯誤 / 超時 | 顯示「暫時無法載入訂單」+ 重試按鈕，不阻擋 RMA 詳情 |
+| 一個 email 對應多個 customer | 取第一個（Shopify search 會按相關度排序），未來 Phase 2 再優化 |
+| 訂單超過 5 筆 | 只顯示最近 5 筆 + 「在 Shopify 查看完整歷史」連結 |
+| RMA 沒有 email | 不顯示卡片（return null） |
+| 重算 warranty_date 時批次未知 | 按鈕 disabled，提示「請先在 WarrantyCalculator 確認批次」 |
 
-無 DB migration、無 Edge Function 變更、無 RLS 影響。
+## 驗收標準
 
----
+1. 開啟任一 RMA 詳情，能看到 Shopify 訂單卡片（無論有無訂單都正常顯示）
+2. 點「使用此訂單日為購買日」後，purchase_date 與 warranty_date 都更新，且 contact log 有記錄
+3. 非 admin 呼叫 edge function 回 401/403
+4. Shopify API 失敗時不會讓整個 RMA 詳情崩潰
+5. 同一 email 5 分鐘內重開不會重打 API（React Query 快取生效）
 
-## 四、技術細節
+## 檔案異動清單
 
-- 純 client-side，沒有任何資料 fetch，完全靠靜態 map render，零效能成本。
-- 樣式沿用現有 shadcn `Dialog` / `Table` / `Badge` / `Button` + Tailwind，符合 memory 中「Clean modern, white cards, primary #3B82F6」基調。
-- 顏色慣例：在保固/正常分頁出現 → `secondary` badge；只在 RMA 列表 → `outline` + 黃字；`closed` → `default`。
-- i18n：全部繁中硬字串，與其他後勤分頁一致。
+**新增：**
+- `supabase/functions/shopify-find-orders-by-email/index.ts`
+- `src/components/rma/ShopifyOrdersCard.tsx`
 
----
+**修改：**
+- `src/components/rma/RmaDetailDialog.tsx`（插入卡片）
+- `supabase/config.toml`（新增 function 設定）
 
-## 五、不在範圍內（避免 scope creep）
+**不動：**
+- `src/lib/warrantyPolicy.ts`、`WarrantyCalculator.tsx`、`refurbishedPricing.ts`、客戶端 RMA 申請相關檔案、資料庫 schema
 
-- 不重構 ReceivingTab / AwaitingConfirmationTab / Dashboard 改吃 `TAB_STATUS_BUCKETS`（要做但獨立 PR）。
-- 不補 `no_repair` / `shipped_back*` / `follow_up` 的專屬分頁（要先跟使用者確認流程再說）。
-- 不改 status enum、不刪 `unknown`。
+## 後續 Phase（不在本次範圍）
+
+- Phase 2A：客戶端申請頁加訂單編號選填欄位
+- Phase 2B：在 `rma_requests` 新增 `shopify_order_id` 欄位以建立永久關聯
+- Phase 2C：獨立 Shopify 訂單分頁（用於主動售後關懷）
+- Phase 2D：批次偵測整合 Shopify 訂單日（兩段驗證更可靠）
+
