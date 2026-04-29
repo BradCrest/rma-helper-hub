@@ -200,3 +200,34 @@ const smallText = {
 const hr = { border: 'none', borderTop: '1px solid #e5e7eb', margin: '24px 0' }
 const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px' }
 const footer = { fontSize: '13px', color: '#6b7280', margin: '8px 0 0' }
+const attachmentBox = {
+  background: '#f1f5f9',
+  border: '1px solid #e2e8f0',
+  padding: '14px 18px',
+  margin: '0 0 24px',
+  borderRadius: '6px',
+}
+const attachmentTitle = {
+  fontSize: '13px',
+  fontWeight: 600 as const,
+  color: '#0f172a',
+  margin: '0 0 10px',
+}
+const attachmentRow = { margin: '0 0 6px' }
+const attachmentLink = {
+  fontSize: '14px',
+  color: '#3B82F6',
+  textDecoration: 'none',
+  fontWeight: 500 as const,
+  wordBreak: 'break-all' as const,
+}
+const attachmentSize = {
+  fontSize: '11px',
+  color: '#94a3b8',
+  margin: '2px 0 0 20px',
+}
+const attachmentNote = {
+  fontSize: '11px',
+  color: '#94a3b8',
+  margin: '8px 0 0',
+}
