@@ -450,6 +450,20 @@ const ReceivingTab = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label htmlFor="diagnosisCategory">診斷分類</Label>
+                      <Select value={diagnosisCategory} onValueChange={setDiagnosisCategory}>
+                        <SelectTrigger id="diagnosisCategory">
+                          <SelectValue placeholder="選擇診斷分類" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIAGNOSIS_CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
                       <Label htmlFor="plannedMethod">預計處理方式</Label>
                       <Select value={plannedMethod} onValueChange={setPlannedMethod}>
                         <SelectTrigger id="plannedMethod">
@@ -461,6 +475,22 @@ const ReceivingTab = () => {
                           <SelectItem value="refund">退款</SelectItem>
                           <SelectItem value="return_supplier">送回供應商</SelectItem>
                           <SelectItem value="no_issue">無問題退回</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="actualMethod">實際處理方式</Label>
+                      <Select value={actualMethod} onValueChange={setActualMethod}>
+                        <SelectTrigger id="actualMethod">
+                          <SelectValue placeholder="選擇實際處理方式" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ACTUAL_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -477,6 +507,29 @@ const ReceivingTab = () => {
                     </div>
                   </div>
 
+                  {actualMethod === "換新" && (
+                    <div className="grid grid-cols-2 gap-4 p-4 border border-border rounded-lg bg-muted/30">
+                      <div>
+                        <Label htmlFor="replacementModel">替換型號</Label>
+                        <Input
+                          id="replacementModel"
+                          placeholder="輸入替換產品型號..."
+                          value={replacementModel}
+                          onChange={(e) => setReplacementModel(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="replacementSerial">替換序號</Label>
+                        <Input
+                          id="replacementSerial"
+                          placeholder="輸入替換產品序號..."
+                          value={replacementSerial}
+                          onChange={(e) => setReplacementSerial(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <Label htmlFor="internalReference">內部參考編號</Label>
                     <Input
@@ -487,6 +540,7 @@ const ReceivingTab = () => {
                     />
                   </div>
                 </div>
+
 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
