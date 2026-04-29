@@ -432,12 +432,11 @@ const ReceivingTab = () => {
     if (!selectedRma) return;
     setNotifying(true);
     try {
-      const { subject, body } = buildDiagnosisEmail();
       const { data, error } = await supabase.functions.invoke("send-rma-reply", {
         body: {
           rmaRequestId: selectedRma.id,
-          subject,
-          body,
+          subject: notifySubject,
+          body: notifyBody,
           attachments: notifyAttachments,
         },
       });
