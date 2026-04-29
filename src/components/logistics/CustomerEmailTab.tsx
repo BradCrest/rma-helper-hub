@@ -594,6 +594,7 @@ const CustomerEmailTab = () => {
   }, [lastSyncTs, syncTick]);
 
   return (
+    <>
     <div className="space-y-4">
       {/* Header / toolbar */}
       <div className="rma-card">
