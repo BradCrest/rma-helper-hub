@@ -74,6 +74,44 @@ interface RepairDetail {
 const DIAGNOSIS_CATEGORIES = ["外觀損壞", "功能異常", "保固問題", "使用者疏失"];
 const ACTUAL_METHODS = ["維修", "換新", "退款", "不在保固內"];
 
+// Attachment config — must match send-rma-reply backend validation (rma-replies/{rmaId}/ prefix required)
+const ATTACHMENT_BUCKET = "rma-attachments";
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_EXTENSIONS = [
+  "jpg", "jpeg", "png", "heic", "webp",
+  "pdf", "doc", "docx", "xls", "xlsx", "zip",
+];
+
+interface UploadedAttachment {
+  name: string;
+  path: string;
+  size: number;
+  contentType?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx + 1).toLowerCase();
+}
+
+function sanitizeForKey(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const safeBase =
+    base.replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") || "file";
+  const safeExt = ext.replace(/[^\w.]+/g, "");
+  return `${safeBase}${safeExt}`.slice(0, 120);
+}
+
 const ReceivingTab = () => {
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
