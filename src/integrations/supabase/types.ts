@@ -337,6 +337,36 @@ export type Database = {
         }
         Relationships: []
       }
+      rma_attachment_cleanup_logs: {
+        Row: {
+          bytes_freed: number
+          cleanup_run_at: string
+          details: Json
+          error: string | null
+          files_deleted: number
+          id: string
+          trigger_source: string
+        }
+        Insert: {
+          bytes_freed?: number
+          cleanup_run_at?: string
+          details?: Json
+          error?: string | null
+          files_deleted?: number
+          id?: string
+          trigger_source?: string
+        }
+        Update: {
+          bytes_freed?: number
+          cleanup_run_at?: string
+          details?: Json
+          error?: string | null
+          files_deleted?: number
+          id?: string
+          trigger_source?: string
+        }
+        Relationships: []
+      }
       rma_customer_contacts: {
         Row: {
           contact_date: string
