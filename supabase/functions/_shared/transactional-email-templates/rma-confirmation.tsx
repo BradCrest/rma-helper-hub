@@ -70,41 +70,37 @@ const RmaConfirmationEmail = ({
           <Button style={buttonPrimary} href={trackUrl}>
             查詢申請進度
           </Button>
-        </Section>
-
-        <Hr style={hr} />
-
-        <Heading as="h2" style={h2}>關於寄回商品</Heading>
-        <Section style={notice}>
-          <Text style={noticeText}>
-            <strong>提醒：並非所有 RMA 申請都需要寄回商品。</strong>
-            部分問題（例如使用諮詢、軟體設定、操作說明等）可由客服遠端協助處理。
-          </Text>
-          <Text style={noticeText}>
-            請等候我們審核後通知，或經客服確認需要寄回後，再點擊下方按鈕填寫寄件資訊。
-          </Text>
-        </Section>
-
-        <Section style={{ textAlign: 'center', margin: '20px 0' }}>
+          <span style={{ display: 'inline-block', width: '12px' }} />
           <Button style={buttonSecondary} href={shippingUrl}>
-            填寫寄件資訊（如需寄回）
+            填寫寄件資訊
           </Button>
         </Section>
 
         <Hr style={hr} />
 
-        <Heading as="h2" style={h2}>寄件須知（如經確認需寄回）</Heading>
+        <Heading as="h2" style={h2}>寄件須知</Heading>
         <Text style={text}>
-          本公司收件地址如下：<br />
-          <strong>242039 新北市新莊區化成路11巷86號1樓</strong>
+          為避免影響您的保固服務時程，請將產品正確寄至以下地址。<br />
+          本公司收件地址如下：
         </Text>
+        <Section style={addressBox}>
+          <Text style={infoLine}><strong>八洋精密股份有限公司</strong></Text>
+          <Text style={infoLine}>客服部</Text>
+          <Text style={infoLine}>電話：02-2994-7450</Text>
+          <Text style={infoLine}>地址：242039 新北市新莊區化成路11巷86號1樓</Text>
+        </Section>
+
+        <Hr style={hrLight} />
+
         <Text style={text}>
-          英文地址：<br />
-          <strong>No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</strong>
+          To avoid any delay in your warranty service, please send the product to the following address:
         </Text>
-        <Text style={warning}>
-          ⚠️ 為避免遺失，本服務中心 <strong>無法接受親送</strong>，請務必透過物流寄送。
-        </Text>
+        <Section style={addressBox}>
+          <Text style={infoLine}><strong>EOPI CO., LTD</strong></Text>
+          <Text style={infoLine}>Customer Service Dept.</Text>
+          <Text style={infoLine}>TEL: 886-2-2994-7450</Text>
+          <Text style={infoLine}>Address: No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</Text>
+        </Section>
 
         <Hr style={hr} />
         <Text style={footer}>
@@ -145,13 +141,20 @@ const infoBox = {
   padding: '16px 20px',
   margin: '20px 0',
 }
+const addressBox = {
+  backgroundColor: '#f8fafc',
+  borderLeft: '3px solid #3B82F6',
+  borderRadius: '4px',
+  padding: '12px 16px',
+  margin: '8px 0 16px',
+}
 const infoLine = { fontSize: '14px', color: '#0f172a', margin: '4px 0', lineHeight: '1.5' }
 const buttonPrimary = {
   backgroundColor: '#3B82F6',
   color: '#ffffff',
-  fontSize: '15px',
+  fontSize: '14px',
   fontWeight: 'bold',
-  padding: '12px 28px',
+  padding: '11px 22px',
   borderRadius: '8px',
   textDecoration: 'none',
   display: 'inline-block',
@@ -161,29 +164,12 @@ const buttonSecondary = {
   color: '#3B82F6',
   fontSize: '14px',
   fontWeight: 'bold',
-  padding: '10px 24px',
+  padding: '10px 20px',
   borderRadius: '8px',
   textDecoration: 'none',
   display: 'inline-block',
   border: '1.5px solid #3B82F6',
 }
-const notice = {
-  backgroundColor: '#fffbeb',
-  border: '1px solid #fde68a',
-  borderRadius: '8px',
-  padding: '14px 18px',
-  margin: '12px 0',
-}
-const noticeText = { fontSize: '13px', color: '#78350f', lineHeight: '1.6', margin: '0 0 8px' }
-const warning = {
-  fontSize: '13px',
-  color: '#b91c1c',
-  backgroundColor: '#fef2f2',
-  border: '1px solid #fecaca',
-  borderRadius: '6px',
-  padding: '10px 14px',
-  margin: '12px 0',
-  lineHeight: '1.5',
-}
 const hr = { borderColor: '#e2e8f0', margin: '24px 0' }
+const hrLight = { borderColor: '#f1f5f9', margin: '16px 0' }
 const footer = { fontSize: '12px', color: '#94a3b8', margin: '20px 0 0', lineHeight: '1.5' }
