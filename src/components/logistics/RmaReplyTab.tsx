@@ -131,7 +131,7 @@ const RmaReplyTab = () => {
     setThreadLoading(true);
     const { data, error } = await supabase
       .from("rma_thread_messages")
-      .select("id, direction, subject, body, created_at, reply_token_used_at")
+      .select("id, direction, subject, body, created_at, reply_token_used_at, attachments")
       .eq("rma_request_id", rmaId)
       .order("created_at", { ascending: true });
     if (error) toast.error("讀取對話失敗：" + error.message);
