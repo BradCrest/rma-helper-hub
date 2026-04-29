@@ -37,8 +37,15 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import {
+  buildDiagnosisNotificationBody,
+  isWithinWarranty,
+  getRefurbPrices,
+  formatNT,
+} from "@/lib/refurbishedPricing";
 
 type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "repairing" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished" | "unknown";
 
@@ -56,6 +63,7 @@ interface RmaRequest {
   issue_description: string;
   initial_diagnosis: string | null;
   diagnosis_category: string | null;
+  warranty_date: string | null;
   created_at: string;
 }
 
@@ -139,6 +147,10 @@ const ReceivingTab = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
   const notifyFileInputRef = useRef<HTMLInputElement | null>(null);
+  // null = 跟隨系統判斷; true/false = admin 手動覆寫
+  const [warrantyOverride, setWarrantyOverride] = useState<boolean | null>(null);
+  const [notifyBody, setNotifyBody] = useState("");
+  const [notifySubject, setNotifySubject] = useState("");
 
   useEffect(() => {
     fetchRmaList();
@@ -295,39 +307,41 @@ const ReceivingTab = () => {
     }
   };
 
-  // Build diagnosis notification email from saved values only
-  const buildDiagnosisEmail = () => {
+  // 系統依 warranty_date 判斷是否在保固內
+  const systemWithinWarranty = selectedRma
+    ? isWithinWarranty(selectedRma.warranty_date)
+    : false;
+
+  // 實際生效的保固判斷（含 admin 覆寫）
+  const effectiveWithinWarranty =
+    warrantyOverride === null ? systemWithinWarranty : warrantyOverride;
+
+  // 依保固狀態 + 已儲存的診斷產生預設 email 主旨/內容
+  const buildDefaultDiagnosisEmail = (within: boolean) => {
     if (!selectedRma) return { subject: "", body: "" };
     const subject = `[${selectedRma.rma_number}] 產品檢測結果與處理方式確認`;
-    const productLine = [selectedRma.product_name, selectedRma.product_model]
-      .filter(Boolean)
-      .join(" ");
-    const category = selectedRma.diagnosis_category || "未分類";
-    const diagnosis = selectedRma.initial_diagnosis || "（尚未填寫）";
-    const method =
-      repairDetail?.actual_method ||
-      repairDetail?.planned_method ||
-      "待確認";
-    const cost =
-      repairDetail?.estimated_cost != null
-        ? `NT$ ${repairDetail.estimated_cost}`
-        : "待報價";
-
-    const body = `您好 ${selectedRma.customer_name}，
-
-您的產品 ${productLine} 已完成初步檢測，結果如下：
-
-【診斷分類】${category}
-【診斷描述】${diagnosis}
-【建議處理方式】${method}
-【預估費用】${cost}
-
-請點擊下方「填寫我的回覆」按鈕確認您是否同意進行此處理方式，
-或回覆任何疑問，我們會儘速為您處理。
-
-謝謝您！`;
+    const body = buildDiagnosisNotificationBody({
+      productModel: selectedRma.product_model || selectedRma.product_name,
+      serialNumber: selectedRma.serial_number,
+      withinWarranty: within,
+      diagnosis: selectedRma.initial_diagnosis,
+    });
     return { subject, body };
   };
+
+  // 開啟通知 dialog 時初始化文字（保留 admin 後續手動編輯）
+  const initializeNotifyContent = (within: boolean) => {
+    const { subject, body } = buildDefaultDiagnosisEmail(within);
+    setNotifySubject(subject);
+    setNotifyBody(body);
+  };
+
+  // 切換保固覆寫時自動重產文字（若 admin 尚未編輯過 / 文字仍為某模板的預設值）
+  const handleWarrantyToggle = (treatAsWarranty: boolean) => {
+    setWarrantyOverride(treatAsWarranty);
+    initializeNotifyContent(treatAsWarranty);
+  };
+
 
   const handleAddNotifyAttachments = async (files: FileList | null) => {
     if (!files || files.length === 0 || !selectedRma) return;
@@ -418,12 +432,11 @@ const ReceivingTab = () => {
     if (!selectedRma) return;
     setNotifying(true);
     try {
-      const { subject, body } = buildDiagnosisEmail();
       const { data, error } = await supabase.functions.invoke("send-rma-reply", {
         body: {
           rmaRequestId: selectedRma.id,
-          subject,
-          body,
+          subject: notifySubject,
+          body: notifyBody,
           attachments: notifyAttachments,
         },
       });
@@ -780,7 +793,12 @@ const ReceivingTab = () => {
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => setNotifyDialogOpen(true)}
+                    onClick={() => {
+                      // 開啟前依目前保固狀態初始化文字
+                      setWarrantyOverride(null);
+                      initializeNotifyContent(systemWithinWarranty);
+                      setNotifyDialogOpen(true);
+                    }}
                     disabled={
                       !selectedRma?.customer_email ||
                       !selectedRma?.initial_diagnosis?.trim()
@@ -816,23 +834,74 @@ const ReceivingTab = () => {
               寄送診斷通知給客戶
             </AlertDialogTitle>
             <AlertDialogDescription>
-              以下內容讀取自<strong>已儲存</strong>的資料。如有修改未儲存，請先取消並按「儲存記錄」。
+              依下方保固判斷自動套用對應模板。寄出前可手動編輯主旨與內容。
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {selectedRma && (
             <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-[80px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-[90px_1fr] gap-2 p-3 bg-muted/50 rounded-lg">
                 <span className="text-muted-foreground">收件人</span>
                 <span className="font-mono">{selectedRma.customer_email}</span>
-                <span className="text-muted-foreground">主旨</span>
-                <span className="font-medium">{buildDiagnosisEmail().subject}</span>
+                <span className="text-muted-foreground">產品型號</span>
+                <span className="font-medium">{selectedRma.product_model || selectedRma.product_name}</span>
+              </div>
+
+              {/* 保固判斷區 */}
+              <div className="flex items-center justify-between gap-3 p-3 border border-border rounded-lg flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-muted-foreground text-xs">保固狀態：</span>
+                  <Badge variant={systemWithinWarranty ? "default" : "secondary"}>
+                    系統判斷：{systemWithinWarranty ? "保固內" : "已過保"}
+                  </Badge>
+                  {selectedRma.warranty_date && (
+                    <span className="text-[10px] text-muted-foreground">
+                      ({format(new Date(selectedRma.warranty_date), "yyyy/MM/dd")} 到期)
+                    </span>
+                  )}
+                  {warrantyOverride !== null && warrantyOverride !== systemWithinWarranty && (
+                    <Badge variant="destructive" className="text-[10px]">已覆寫</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">以保固內處理</span>
+                  <Switch
+                    checked={effectiveWithinWarranty}
+                    onCheckedChange={handleWarrantyToggle}
+                    disabled={notifying || cleaningUp}
+                  />
+                </div>
+              </div>
+
+              {!effectiveWithinWarranty && (
+                <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-[11px] text-amber-900 dark:text-amber-200">
+                  過保固模板已自動帶入「{selectedRma.product_model || "—"}」整新機價格：
+                  A {formatNT(getRefurbPrices(selectedRma.product_model).A)}　
+                  B {formatNT(getRefurbPrices(selectedRma.product_model).B)}　
+                  C {formatNT(getRefurbPrices(selectedRma.product_model).C)}
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="notifySubject" className="text-xs">主旨</Label>
+                <Input
+                  id="notifySubject"
+                  value={notifySubject}
+                  onChange={(e) => setNotifySubject(e.target.value)}
+                  disabled={notifying || cleaningUp}
+                  className="text-sm"
+                />
               </div>
               <div>
-                <p className="text-muted-foreground mb-1">信件內容預覽</p>
-                <pre className="whitespace-pre-wrap text-xs p-3 bg-muted/30 rounded-lg border border-border max-h-64 overflow-y-auto font-sans">
-{buildDiagnosisEmail().body}
-                </pre>
+                <Label htmlFor="notifyBody" className="text-xs">信件內容（可編輯）</Label>
+                <Textarea
+                  id="notifyBody"
+                  value={notifyBody}
+                  onChange={(e) => setNotifyBody(e.target.value)}
+                  disabled={notifying || cleaningUp}
+                  rows={12}
+                  className="font-mono text-xs"
+                />
               </div>
               {/* Attachments */}
               <div className="space-y-2">

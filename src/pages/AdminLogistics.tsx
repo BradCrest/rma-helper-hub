@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { LogOut, Home, Package, Phone, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply } from "lucide-react";
+import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
-import CustomerHandlingTab from "@/components/logistics/CustomerHandlingTab";
+import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmationTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 import RmaReplyTab from "@/components/logistics/RmaReplyTab";
 
@@ -22,7 +22,7 @@ const AdminLogistics = () => {
     { id: "rma-reply", label: "RMA 回覆", icon: MessageSquareReply },
     { id: "email", label: "客戶來信", icon: Mail },
     { id: "receiving", label: "收件處理", icon: Package },
-    { id: "customer", label: "客戶處理", icon: Phone },
+    { id: "customer", label: "待客戶確認", icon: Inbox },
     { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
     { id: "fault", label: "故障登記", icon: ClipboardCheck, disabled: true },
     { id: "followup", label: "客戶關懷", icon: Heart, disabled: true },
@@ -87,7 +87,7 @@ const AdminLogistics = () => {
           </TabsContent>
 
           <TabsContent value="customer" className="mt-0">
-            <CustomerHandlingTab />
+            <AwaitingConfirmationTab />
           </TabsContent>
 
           <TabsContent value="supplier" className="mt-0">
