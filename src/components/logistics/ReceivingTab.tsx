@@ -301,7 +301,7 @@ const ReceivingTab = () => {
         },
       });
       if (error) throw error;
-      const result = data as any;
+      const result = data as { error?: string } | null;
       if (result?.error) throw new Error(result.error);
       toast.success(`已寄出診斷通知給 ${selectedRma.customer_email}`);
 
