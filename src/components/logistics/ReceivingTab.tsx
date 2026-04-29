@@ -900,7 +900,19 @@ const ReceivingTab = () => {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={notifying}>取消</AlertDialogCancel>
+            <AlertDialogCancel
+              disabled={notifying || cleaningUp || uploadingFiles}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNotifyDialogChange(false);
+              }}
+            >
+              {cleaningUp ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />清理中...</>
+              ) : (
+                "取消"
+              )}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
