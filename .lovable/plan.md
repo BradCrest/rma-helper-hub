@@ -1,127 +1,113 @@
+## 目標
 
-# 對齊 CREST 官方保固政策（精簡版 + 序號自動解析）
-
-## 三個確認事項回覆
-
-| 確認事項 | 答案 |
-|---|---|
-| Legacy 批次定價 | 與一般過保相同 A/B/C 價格，UI 加文字備註即可 |
-| 批次判斷 | **可從序號解析**（CR-4 / CR-5L / CR-1 / CR-F 都含年份+週數）|
-| 公告連結 | Email 模板 + 客戶 tracking 頁 |
-
-## CREST 序號規則（官方文件）
-
-| 型號 | 範例 | 年份位置 | 週數位置 |
-|---|---|---|---|
-| CR-4  | `CBK25160015` | 第 4-5 碼 (`25` = 2025) | 第 6-7 碼 (`16` = 第 16 週) |
-| CR-5L | `CBK25160015` | 第 5-6 碼 | 第 7-8 碼 |
-| CR-1  | `CR125160015` | 第 4-5 碼 | 第 6-7 碼 |
-| CR-F  | `CRFY25160015`| 第 5-6 碼 | 第 7-8 碼 |
-
-→ `生產年 + 週數` 可推得「大約生產日期」→ 比對政策三段制 → 自動算保固到期日。
-
-## 政策對應
-
-| 生產日期 | 保固年限 | 備註 |
-|---|---|---|
-| 2018/01 – 2022/10 | **無**（過保） | UI 顯示「老批次」備註 + 沿用 A/B/C 價 |
-| 2022/11 – 2025/10 | **2 年** | 一般保固流程 |
-| 2025/11/12 起 | **1 年** | 一般保固流程 |
+整理 16 種 `rma_status` 與後勤管理各分頁／Dashboard 的對應關係，並在管理介面新增一個「狀態 ↔ 分頁對照表」的快速查看 UI，讓管理員一眼看到每個狀態目前會在哪個分頁出現。
 
 ---
 
-## 實作計劃（精簡為兩個 Phase）
+## 一、Status ↔ 分頁／Dashboard 對應總表（從程式碼盤點所得）
 
-### Phase 1 — 純函式模組（高優先）
+來源：
+- `src/components/logistics/ReceivingTab.tsx` line 171
+- `src/components/logistics/AwaitingConfirmationTab.tsx` line 111（只看 `contacting`）
+- `src/components/logistics/CustomerHandlingTab.tsx` line 96（舊版「客戶處理」分頁，目前未掛在 AdminLogistics tabs 上）
+- `src/pages/AdminDashboard.tsx` line 25–58（首頁三個統計卡）
+- `src/pages/AdminRmaList.tsx` 用 `statusFilter` 任選
 
-**新建 `src/lib/warrantyPolicy.ts`** — 純函式，易測試
-```typescript
-export type ProductionBatch = "legacy_2018_2022" | "v2_2022_2025" | "v3_2025_onwards";
+| status | 中文標籤 | 收件處理 | 待客戶確認 | 客戶處理（舊） | Dashboard 待處理 | Dashboard 處理中 | Dashboard 已完成 | RMA 列表 |
+|---|---|---|---|---|---|---|---|---|
+| `registered` | 已登錄 | | | | ✅ | | | ✅ |
+| `shipped` | 已寄出（客→公司） | ✅ | | | | ✅ | | ✅ |
+| `received` | 已收到 | ✅ | | | | ✅ | | ✅ |
+| `inspecting` | 檢測中 | ✅ | | | | ✅ | | ✅ |
+| `contacting` | 聯繫客戶中 | | ✅ | ✅ | | ✅ | | ✅ |
+| `quote_confirmed` | 已確認方案 | | | ✅ | | ✅ | | ✅ |
+| `paid` | 已付款 | | | ✅ | | ✅ | | ✅ |
+| `no_repair` | 不維修 | | | | | | | ✅ |
+| `repairing` | 處理中 | | | | | ✅ | | ✅ |
+| `shipped_back` | 已寄回（舊） | | | | | | | ✅ |
+| `shipped_back_new` | 寄回新品 | | | | | | | ✅ |
+| `shipped_back_refurbished` | 寄回整新機 | | | | | | | ✅ |
+| `shipped_back_original` | 寄回原機 | | | | | | | ✅ |
+| `follow_up` | 後續追蹤 | | | | | | | ✅ |
+| `closed` | 已結案 | | | | | | ✅ | ✅ |
+| `unknown` | 未知 | | | | | | | ✅ |
 
-// 從序號解析生產日期（年+週數轉日期）
-export function parseSerialNumber(serial: string, model: string): {
-  year: number;
-  week: number;
-  productionDate: Date;
-} | null;
+### 觀察到的缺口（會在 UI 上以警示標出，不在這個 PR 修）
+1. `no_repair`、`shipped_back*`、`follow_up` 三組狀態目前不在任何後勤分頁的預設視窗，只能去「RMA 列表」用篩選找。
+2. `contacting` 同時出現在「待客戶確認」和舊「客戶處理」兩處（CustomerHandlingTab 仍在 codebase 但未掛上 tabs）。
+3. Dashboard 的「處理中」桶包含 7 種狀態，但「已完成」只算 `closed`，`shipped_back*` 沒被歸進完成統計。
 
-// 由生產日期推批次
-export function detectBatch(productionDate: Date): ProductionBatch;
+---
 
-// 由批次 + 生產日推保固到期日
-export function calcWarrantyExpiry(batch: ProductionBatch, productionDate: Date): Date | null;
+## 二、新增的 UI
 
-// 完整評估（給 UI 用）
-export interface WarrantyDecision {
-  batch: ProductionBatch;
-  withinWarranty: boolean;
-  isLegacyBatch: boolean;
-  warrantyYears: 1 | 2 | null;
-  productionDate: Date | null;
-  expiry: Date | null;
-  source: "serial" | "manual" | "warranty_date_field";
-  policyNote: string;
-}
-export function evaluateWarranty(params: {
-  serialNumber?: string | null;
-  productModel?: string | null;
-  warrantyDate?: string | null;
-  manualBatchOverride?: ProductionBatch | null;
-  manualWarrantyOverride?: "in_warranty" | "out_of_warranty" | null;
-}): WarrantyDecision;
+### 1. 共用資料模組：`src/lib/rmaStatusMap.ts`（新檔，純資料）
 
-export const POLICY_ANNOUNCEMENT_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update";
+匯出三件東西，供本次 UI 與未來各分頁/列表共用，避免再到處硬編碼：
+
+```ts
+export const RMA_STATUS_LABELS: Record<RmaStatus, string> = { ... };
+// 每個 status 出現在哪些「位置」
+export const RMA_STATUS_LOCATIONS: Record<RmaStatus, Location[]>;
+// 反過來：每個分頁/桶包含哪些 status（從上面表格直接複製）
+export const TAB_STATUS_BUCKETS = {
+  receiving: ["shipped", "received", "inspecting"],
+  awaitingConfirmation: ["contacting"],
+  customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
+  dashboardPending: ["registered"],
+  dashboardInProgress: ["shipped","received","inspecting","contacting","quote_confirmed","paid","repairing"],
+  dashboardCompleted: ["closed"],
+};
 ```
 
-**新建 `src/lib/warrantyPolicy.test.ts`** — 單元測試
-- CR-4 / CR-5L / CR-1 / CR-F 序號各 3-5 個樣本
-- 三段批次邊界日期（2022/10/31、2022/11/01、2025/10/31、2025/11/12）
-- 缺序號 / 缺型號 fallback 行為
+> 重要：這份資料只在新元件使用。**不**改 ReceivingTab / AwaitingConfirmationTab / Dashboard 既有 query，避免影響行為。後續若要逐步重構讓它們改吃這份 map，再分開做。
 
-### Phase 2 — UI 整合
+### 2. 新元件：`src/components/logistics/StatusMapDialog.tsx`
 
-**A. `WarrantyCalculator.tsx`（嵌在 ReceivingTab 收件 Dialog）**
-- 自動讀取該 RMA 的 `serial_number` + `product_model`
-- 顯示：`從序號 CBK25160015 解析 → 2025/04/15 生產 → 第 3 段批次（2025/11+）→ 保固 1 年 → 到期日 2026/04/15`
-- Admin 可手動覆寫批次（下拉三選一）
-- 「套用到此 RMA」按鈕 → 寫入 `warranty_date` + `warranty_status`
+一個用 `Dialog` 包起來的對照表：
 
-**B. `ReceivingTab.tsx` 診斷通知 Dialog**
-- 保固區塊顯示批次徽章 + 解析來源（從序號 / 手動）
-- 若 `isLegacyBatch` → 顯示警示橫幅：「此產品為 2018–2022 批次，依 2025/11/12 公告已不提供原廠維修，可走特殊換購方案」
+- **Trigger**：在 `AdminLogistics.tsx` header 右側、「首頁」按鈕左邊新增一顆 outline 按鈕「狀態對照表」（icon `Map` 或 `TableProperties`）。
+- **內容**：
+  - 上方一段說明文字：「每筆 RMA 依 `status` 自動進入對應分頁。下表整理目前各分頁的篩選範圍。」
+  - 第一張表（主視角）：**Status → 出現位置**
+    - 欄位：狀態 badge｜中文標籤｜後勤分頁｜Dashboard 統計｜備註
+    - 用 `<Badge>` 標示位置，多個就並列
+    - `unknown` / `no_repair` / `shipped_back*` / `follow_up` 顯示淡黃 badge「⚠ 僅在 RMA 列表」
+  - 第二張表（反視角，可摺疊）：**分頁 → 包含哪些 status**
+    - 每個分頁一列，右邊把 status badge 全列出
+  - 底部小字注記：上面提到的三個觀察缺口，純資訊揭露。
 
-**C. `AwaitingConfirmationTab.tsx` — 保留現有兩種模式**
-- ✅ 保固內 → 一鍵「換整新機」（不變）
-- ⚠️ 過保 → A/B/C + 原錶退回（不變）；若是 legacy 批次，**只在過保區塊頂部加一段灰色備註**：「此為 2018–2022 老批次，依公告為特殊換購方案」
+### 3. 主畫面位置
 
-**D. 過保 Email 模板（`refurbishedPricing.ts`）**
-- 在 `buildDiagnosisNotificationBody` 過保版本最後加入：
-  ```
-  詳細政策請參閱：https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update
-  ```
-- 若 `isLegacyBatch`，第一段改為「您的產品為 2018–2022 批次，依公告政策已不提供原廠維修，以下為特殊換購方案」
-
-**E. 客戶 tracking 頁（`Track.tsx` 或 RMA 詳情顯示處）**
-- 在保固狀態旁加小字連結：「📋 查看保固政策」→ 開新分頁到公告
+只動 `AdminLogistics.tsx`：
+- 在 header 的 buttons 區（`<span>{user?.email}</span>` 後）插入 `<StatusMapDialog />`。
+- 不動 tabs 結構、不動既有分頁元件。
 
 ---
 
-## 不在本次範圍（依 Claude 建議精簡）
+## 三、檔案異動清單
 
-- ❌ DB migration 加 `production_batch` 欄位（warranty_date 算對就夠用）
-- ❌ 第三種獨立 UI 模式（legacy 只是過保 + 備註，不另開分支）
-- ❌ Legacy 獨立價格表（沿用 A/B/C）
-
-## 檔案異動清單
-
-| 檔案 | 動作 |
+| 動作 | 檔案 |
 |---|---|
-| `src/lib/warrantyPolicy.ts` | 新建 |
-| `src/lib/warrantyPolicy.test.ts` | 新建 |
-| `src/components/logistics/WarrantyCalculator.tsx` | 新建 |
-| `src/components/logistics/ReceivingTab.tsx` | 嵌入 Calculator + legacy 警示 |
-| `src/components/logistics/AwaitingConfirmationTab.tsx` | 過保區加 legacy 備註 |
-| `src/lib/refurbishedPricing.ts` | Email 模板加公告連結 + legacy 變體 |
-| `src/pages/Track.tsx` | 加政策連結 |
+| 新增 | `src/lib/rmaStatusMap.ts` |
+| 新增 | `src/components/logistics/StatusMapDialog.tsx` |
+| 編輯 | `src/pages/AdminLogistics.tsx`（header 加按鈕） |
 
-確認後依此順序實作。
+無 DB migration、無 Edge Function 變更、無 RLS 影響。
+
+---
+
+## 四、技術細節
+
+- 純 client-side，沒有任何資料 fetch，完全靠靜態 map render，零效能成本。
+- 樣式沿用現有 shadcn `Dialog` / `Table` / `Badge` / `Button` + Tailwind，符合 memory 中「Clean modern, white cards, primary #3B82F6」基調。
+- 顏色慣例：在保固/正常分頁出現 → `secondary` badge；只在 RMA 列表 → `outline` + 黃字；`closed` → `default`。
+- i18n：全部繁中硬字串，與其他後勤分頁一致。
+
+---
+
+## 五、不在範圍內（避免 scope creep）
+
+- 不重構 ReceivingTab / AwaitingConfirmationTab / Dashboard 改吃 `TAB_STATUS_BUCKETS`（要做但獨立 PR）。
+- 不補 `no_repair` / `shipped_back*` / `follow_up` 的專屬分頁（要先跟使用者確認流程再說）。
+- 不改 status enum、不刪 `unknown`。
