@@ -50,6 +50,46 @@ function getExtension(name: string): string {
   return name.slice(idx + 1).toLowerCase();
 }
 
+  const handleAddFromLibrary = async (picked: PickedLibFile[]) => {
+    if (!selected || picked.length === 0) return;
+    if (attachments.length + picked.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const f of picked) {
+        try {
+          const { data: blob, error: dlErr } = await supabase.storage.from("shared-library").download(f.path);
+          if (dlErr || !blob) throw dlErr || new Error("下載失敗");
+          const path = `rma-replies/${selected.id}/${crypto.randomUUID()}-${f.file_name.replace(/[^\w.\-]+/g, "_")}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACHMENT_BUCKET)
+            .upload(path, blob, { contentType: f.content_type || undefined, upsert: false });
+          if (upErr) throw upErr;
+          uploaded.push({
+            name: f.name,
+            path,
+            size: f.size,
+            contentType: f.content_type || undefined,
+          });
+          // bump usage count (best-effort)
+          supabase.rpc as any; // noop guard
+          supabase.from("shared_library_files").update({ download_count: (await supabase.from("shared_library_files").select("download_count").eq("id", f.id).single()).data?.download_count + 1 || 1 }).eq("id", f.id).then(() => {});
+        } catch (e) {
+          toast.error(`從檔案庫加入失敗：${f.name} - ${e instanceof Error ? e.message : "未知錯誤"}`);
+        }
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已從檔案庫加入 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
 
 interface RmaRow {
   id: string;
