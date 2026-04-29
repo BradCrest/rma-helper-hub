@@ -58,6 +58,9 @@ interface RepairDetail {
   replacement_serial: string | null;
 }
 
+const DIAGNOSIS_CATEGORIES = ["外觀損壞", "功能異常", "保固問題", "使用者疏失"];
+const ACTUAL_METHODS = ["維修", "換新", "退款", "不在保固內"];
+
 const ReceivingTab = () => {
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +76,10 @@ const ReceivingTab = () => {
   const [internalReference, setInternalReference] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
   const [initialDiagnosis, setInitialDiagnosis] = useState("");
+  const [diagnosisCategory, setDiagnosisCategory] = useState("");
+  const [actualMethod, setActualMethod] = useState("");
+  const [replacementModel, setReplacementModel] = useState("");
+  const [replacementSerial, setReplacementSerial] = useState("");
 
   useEffect(() => {
     fetchRmaList();
@@ -115,10 +122,10 @@ const ReceivingTab = () => {
       .eq("rma_request_id", rma.id)
       .single();
 
-    // Fetch initial diagnosis from rma_requests
+    // Fetch initial diagnosis + diagnosis_category from rma_requests
     const { data: rmaData } = await supabase
       .from("rma_requests")
-      .select("initial_diagnosis")
+      .select("initial_diagnosis, diagnosis_category")
       .eq("id", rma.id)
       .single();
 
@@ -127,14 +134,21 @@ const ReceivingTab = () => {
       setPlannedMethod(repairData.planned_method || "");
       setInternalReference(repairData.internal_reference || "");
       setEstimatedCost(repairData.estimated_cost?.toString() || "");
+      setActualMethod(repairData.actual_method || "");
+      setReplacementModel(repairData.replacement_model || "");
+      setReplacementSerial(repairData.replacement_serial || "");
     } else {
       setRepairDetail(null);
       setPlannedMethod("");
       setInternalReference("");
       setEstimatedCost("");
+      setActualMethod("");
+      setReplacementModel("");
+      setReplacementSerial("");
     }
 
     setInitialDiagnosis(rmaData?.initial_diagnosis || "");
+    setDiagnosisCategory(rmaData?.diagnosis_category || "");
     setDialogOpen(true);
   };
 
@@ -143,10 +157,13 @@ const ReceivingTab = () => {
     setSaving(true);
 
     try {
-      // Update initial diagnosis in rma_requests
+      // Update initial diagnosis + diagnosis_category in rma_requests
       await supabase
         .from("rma_requests")
-        .update({ initial_diagnosis: initialDiagnosis })
+        .update({
+          initial_diagnosis: initialDiagnosis,
+          diagnosis_category: diagnosisCategory || null,
+        })
         .eq("id", selectedRma.id);
 
       // Upsert repair details
@@ -155,6 +172,9 @@ const ReceivingTab = () => {
         planned_method: plannedMethod || null,
         internal_reference: internalReference || null,
         estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
+        actual_method: actualMethod || null,
+        replacement_model: actualMethod === "換新" ? (replacementModel || null) : null,
+        replacement_serial: actualMethod === "換新" ? (replacementSerial || null) : null,
       };
 
       if (repairDetail?.id) {
@@ -165,6 +185,7 @@ const ReceivingTab = () => {
       } else {
         await supabase.from("rma_repair_details").insert(repairData);
       }
+
 
       toast.success("已儲存檢查記錄");
       setDialogOpen(false);
@@ -429,6 +450,20 @@ const ReceivingTab = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <Label htmlFor="diagnosisCategory">診斷分類</Label>
+                      <Select value={diagnosisCategory} onValueChange={setDiagnosisCategory}>
+                        <SelectTrigger id="diagnosisCategory">
+                          <SelectValue placeholder="選擇診斷分類" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DIAGNOSIS_CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
                       <Label htmlFor="plannedMethod">預計處理方式</Label>
                       <Select value={plannedMethod} onValueChange={setPlannedMethod}>
                         <SelectTrigger id="plannedMethod">
@@ -440,6 +475,22 @@ const ReceivingTab = () => {
                           <SelectItem value="refund">退款</SelectItem>
                           <SelectItem value="return_supplier">送回供應商</SelectItem>
                           <SelectItem value="no_issue">無問題退回</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="actualMethod">實際處理方式</Label>
+                      <Select value={actualMethod} onValueChange={setActualMethod}>
+                        <SelectTrigger id="actualMethod">
+                          <SelectValue placeholder="選擇實際處理方式" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ACTUAL_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -456,6 +507,29 @@ const ReceivingTab = () => {
                     </div>
                   </div>
 
+                  {actualMethod === "換新" && (
+                    <div className="grid grid-cols-2 gap-4 p-4 border border-border rounded-lg bg-muted/30">
+                      <div>
+                        <Label htmlFor="replacementModel">替換型號</Label>
+                        <Input
+                          id="replacementModel"
+                          placeholder="輸入替換產品型號..."
+                          value={replacementModel}
+                          onChange={(e) => setReplacementModel(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="replacementSerial">替換序號</Label>
+                        <Input
+                          id="replacementSerial"
+                          placeholder="輸入替換產品序號..."
+                          value={replacementSerial}
+                          onChange={(e) => setReplacementSerial(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <Label htmlFor="internalReference">內部參考編號</Label>
                     <Input
@@ -466,6 +540,7 @@ const ReceivingTab = () => {
                     />
                   </div>
                 </div>
+
 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
