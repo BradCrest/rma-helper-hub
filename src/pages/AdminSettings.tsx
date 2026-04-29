@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import AiModelSettings from "@/components/admin/AiModelSettings";
+import AttachmentCleanupSettings from "@/components/admin/AttachmentCleanupSettings";
 
 interface Admin {
   id: string;
