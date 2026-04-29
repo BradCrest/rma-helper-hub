@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +6,7 @@ import { kickoffEmailEmbeddingJob } from "@/lib/email-embedding-job";
 import {
   Mail, Search, RefreshCw, Sparkles, Copy, Check, ExternalLink,
   Loader2, AlertCircle, Inbox, Save, BookOpen, CheckCircle2,
+  Send, Paperclip, FolderOpen, X, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,48 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import SharedLibraryPicker, { type PickedLibFile } from "@/components/admin/SharedLibraryPicker";
+
+const ATTACHMENT_BUCKET = "rma-attachments";
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const ALLOWED_EXTENSIONS = [
+  "jpg", "jpeg", "png", "heic", "webp",
+  "pdf", "doc", "docx", "xls", "xlsx", "zip",
+];
+
+interface UploadedAttachment {
+  name: string;
+  path: string;
+  size: number;
+  contentType?: string;
+  source?: "upload" | "library";
+  libraryFileId?: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx + 1).toLowerCase();
+}
+
+function sanitizeForKey(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  const safeBase =
+    base.replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "") ||
+    "file";
+  const safeExt = ext.replace(/[^\w.]+/g, "");
+  return `${safeBase}${safeExt}`.slice(0, 120);
+}
+
 
 interface EmailListItem {
   id: string;
@@ -111,6 +154,14 @@ const CustomerEmailTab = () => {
   const [kbExistingId, setKbExistingId] = useState<string | null>(null);
   const [kbJustSaved, setKbJustSaved] = useState(false);
 
+  // 寄出回覆相關狀態
+  const [replySubject, setReplySubject] = useState("");
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const buildQuery = useCallback(() => {
     const parts: string[] = ["in:inbox"];
     if (filter === "unread") parts.push("is:unread");
@@ -192,12 +243,19 @@ const CustomerEmailTab = () => {
     setKbJustSaved(false);
     setKbTag("");
     setDraft("");
+    // 重置寄出區塊狀態
+    setAttachments([]);
+    setReplySubject("");
+    setSending(false);
 
     // 先看快取
     const cached = emailDetailCache.get(messageId);
     if (cached) {
       setDetail(cached);
       setDetailLoading(false);
+      setReplySubject(
+        cached.subject ? (cached.subject.startsWith("Re:") ? cached.subject : `Re: ${cached.subject}`) : "Re: ",
+      );
       void checkExistingKnowledge(messageId);
       return;
     }
@@ -212,6 +270,9 @@ const CustomerEmailTab = () => {
       if (data?.error) throw new Error(data.error);
       setDetail(data);
       emailDetailCache.set(messageId, data);
+      setReplySubject(
+        data?.subject ? (data.subject.startsWith("Re:") ? data.subject : `Re: ${data.subject}`) : "Re: ",
+      );
 
       // Auto mark as read if currently unread
       if (data?.unread) {
@@ -302,6 +363,143 @@ const CustomerEmailTab = () => {
   const openInGmail = () => {
     if (!detail) return;
     window.open(`https://mail.google.com/mail/u/0/#inbox/${detail.id}`, "_blank");
+  };
+
+  // ===== 寄出回覆相關 handlers =====
+  const recipient = useMemo(() => {
+    if (!detail) return null;
+    return parseFromHeader(detail.from);
+  }, [detail]);
+
+  const handleAddAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !detail) return;
+    const fileArr = Array.from(files);
+    if (attachments.length + fileArr.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    setUploadingFiles(true);
+    const uploaded: UploadedAttachment[] = [];
+    try {
+      for (const file of fileArr) {
+        const ext = getExtension(file.name);
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+          toast.error(`不支援的檔案類型：${file.name}`);
+          continue;
+        }
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+          toast.error(`檔案超過 25 MB：${file.name}`);
+          continue;
+        }
+        const safeName = sanitizeForKey(file.name);
+        const path = `email-replies/${detail.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACHMENT_BUCKET)
+          .upload(path, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+        if (upErr) {
+          toast.error(`上傳失敗：${file.name} - ${upErr.message}`);
+          continue;
+        }
+        uploaded.push({
+          name: file.name,
+          path,
+          size: file.size,
+          contentType: file.type || undefined,
+          source: "upload",
+        });
+      }
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+        toast.success(`已上傳 ${uploaded.length} 個附件`);
+      }
+    } finally {
+      setUploadingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (idx: number) => {
+    const att = attachments[idx];
+    if (!att) return;
+    if (att.source !== "library") {
+      await supabase.storage.from(ATTACHMENT_BUCKET).remove([att.path]).catch(() => {});
+    }
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddFromLibrary = async (picked: PickedLibFile[]) => {
+    if (!detail || picked.length === 0) return;
+    if (attachments.length + picked.length > MAX_ATTACHMENTS) {
+      toast.error(`最多只能附加 ${MAX_ATTACHMENTS} 個檔案`);
+      return;
+    }
+    const added: UploadedAttachment[] = picked.map((f) => ({
+      name: f.name,
+      path: f.path,
+      size: f.size,
+      contentType: f.content_type || undefined,
+      source: "library",
+      libraryFileId: f.id,
+    }));
+    setAttachments((prev) => [...prev, ...added]);
+    toast.success(`已從檔案庫加入 ${added.length} 個附件`);
+    for (const f of picked) {
+      (async () => {
+        const { data: row } = await supabase
+          .from("shared_library_files")
+          .select("download_count")
+          .eq("id", f.id)
+          .maybeSingle();
+        await supabase
+          .from("shared_library_files")
+          .update({ download_count: (row?.download_count ?? 0) + 1 })
+          .eq("id", f.id);
+      })().catch(() => {});
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!detail || !recipient) return;
+    if (!draft.trim() || !replySubject.trim()) {
+      toast.error("主旨與內文不可為空");
+      return;
+    }
+    if (!recipient.email || !recipient.email.includes("@")) {
+      toast.error("無法解析收件人 Email");
+      return;
+    }
+    const attachmentNote = attachments.length > 0 ? `（含 ${attachments.length} 個附件）` : "";
+    if (!confirm(`確定要以 noreply 寄送回覆給 ${recipient.email} 嗎？${attachmentNote}`)) return;
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-customer-email-reply", {
+        body: {
+          gmailMessageId: detail.id,
+          recipientEmail: recipient.email,
+          recipientName: recipient.name || undefined,
+          rmaNumber: detectedRma || undefined,
+          subject: replySubject.trim(),
+          body: draft.trim(),
+          attachments,
+        },
+      });
+      if (error) throw error;
+      const result = data as any;
+      if (result?.error) {
+        throw new Error(
+          typeof result.error === "string" ? result.error : JSON.stringify(result.error),
+        );
+      }
+      toast.success(`已寄出回覆給 ${recipient.email}`);
+      setAttachments([]);
+    } catch (e: any) {
+      toast.error("寄送失敗：" + (e?.message || ""));
+    } finally {
+      setSending(false);
+    }
   };
 
   // 組合「客戶來信 + 客服回覆」寫入內容
@@ -396,6 +594,7 @@ const CustomerEmailTab = () => {
   }, [lastSyncTs, syncTick]);
 
   return (
+    <>
     <div className="space-y-4">
       {/* Header / toolbar */}
       <div className="rma-card">
@@ -619,8 +818,135 @@ const CustomerEmailTab = () => {
                     readOnly={draftLoading}
                   />
                   <p className="text-xs text-muted-foreground">
-                    可直接編輯後複製貼回 Gmail 寄出
+                    可直接編輯後以 noreply 寄出，或複製貼回 Gmail
                   </p>
+                </div>
+              )}
+
+              {/* 寄出回覆區塊：草稿存在時顯示 */}
+              {draft.trim() && !draftLoading && recipient && (
+                <div className="border-t border-border pt-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-medium">以 noreply 寄出回覆</Label>
+                  </div>
+
+                  <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-sm">
+                    <span className="text-muted-foreground">收件人：</span>
+                    <span className="font-medium break-all">
+                      {recipient.email}
+                      {recipient.name && recipient.name !== recipient.email && (
+                        <span className="text-muted-foreground ml-2">({recipient.name})</span>
+                      )}
+                    </span>
+                    <Label htmlFor="reply-subject" className="text-muted-foreground">
+                      主旨：
+                    </Label>
+                    <Input
+                      id="reply-subject"
+                      value={replySubject}
+                      onChange={(e) => setReplySubject(e.target.value)}
+                      className="h-9"
+                      disabled={sending}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <Label className="text-xs text-muted-foreground">
+                        附件（{attachments.length}/{MAX_ATTACHMENTS}）
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => handleAddAttachments(e.target.files)}
+                          accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploadingFiles || sending || attachments.length >= MAX_ATTACHMENTS}
+                        >
+                          {uploadingFiles ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Paperclip className="w-4 h-4 mr-2" />
+                          )}
+                          上傳檔案
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPickerOpen(true)}
+                          disabled={sending || attachments.length >= MAX_ATTACHMENTS}
+                        >
+                          <FolderOpen className="w-4 h-4 mr-2" />
+                          從檔案庫選擇
+                        </Button>
+                      </div>
+                    </div>
+
+                    {attachments.length > 0 && (
+                      <ul className="border border-border rounded-md divide-y divide-border">
+                        {attachments.map((a, idx) => (
+                          <li
+                            key={`${a.path}-${idx}`}
+                            className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <span className="truncate">{a.name}</span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {formatBytes(a.size)}
+                              </span>
+                              {a.source === "library" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50"
+                                >
+                                  檔案庫
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => handleRemoveAttachment(idx)}
+                              disabled={sending}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                    <p className="text-xs text-muted-foreground">
+                      寄件人為 noreply 系統信箱，附件下載連結 30 天內有效
+                    </p>
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sending || uploadingFiles || !draft.trim() || !replySubject.trim()}
+                      size="sm"
+                    >
+                      {sending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-2" />
+                      )}
+                      {sending ? "寄送中..." : "以 noreply 寄出"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -696,6 +1022,13 @@ const CustomerEmailTab = () => {
         </div>
       </div>
     </div>
+      <SharedLibraryPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        onConfirm={handleAddFromLibrary}
+        maxSelectable={MAX_ATTACHMENTS - attachments.length}
+      />
+    </>
   );
 };
 
