@@ -107,6 +107,7 @@ const RmaReplyTab = () => {
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const selected = rmas.find((r) => r.id === selectedId) || null;
 
