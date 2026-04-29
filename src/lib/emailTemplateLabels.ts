@@ -2,6 +2,7 @@
 // 新增模板時請在此擴充。
 export const EMAIL_TEMPLATE_LABELS: Record<string, string> = {
   "shipping-reminder": "未寄件提醒",
+  "rma-confirmation": "RMA 申請確認",
 };
 
 export function getEmailTemplateLabel(templateName: string): string {
