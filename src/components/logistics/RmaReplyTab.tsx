@@ -135,7 +135,7 @@ const RmaReplyTab = () => {
       .eq("rma_request_id", rmaId)
       .order("created_at", { ascending: true });
     if (error) toast.error("讀取對話失敗：" + error.message);
-    else setThread((data || []) as ThreadMsg[]);
+    else setThread((data || []) as unknown as ThreadMsg[]);
     setThreadLoading(false);
   }, []);
 
