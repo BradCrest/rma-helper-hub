@@ -531,6 +531,68 @@ ${draft.trim()}`;
                 className="font-mono text-sm"
               />
 
+              {/* Attachments */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5" />
+                    附件 {attachments.length > 0 && `(${attachments.length}/${MAX_ATTACHMENTS})`}
+                  </Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    accept={ALLOWED_EXTENSIONS.map((e) => `.${e}`).join(",")}
+                    onChange={(e) => handleAddAttachments(e.target.files)}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingFiles || attachments.length >= MAX_ATTACHMENTS}
+                  >
+                    {uploadingFiles ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Paperclip className="w-3.5 h-3.5" />
+                    )}
+                    加入附件
+                  </Button>
+                </div>
+                {attachments.length > 0 && (
+                  <ul className="space-y-1 border rounded p-2 bg-muted/20">
+                    {attachments.map((a, idx) => (
+                      <li
+                        key={a.path}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />
+                          <span className="truncate">{a.name}</span>
+                          <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                            ({formatBytes(a.size)})
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleRemoveAttachment(idx)}
+                          disabled={sending}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  最多 {MAX_ATTACHMENTS} 個檔案，單檔上限 25 MB。Email 內以下載連結呈現，30 天內有效。
+                </p>
+              </div>
+
               {!selected.customer_email && (
                 <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-2 rounded">
                   <AlertCircle className="w-4 h-4" />
