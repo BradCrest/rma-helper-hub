@@ -44,6 +44,7 @@ import {
   type ActualMethod,
   ACTUAL_METHOD_LABELS,
 } from "@/lib/refurbishedPricing";
+import { evaluateWarranty } from "@/lib/warrantyPolicy";
 
 interface RmaRequest {
   id: string;
@@ -181,9 +182,19 @@ const AwaitingConfirmationTab = () => {
     }
   };
 
-  const systemWithinWarranty = selectedRma
+  const warrantyDecision = selectedRma
+    ? evaluateWarranty({
+        serialNumber: selectedRma.serial_number,
+        productModel: selectedRma.product_model,
+        warrantyDate: selectedRma.warranty_date,
+      })
+    : null;
+  const systemWithinWarranty = warrantyDecision
+    ? warrantyDecision.withinWarranty
+    : selectedRma
     ? isWithinWarranty(selectedRma.warranty_date)
     : false;
+  const isLegacyBatch = warrantyDecision?.isLegacyBatch ?? false;
   const effectiveWithinWarranty =
     warrantyOverride === null ? systemWithinWarranty : warrantyOverride;
 
@@ -537,6 +548,11 @@ const AwaitingConfirmationTab = () => {
                     <Badge variant={systemWithinWarranty ? "default" : "secondary"}>
                       系統判斷：{systemWithinWarranty ? "保固內" : "已過保"}
                     </Badge>
+                    {isLegacyBatch && (
+                      <Badge variant="destructive" className="text-[10px]">
+                        Legacy 批次
+                      </Badge>
+                    )}
                     {selectedRma.warranty_date && (
                       <span className="text-[10px] text-muted-foreground">
                         ({format(new Date(selectedRma.warranty_date), "yyyy/MM/dd")} 到期)
@@ -627,7 +643,13 @@ const AwaitingConfirmationTab = () => {
                     />
                   </div>
                 ) : (
-                  // 過保固：4 選 1
+                  // 過保固：4 選 1（含 legacy 提醒）
+                  <>
+                    {isLegacyBatch && (
+                      <div className="p-2 rounded text-xs bg-destructive/10 border border-destructive/30 text-destructive">
+                        ⚠️ 此產品為 2018–2022 老批次，依 2025/11/12 公告為特殊換購方案，價格沿用一般 A/B/C 整新機。
+                      </div>
+                    )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <DecisionCard
                       selected={selectedMethod === "purchase_a"}
@@ -658,6 +680,7 @@ const AwaitingConfirmationTab = () => {
                       subtitle="客戶不購買，原錶寄回"
                     />
                   </div>
+                  </>
                 )}
 
                 {/* 金額覆寫 */}

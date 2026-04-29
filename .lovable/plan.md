@@ -1,151 +1,127 @@
-# 待客戶確認流程 — 整合方案（採納 Claude 建議）
 
-## 兩方案比較
+# 對齊 CREST 官方保固政策（精簡版 + 序號自動解析）
 
-| 項目 | 原計劃 | Claude 建議 | 採用 |
-|------|--------|-------------|------|
-| 價格表儲存 | DB (`ai_settings`) + 設定頁 | 前端硬編碼常數 | **Claude** — 更簡單，不用建設定 UI |
-| `actual_method` 命名 | `purchased_refurbished_a` | `purchase_a` | **Claude** — 更簡潔 |
-| 依產品分價 | 全產品共用一組價格 | 各型號獨立價格 (CR-4 / CR-5L) | **Claude** — 符合實況 |
-| Email 內容 | 未提 | 依保固狀態自動切換 | **Claude 補強** |
-| 待客戶確認分頁 | 完整設計 | 未提 | **保留原計劃** |
-| 保固判斷 + 手動覆寫 | 有 | 未提 | **保留原計劃** |
-| 訊息時間軸 + 4 選項決定 UI | 有 | 未提 | **保留原計劃** |
+## 三個確認事項回覆
+
+| 確認事項 | 答案 |
+|---|---|
+| Legacy 批次定價 | 與一般過保相同 A/B/C 價格，UI 加文字備註即可 |
+| 批次判斷 | **可從序號解析**（CR-4 / CR-5L / CR-1 / CR-F 都含年份+週數）|
+| 公告連結 | Email 模板 + 客戶 tracking 頁 |
+
+## CREST 序號規則（官方文件）
+
+| 型號 | 範例 | 年份位置 | 週數位置 |
+|---|---|---|---|
+| CR-4  | `CBK25160015` | 第 4-5 碼 (`25` = 2025) | 第 6-7 碼 (`16` = 第 16 週) |
+| CR-5L | `CBK25160015` | 第 5-6 碼 | 第 7-8 碼 |
+| CR-1  | `CR125160015` | 第 4-5 碼 | 第 6-7 碼 |
+| CR-F  | `CRFY25160015`| 第 5-6 碼 | 第 7-8 碼 |
+
+→ `生產年 + 週數` 可推得「大約生產日期」→ 比對政策三段制 → 自動算保固到期日。
+
+## 政策對應
+
+| 生產日期 | 保固年限 | 備註 |
+|---|---|---|
+| 2018/01 – 2022/10 | **無**（過保） | UI 顯示「老批次」備註 + 沿用 A/B/C 價 |
+| 2022/11 – 2025/10 | **2 年** | 一般保固流程 |
+| 2025/11/12 起 | **1 年** | 一般保固流程 |
 
 ---
 
-## Phase A — 價格表常數
+## 實作計劃（精簡為兩個 Phase）
 
-新建 `src/lib/refurbishedPricing.ts`：
+### Phase 1 — 純函式模組（高優先）
 
+**新建 `src/lib/warrantyPolicy.ts`** — 純函式，易測試
 ```typescript
-export const REFURB_PRICES: Record<string, { A: number; B: number; C: number }> = {
-  "CR-4":  { A: 3680, B: 3180, C: 2680 },
-  "CR-5L": { A: 5780, B: 5180, C: 4580 },
-};
+export type ProductionBatch = "legacy_2018_2022" | "v2_2022_2025" | "v3_2025_onwards";
 
-export const DEFAULT_REFURB_PRICES = { A: 0, B: 0, C: 0 };
+// 從序號解析生產日期（年+週數轉日期）
+export function parseSerialNumber(serial: string, model: string): {
+  year: number;
+  week: number;
+  productionDate: Date;
+} | null;
 
-export function getRefurbPrices(productModel: string | null | undefined) {
-  if (!productModel) return DEFAULT_REFURB_PRICES;
-  // 模糊比對：CR-5L、CR5L、cr-5l 都可
-  const normalized = productModel.toUpperCase().replace(/[\s-]/g, "");
-  for (const [key, prices] of Object.entries(REFURB_PRICES)) {
-    if (key.toUpperCase().replace(/[\s-]/g, "") === normalized) return prices;
-  }
-  return DEFAULT_REFURB_PRICES;
+// 由生產日期推批次
+export function detectBatch(productionDate: Date): ProductionBatch;
+
+// 由批次 + 生產日推保固到期日
+export function calcWarrantyExpiry(batch: ProductionBatch, productionDate: Date): Date | null;
+
+// 完整評估（給 UI 用）
+export interface WarrantyDecision {
+  batch: ProductionBatch;
+  withinWarranty: boolean;
+  isLegacyBatch: boolean;
+  warrantyYears: 1 | 2 | null;
+  productionDate: Date | null;
+  expiry: Date | null;
+  source: "serial" | "manual" | "warranty_date_field";
+  policyNote: string;
 }
+export function evaluateWarranty(params: {
+  serialNumber?: string | null;
+  productModel?: string | null;
+  warrantyDate?: string | null;
+  manualBatchOverride?: ProductionBatch | null;
+  manualWarrantyOverride?: "in_warranty" | "out_of_warranty" | null;
+}): WarrantyDecision;
 
-export const ACTUAL_METHOD_LABELS: Record<string, string> = {
-  warranty_replace: "保固換整新機",
-  purchase_a: "購買 A 級整新機",
-  purchase_b: "購買 B 級整新機",
-  purchase_c: "購買 C 級整新機",
-  return_original: "原錶退回",
-};
+export const POLICY_ANNOUNCEMENT_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update";
 ```
 
-未列在 `REFURB_PRICES` 的型號 → 顯示 0，admin 可在 Dialog 中手動填入。新型號上線時直接改這支檔即可。
+**新建 `src/lib/warrantyPolicy.test.ts`** — 單元測試
+- CR-4 / CR-5L / CR-1 / CR-F 序號各 3-5 個樣本
+- 三段批次邊界日期（2022/10/31、2022/11/01、2025/10/31、2025/11/12）
+- 缺序號 / 缺型號 fallback 行為
+
+### Phase 2 — UI 整合
+
+**A. `WarrantyCalculator.tsx`（嵌在 ReceivingTab 收件 Dialog）**
+- 自動讀取該 RMA 的 `serial_number` + `product_model`
+- 顯示：`從序號 CBK25160015 解析 → 2025/04/15 生產 → 第 3 段批次（2025/11+）→ 保固 1 年 → 到期日 2026/04/15`
+- Admin 可手動覆寫批次（下拉三選一）
+- 「套用到此 RMA」按鈕 → 寫入 `warranty_date` + `warranty_status`
+
+**B. `ReceivingTab.tsx` 診斷通知 Dialog**
+- 保固區塊顯示批次徽章 + 解析來源（從序號 / 手動）
+- 若 `isLegacyBatch` → 顯示警示橫幅：「此產品為 2018–2022 批次，依 2025/11/12 公告已不提供原廠維修，可走特殊換購方案」
+
+**C. `AwaitingConfirmationTab.tsx` — 保留現有兩種模式**
+- ✅ 保固內 → 一鍵「換整新機」（不變）
+- ⚠️ 過保 → A/B/C + 原錶退回（不變）；若是 legacy 批次，**只在過保區塊頂部加一段灰色備註**：「此為 2018–2022 老批次，依公告為特殊換購方案」
+
+**D. 過保 Email 模板（`refurbishedPricing.ts`）**
+- 在 `buildDiagnosisNotificationBody` 過保版本最後加入：
+  ```
+  詳細政策請參閱：https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update
+  ```
+- 若 `isLegacyBatch`，第一段改為「您的產品為 2018–2022 批次，依公告政策已不提供原廠維修，以下為特殊換購方案」
+
+**E. 客戶 tracking 頁（`Track.tsx` 或 RMA 詳情顯示處）**
+- 在保固狀態旁加小字連結：「📋 查看保固政策」→ 開新分頁到公告
 
 ---
 
-## Phase B — 診斷通知 Email 動態化（ReceivingTab）
+## 不在本次範圍（依 Claude 建議精簡）
 
-修改現有「通知客戶診斷結果」的預設文字，依 `warranty_date >= today` 切換：
+- ❌ DB migration 加 `production_batch` 欄位（warranty_date 算對就夠用）
+- ❌ 第三種獨立 UI 模式（legacy 只是過保 + 備註，不另開分支）
+- ❌ Legacy 獨立價格表（沿用 A/B/C）
 
-**保固內模板**：
-```
-您好，
+## 檔案異動清單
 
-您的 {product_model}（序號 {serial_number}）已完成檢測，
-確認符合保固更換條件。我們將為您更換整新機（免費）。
+| 檔案 | 動作 |
+|---|---|
+| `src/lib/warrantyPolicy.ts` | 新建 |
+| `src/lib/warrantyPolicy.test.ts` | 新建 |
+| `src/components/logistics/WarrantyCalculator.tsx` | 新建 |
+| `src/components/logistics/ReceivingTab.tsx` | 嵌入 Calculator + legacy 警示 |
+| `src/components/logistics/AwaitingConfirmationTab.tsx` | 過保區加 legacy 備註 |
+| `src/lib/refurbishedPricing.ts` | Email 模板加公告連結 + legacy 變體 |
+| `src/pages/Track.tsx` | 加政策連結 |
 
-請回覆此信件確認接受，我們將盡快安排寄出。
-
-CREST 售後服務團隊
-```
-
-**過保固模板**（自動帶入該型號 ABC 價格）：
-```
-您好，
-
-您的 {product_model}（序號 {serial_number}）已完成檢測，
-非保固範圍。以下為可選方案：
-
-  A 級整新機：NT$ {price_a}
-  B 級整新機：NT$ {price_b}
-  C 級整新機：NT$ {price_c}
-  原錶退回：免費（僅需負擔回寄運費）
-
-請回覆此信件告知您的選擇。
-
-CREST 售後服務團隊
-```
-
-實作：在 `ReceivingTab.tsx` 開啟通知 Dialog 時，依該 RMA 的 `warranty_date` 與 `product_model` 自動產生預設文字填入 textarea，admin 仍可編輯。新增「保固內 / 過保固」切換 toggle 供 admin 覆寫（人情保固）。
-
----
-
-## Phase C — 待客戶確認分頁
-
-### 列表（`AdminLogistics.tsx` + 新 `AwaitingConfirmationTab.tsx`）
-
-- 取代現有「客戶處理」分頁，名稱改為 **「待客戶確認」**
-- 只顯示 `status = 'contacting'` 的 RMA
-- 每列顯示：RMA 編號、客戶、產品 + 序號、保固狀態徽章、最後通知日期、客戶回覆狀態（已回 / 等待中 / 超過 7 天警示）
-
-### Dialog（點擊列開啟）
-
-**1. 保固判斷區**
-- 系統依 `warranty_date >= today` 顯示「保固內」/「已過保」徽章
-- Toggle：「以保固內處理 / 以過保處理」（人情保固覆寫）
-
-**2. 客戶往來訊息時間軸**
-- 從 `rma_thread_messages` 讀取，依時間顯示 admin 通知 + 客戶回覆 + 附件
-
-**3. 客戶決定區**
-
-依保固狀態顯示對應選項：
-
-**保固內** → 單一動作按鈕：
-- ✅ **客戶同意換整新機** → 狀態 `quote_confirmed`、`actual_method = 'warranty_replace'`、`repair_fee = 0`
-
-**過保固** → 4 選 1（顯示該型號 ABC 價格，可覆寫）：
-- 🅰️ 購買 A 級整新機（NT$ X,XXX）→ `actual_method = 'purchase_a'`、`repair_fee = A 價`
-- 🅱️ 購買 B 級整新機（NT$ X,XXX）→ `actual_method = 'purchase_b'`、`repair_fee = B 價`
-- 🅲 購買 C 級整新機（NT$ X,XXX）→ `actual_method = 'purchase_c'`、`repair_fee = C 價`
-- ❌ 原錶退回（需填取消原因）→ 狀態 `no_repair`、`actual_method = 'return_original'`
-
-A/B/C 與保固換新最終狀態都是 `quote_confirmed`，後續寄回階段再依 `actual_method` 決定 `shipped_back_new` / `shipped_back_refurbished`。
-
-**4. 自動寫入**
-- `rma_repair_details`：upsert `actual_method`、`replacement_model`（A/B/C 級標籤）
-- `rma_requests.repair_fee`
-- `rma_customer_contacts`：`contact_method = 'decision_logged'`、`contact_notes` = 決定摘要
-- `rma_status_history`：狀態變更紀錄
-
-**5. 再次聯繫**
-- 「💬 再次發送通知」按鈕導向 RmaReplyTab
-
----
-
-## 技術細節
-
-### 檔案異動
-- 新建：`src/lib/refurbishedPricing.ts`
-- 新建：`src/components/logistics/AwaitingConfirmationTab.tsx`
-- 修改：`src/pages/AdminLogistics.tsx`（換掉 CustomerHandlingTab）
-- 修改：`src/components/logistics/ReceivingTab.tsx`（診斷通知模板動態化 + 保固切換）
-
-### 不需 DB schema 變更
-- 沿用現有 `rma_status` enum
-- `actual_method` 用字串：`warranty_replace` / `purchase_a` / `purchase_b` / `purchase_c` / `return_original`
-
-### 不在本次範圍
-- 寄回作業分頁（下一階段，依 `actual_method` 自動建議寄回類型）
-- 付費追蹤、滿意度 follow-up
-
-### 確認後實作順序
-1. `refurbishedPricing.ts` 常數檔
-2. `ReceivingTab` 通知模板依保固動態切換
-3. `AwaitingConfirmationTab` 完整實作 + AdminLogistics 串接
+確認後依此順序實作。

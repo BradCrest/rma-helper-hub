@@ -431,6 +431,18 @@ const Track = () => {
                       <p className="text-foreground">{formatDate(selectedRma.created_at)}</p>
                     </div>
                   </div>
+
+                  <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
+                    📋 保固政策說明：
+                    <a
+                      href="https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline ml-1"
+                    >
+                      查看 CREST 官方保固維修政策公告
+                    </a>
+                  </div>
                 </div>
 
                 {/* Status Timeline */}

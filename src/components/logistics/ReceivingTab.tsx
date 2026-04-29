@@ -46,6 +46,8 @@ import {
   getRefurbPrices,
   formatNT,
 } from "@/lib/refurbishedPricing";
+import { evaluateWarranty } from "@/lib/warrantyPolicy";
+import WarrantyCalculator from "./WarrantyCalculator";
 
 type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "repairing" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished" | "unknown";
 
@@ -307,10 +309,23 @@ const ReceivingTab = () => {
     }
   };
 
-  // 系統依 warranty_date 判斷是否在保固內
-  const systemWithinWarranty = selectedRma
+  // 完整保固評估（序號 + warranty_date 綜合）
+  const warrantyDecision = selectedRma
+    ? evaluateWarranty({
+        serialNumber: selectedRma.serial_number,
+        productModel: selectedRma.product_model,
+        warrantyDate: selectedRma.warranty_date,
+      })
+    : null;
+
+  // 系統依完整評估判斷是否在保固內（優先使用 warrantyPolicy 模組結果）
+  const systemWithinWarranty = warrantyDecision
+    ? warrantyDecision.withinWarranty
+    : selectedRma
     ? isWithinWarranty(selectedRma.warranty_date)
     : false;
+
+  const isLegacyBatch = warrantyDecision?.isLegacyBatch ?? false;
 
   // 實際生效的保固判斷（含 admin 覆寫）
   const effectiveWithinWarranty =
@@ -325,6 +340,7 @@ const ReceivingTab = () => {
       serialNumber: selectedRma.serial_number,
       withinWarranty: within,
       diagnosis: selectedRma.initial_diagnosis,
+      isLegacyBatch,
     });
     return { subject, body };
   };
@@ -674,6 +690,29 @@ const ReceivingTab = () => {
                 )}
               </div>
 
+              {/* Warranty Calculator — 序號自動解析批次 + 保固到期 */}
+              <WarrantyCalculator
+                serialNumber={selectedRma.serial_number}
+                productModel={selectedRma.product_model}
+                warrantyDate={selectedRma.warranty_date}
+                onApply={async (decision) => {
+                  if (!decision.expiry) return;
+                  try {
+                    const expiryStr = decision.expiry.toISOString().slice(0, 10);
+                    await supabase
+                      .from("rma_requests")
+                      .update({ warranty_date: expiryStr })
+                      .eq("id", selectedRma.id);
+                    toast.success(`已套用保固到期日：${expiryStr}`);
+                    setSelectedRma({ ...selectedRma, warranty_date: expiryStr });
+                    fetchRmaList();
+                  } catch (err) {
+                    console.error(err);
+                    toast.error("套用失敗");
+                  }
+                }}
+              />
+
               {/* Inspection Form */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
@@ -854,6 +893,11 @@ const ReceivingTab = () => {
                   <Badge variant={systemWithinWarranty ? "default" : "secondary"}>
                     系統判斷：{systemWithinWarranty ? "保固內" : "已過保"}
                   </Badge>
+                  {isLegacyBatch && (
+                    <Badge variant="destructive" className="text-[10px]">
+                      Legacy 批次
+                    </Badge>
+                  )}
                   {selectedRma.warranty_date && (
                     <span className="text-[10px] text-muted-foreground">
                       ({format(new Date(selectedRma.warranty_date), "yyyy/MM/dd")} 到期)
@@ -872,6 +916,12 @@ const ReceivingTab = () => {
                   />
                 </div>
               </div>
+
+              {isLegacyBatch && !effectiveWithinWarranty && (
+                <div className="p-2 bg-destructive/10 border border-destructive/30 rounded text-[11px] text-destructive">
+                  ⚠️ 此產品為 2018–2022 老批次，依 2025/11/12 公告已不提供原廠維修。Email 將自動採用 Legacy 特殊換購文案。
+                </div>
+              )}
 
               {!effectiveWithinWarranty && (
                 <div className="p-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded text-[11px] text-amber-900 dark:text-amber-200">
