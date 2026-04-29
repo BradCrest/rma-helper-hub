@@ -1,74 +1,146 @@
 ## 目標
 
-把「RMA 回覆給客戶」從 Gmail 連接器（用管理員個人 Gmail 寄出）改為走 Lovable 內建的 transactional email 系統，與其他通知 email 一致使用 `noreply@notify.crestdiving.com` 寄出。
+在 RMA 回覆 Email 中支援「附件 = 下載連結」：管理員上傳檔案 → 存到 Storage → 產生 30 天 signed URL → Email 內以「📎 下載附件」按鈕呈現。附件記錄保留在 `rma_thread_messages` 中，未來可在 RMA 詳情頁查到歷史。
 
-## 現況
+---
 
-- 通知 email（RMA 確認、寄件提醒）已使用 `send-transactional-email` + 模板 (`rma-confirmation`, `shipping-reminder`)，由 `noreply@notify.crestdiving.com` 寄出。
-- RMA 回覆 (`send-rma-reply`) 仍走 Gmail Connector Gateway，用管理員個人帳號當 From。
-- 需要保留的功能：
-  - 動態主旨（管理員可自訂）
-  - 動態內文（管理員輸入的回覆）
-  - 嵌入「填寫我的回覆」按鈕（含 `reply_token`）
-  - 寫入 `rma_thread_messages`（保留 thread 紀錄、token、過期時間）
-  - 寫入 `email_send_log`
+## 預設設定（採用上次討論的建議）
 
-## 變更內容
+| 項目 | 值 |
+|---|---|
+| Storage bucket | `rma-attachments`（**私有**，用 signed URL） |
+| 單檔大小上限 | 25 MB |
+| 每封回覆檔案數上限 | 5 個 |
+| 連結有效期 | 30 天（與 reply token 一致） |
+| 允許檔案類型 | jpg, png, heic, webp, pdf, doc, docx, xls, xlsx, zip |
 
-### 1. 新增 React Email 模板
-`supabase/functions/_shared/transactional-email-templates/rma-reply.tsx`
-- Props: `customerName`, `rmaNumber`, `replyBody`, `replyUrl`
-- 主旨：使用函式形式 `(data) => data.subject || \`Re: [${data.rmaNumber}] 您的維修申請進度回覆\``，這樣管理員自訂主旨仍可生效（透過 `templateData.subject` 傳入）
-- 視覺風格與 `rma-confirmation` 一致（白底、藍色 CTA、CREST 品牌）
-- 包含「填寫我的回覆」按鈕指向 `${PUBLIC_BASE_URL}/rma-reply/${token}`
-- 文案維持："若您針對這個回覆有進一步的疑問或說明，請點擊下方按鈕"
+---
 
-### 2. 在 registry.ts 註冊新模板
-加入 `'rma-reply': rmaReply`
-
-### 3. 改寫 `send-rma-reply/index.ts`
-- 移除所有 Gmail Gateway 相關程式（`buildRawEmail`、Gmail fetch、`GOOGLE_MAIL_API_KEY`）
-- 保留：管理員身分驗證、RMA 查詢、`reply_token` 產生、寫入 `rma_thread_messages`
-- 改為呼叫 `supabase.functions.invoke('send-transactional-email', { body: { templateName: 'rma-reply', recipientEmail, idempotencyKey, templateData: { subject, customerName, rmaNumber, replyBody, replyUrl } } })`
-- `idempotencyKey` 用 `rma-reply-${threadMessageId}` 確保重試安全
-- 不再手動寫 `email_send_log`（transactional email 系統會自動記錄）
-- 仍回傳 `replyUrl` 供前端展示
-
-### 4. 部署
-- 部署 `send-transactional-email`（因為新模板需要重新打包 registry）
-- 部署 `send-rma-reply`
-
-### 5. 不變動
-- 前端 `RmaReplyTab.tsx` 介面、`/rma-reply/:token` 客戶頁面、`submit-customer-reply`、`lookup-rma-reply-thread` 全部保持原樣
-- Gmail 連接器仍保留供 `gmail-list-messages` 等其他功能使用
-
-## 流程圖
+## 變更總覽
 
 ```text
-管理員後台「RMA 回覆」分頁
-  └─> send-rma-reply (Edge Function)
-        ├─ 驗證 admin
-        ├─ 產生 reply_token + 過期時間
-        ├─ INSERT rma_thread_messages (direction=outbound)
-        └─> send-transactional-email
-              ├─ 套用 'rma-reply' 模板（React Email）
-              ├─ 從 noreply@notify.crestdiving.com 寄出
-              ├─ 進入 transactional pgmq 佇列
-              └─ 自動寫入 email_send_log
-                    │
-                    ▼
-              客戶信箱收到 email（noreply 寄件者）
-                    │
-                    ▼ 點「填寫我的回覆」
-              /rma-reply/:token 公開頁面（不需登入）
-                    │
-                    ▼
-              submit-customer-reply
-                    └─ INSERT rma_thread_messages (direction=inbound)
-                       UPDATE rma_requests.has_unread_customer_reply=true
+1. 新增 Storage bucket  rma-attachments（私有）+ RLS policy
+2. 新增欄位            rma_thread_messages.attachments (jsonb)
+3. 改 Edge Function    send-rma-reply  → 接收 attachments，產生 signed URL
+4. 改 Email Template   rma-reply.tsx   → 渲染附件下載按鈕區塊
+5. 改前端 UI           RmaReplyTab.tsx → 上傳 / 列表 / 移除附件 UI
+6. 對話歷史顯示        在 thread 訊息中也顯示已寄出的附件名稱
 ```
 
-## 注意事項
+---
 
-- 客戶若直接「回覆」此 email，會寄到 `noreply@notify.crestdiving.com`，不會被人收到。這是預期行為；客戶必須點按鈕透過網頁回覆，所有對話才會集中在 RMA 紀錄裡。模板會清楚說明這點。
-- Gmail thread 紀錄（gmail_message_id）將不再產生；現有歷史資料不受影響。
+## 1. 資料庫變更（migration）
+
+**Bucket**：建立 `rma-attachments`，`public = false`。
+
+**RLS（storage.objects）**：
+- Admin 可 `INSERT` / `SELECT` / `DELETE` bucket 內物件
+- 一般用戶無權限（Email 收件人透過 signed URL 存取，不需 RLS）
+
+**Schema**：在 `rma_thread_messages` 新增
+```sql
+ALTER TABLE rma_thread_messages
+  ADD COLUMN attachments jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- 結構: [{ name, path, size, contentType, uploadedAt }]
+```
+
+---
+
+## 2. 前端 UI 改動（`src/components/logistics/RmaReplyTab.tsx`）
+
+在「回覆內容」textarea 下方、按鈕列上方，新增「附件」區塊：
+
+- 「＋ 加入附件」按鈕（呼叫隱藏的 `<input type="file" multiple>`）
+- 已選檔案列表（每行：圖示 / 檔名 / 大小 / 移除 X）
+- 上傳進度顯示（小 spinner 或 % 文字）
+- 上限驗證：>5 檔或 >25 MB 即時提示，副檔名不符直接拒絕
+
+**上傳流程**：
+1. 使用者選檔 → 立即用 `supabase.storage.from('rma-attachments').upload()` 上傳到 `rma-replies/{rmaId}/{uuid}-{filename}`
+2. 上傳成功的檔案存進 React state `attachments: UploadedFile[]`
+3. 按「寄出回覆」時，把 `attachments`（含 storage path）一起傳給 `send-rma-reply`
+4. 寄送失敗或使用者移除某檔 → 從 storage 刪掉對應物件（避免孤兒檔）
+5. 切換到別的 RMA 或寄送成功後，清空 state
+
+**對話歷史**：渲染 `m.attachments`（如果有），顯示為「📎 檔名（大小）」清單，方便管理員回顧過去附件。
+
+---
+
+## 3. Edge Function 改動（`supabase/functions/send-rma-reply/index.ts`）
+
+**Schema 新增**：
+```ts
+attachments: z.array(z.object({
+  name: z.string().min(1).max(255),
+  path: z.string().min(1).max(500),
+  size: z.number().int().nonnegative().max(25 * 1024 * 1024),
+  contentType: z.string().max(200).optional(),
+})).max(5).default([]),
+```
+
+**處理流程**：
+1. 驗證每個 `path` 都以 `rma-replies/{rmaRequestId}/` 開頭（防止存取其他 RMA 的檔案）
+2. 對每個附件呼叫 `admin.storage.from('rma-attachments').createSignedUrl(path, 30 * 24 * 3600)`，得到 30 天有效的 download URL
+3. 將「附件 metadata + signed URL」組成 `templateAttachments` 陣列傳給 email template
+4. 寫入 `rma_thread_messages.attachments` 欄位（**只存 metadata + path，不存 signed URL**，因為 URL 會過期；未來顯示歷史時若需要再生新 URL）
+
+---
+
+## 4. Email Template 改動（`supabase/functions/_shared/transactional-email-templates/rma-reply.tsx`）
+
+**Props 新增**：
+```ts
+attachments?: Array<{
+  name: string;
+  url: string;
+  size: number;
+}>
+```
+
+**渲染**：在「填寫我的回覆」按鈕區塊**之上**新增附件區（如果 `attachments?.length > 0`）：
+
+```text
+┌────────────────────────────────────┐
+│ 📎 附件（2）                        │
+│                                    │
+│ [📄 報價單.pdf  下載]  120 KB       │
+│ [🖼 維修照片.jpg 下載] 850 KB       │
+│                                    │
+│ 連結 30 天內有效                   │
+└────────────────────────────────────┘
+```
+
+每個附件用 React Email 的 `Button` 元件，連到 signed URL；旁邊小字顯示檔案大小。
+
+更新 `previewData` 加入 1-2 個範例附件。
+
+---
+
+## 5. 安全考量
+
+- **Path 驗證**：edge function 強制檢查 path prefix `rma-replies/{rmaRequestId}/`，防止管理員 A 拿到 RMA B 的檔案路徑後寄出
+- **Bucket 私有**：物件無法被猜到 URL 直接存取
+- **Signed URL 30 天**：與 reply token 同步，過期即失效
+- **檔案大小 / 數量上限**：前端 + zod schema 雙重驗證
+- **副檔名白名單**：前端驗證（後端不嚴格擋，因為 contentType 可偽造，主要靠 bucket 私有 + signed URL 控制風險）
+- **RLS**：Storage RLS 限制只有 admin 能寫入 / 列出 bucket
+
+---
+
+## 6. 不在這次範圍
+
+- 客戶回覆時上傳附件（目前 customer reply 表單沒有附件功能 — 之後若要可再規劃）
+- 附件預覽（直接靠瀏覽器處理 PDF/圖片）
+- 附件單獨刪除 UI（已寄出後不提供刪除，避免破壞 email 連結；未寄送前可從 compose 區移除）
+- 過期 signed URL 的自動續期（30 天足夠，過期視為正常生命週期結束）
+
+---
+
+## 完成後測試流程
+
+1. 進入「RMA 回覆」分頁，選一筆 RMA
+2. 撰寫回覆內容 → 上傳 1-2 個附件（測試 jpg + pdf）
+3. 按「寄出回覆」
+4. 收件信箱應收到 email，內含「📎 附件」區塊
+5. 點下載連結 → 瀏覽器下載檔案
+6. 回到管理面板，對話歷史那筆 outbound 訊息應顯示附件列表
