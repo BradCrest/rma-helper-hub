@@ -37,8 +37,15 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import {
+  buildDiagnosisNotificationBody,
+  isWithinWarranty,
+  getRefurbPrices,
+  formatNT,
+} from "@/lib/refurbishedPricing";
 
 type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "repairing" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished" | "unknown";
 
@@ -56,6 +63,7 @@ interface RmaRequest {
   issue_description: string;
   initial_diagnosis: string | null;
   diagnosis_category: string | null;
+  warranty_date: string | null;
   created_at: string;
 }
 
