@@ -105,7 +105,7 @@ serve(async (req) => {
       const { data, error } = await supabase
         .from("rma_requests")
         .insert([insertData])
-        .select("rma_number")
+        .select("id, rma_number")
         .single();
 
       if (error) {
@@ -123,6 +123,56 @@ serve(async (req) => {
       });
 
       console.log("Successfully created RMA:", data.rma_number);
+
+      // Send confirmation email to customer (non-blocking)
+      try {
+        const trackUrl = `https://rma-helper-hub.lovable.app/track?rma=${encodeURIComponent(data.rma_number)}`;
+        const shippingUrl = `https://rma-helper-hub.lovable.app/shipping-form?rma=${encodeURIComponent(data.rma_number)}`;
+        const createdDate = new Date().toLocaleDateString("zh-TW", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          timeZone: "Asia/Taipei",
+        });
+
+        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "apikey": supabaseServiceKey,
+          },
+          body: JSON.stringify({
+            templateName: "rma-confirmation",
+            recipientEmail: product.customer_email,
+            idempotencyKey: `rma-confirm-${data.rma_number}`,
+            templateData: {
+              customerName: product.customer_name,
+              rmaNumber: data.rma_number,
+              productName: product.product_name || "保固服務商品",
+              productModel: product.product_model || "",
+              serialNumber: product.serial_number || "",
+              issueType: product.issue_type || "",
+              createdDate,
+              trackUrl,
+              shippingUrl,
+            },
+            logMetadata: {
+              rma_number: data.rma_number,
+              rma_request_id: data.id,
+            },
+          }),
+        });
+
+        if (!emailResp.ok) {
+          console.error("Failed to send confirmation email:", await emailResp.text());
+        } else {
+          console.log("Confirmation email enqueued for RMA:", data.rma_number);
+        }
+      } catch (emailError) {
+        console.error("Error sending confirmation email:", emailError);
+        // Don't fail RMA creation
+      }
 
       // Send Slack notification for new RMA
       try {
