@@ -58,6 +58,9 @@ interface RepairDetail {
   replacement_serial: string | null;
 }
 
+const DIAGNOSIS_CATEGORIES = ["外觀損壞", "功能異常", "保固問題", "使用者疏失"];
+const ACTUAL_METHODS = ["維修", "換新", "退款", "不在保固內"];
+
 const ReceivingTab = () => {
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
