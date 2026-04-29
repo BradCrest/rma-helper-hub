@@ -8,10 +8,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024; // 25 MB
+const SIGNED_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const ATTACHMENT_BUCKET = "rma-attachments";
+
+const AttachmentSchema = z.object({
+  name: z.string().min(1).max(255),
+  path: z.string().min(1).max(500),
+  size: z.number().int().nonnegative().max(MAX_ATTACHMENT_SIZE),
+  contentType: z.string().max(200).optional(),
+});
+
 const BodySchema = z.object({
   rmaRequestId: z.string().uuid(),
   subject: z.string().min(1).max(500),
   body: z.string().min(1).max(20000),
+  attachments: z.array(AttachmentSchema).max(5).default([]),
 });
 
 // Always use the published public domain so the reply link is not gated
