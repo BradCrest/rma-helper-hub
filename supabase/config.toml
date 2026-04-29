@@ -98,3 +98,6 @@ verify_jwt = false
 [functions.submit-customer-reply]
 verify_jwt = false
 
+[functions.shopify-find-orders-by-email]
+verify_jwt = true
+
