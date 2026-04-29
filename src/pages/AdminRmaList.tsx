@@ -831,6 +831,26 @@ const AdminRmaList = () => {
       const { error: embeddingsErr } = await supabase.from("rma_embeddings").delete().eq("rma_request_id", rmaToDelete.id);
       if (embeddingsErr) throw new Error(`刪除 embeddings 失敗：${embeddingsErr.message}`);
 
+      // Best-effort: remove reply attachments from storage (don't block delete on failure)
+      try {
+        const { data: attFiles } = await supabase.storage
+          .from("rma-attachments")
+          .list(`rma-replies/${rmaToDelete.id}`);
+        if (attFiles && attFiles.length > 0) {
+          const paths = attFiles.map((f) => `rma-replies/${rmaToDelete.id}/${f.name}`);
+          await supabase.storage.from("rma-attachments").remove(paths);
+        }
+      } catch (e) {
+        console.warn("清理附件檔案失敗（不阻擋刪除）", e);
+      }
+
+      // Delete thread messages (was missing before)
+      const { error: threadErr } = await supabase
+        .from("rma_thread_messages")
+        .delete()
+        .eq("rma_request_id", rmaToDelete.id);
+      if (threadErr) console.warn("刪除 thread_messages 失敗（不阻擋刪除）", threadErr.message);
+
       const { error: requestsErr } = await supabase.from("rma_requests").delete().eq("id", rmaToDelete.id);
       if (requestsErr) throw new Error(`刪除 RMA 失敗：${requestsErr.message}`);
 
