@@ -28,6 +28,8 @@ interface UploadedAttachment {
   path: string;
   size: number;
   contentType?: string;
+  source?: "upload" | "library";
+  libraryFileId?: string;
 }
 
 interface ThreadAttachment {
