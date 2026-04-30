@@ -430,7 +430,12 @@ ${draft.trim()}`;
       toast.success("已存入知識庫，正在喚醒背景索引…");
       kickoffEmailEmbeddingJob("rma-reply-save").catch(() => { /* non-fatal */ });
     } catch (e: any) {
-      toast.error("存入知識庫失敗：" + (e?.message || ""));
+      const raw = String(e?.message || "");
+      if (raw.includes("source_type_check")) {
+        toast.error("知識庫資料表設定尚未更新，請稍後重試或聯絡管理員（DB constraint 過期）");
+      } else {
+        toast.error("存入知識庫失敗：" + raw.slice(0, 200));
+      }
     } finally {
       setSaving(false);
     }
