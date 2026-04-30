@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Upload, Check, Loader2, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { ProductEntry, ParseError } from "@/lib/rmaMultiCsvParser";
 import MultiProductForm from "./MultiProductForm";
 import CsvImportSection from "./CsvImportSection";
@@ -729,7 +729,27 @@ const RmaForm = () => {
               {agreed && <Check className="w-3 h-3 text-primary-foreground" />}
             </div>
             <span className="text-sm text-foreground">
-              我同意服務條款和隱私政策 *
+              我同意
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline mx-1"
+              >
+                服務條款
+              </Link>
+              和
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline mx-1"
+              >
+                隱私政策
+              </Link>
+              *
             </span>
           </label>
         </div>
