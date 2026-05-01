@@ -213,7 +213,6 @@ Deno.serve(async (req) => {
           headers: {
             "Content-Type": "application/json",
             "apikey": serviceKey,
-            "Authorization": `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({
             templateName: "shipping-reminder",
