@@ -54,6 +54,28 @@ Deno.serve(async (req) => {
     )
   }
 
+  // Auth: this function is called server-to-server only. Under the new
+  // signing-keys system the gateway can no longer reliably verify the
+  // service-role key as a JWT, so verify_jwt is disabled in config.toml
+  // and we enforce the service-role bearer here in code instead.
+  // Accepted in the `Authorization: Bearer <token>` header OR the
+  // `apikey` header (matching the legacy gateway behaviour).
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const apikeyHeader = req.headers.get('apikey') ?? ''
+  const bearer = authHeader.toLowerCase().startsWith('bearer ')
+    ? authHeader.slice(7).trim()
+    : ''
+  const presented = bearer || apikeyHeader.trim()
+  if (!presented || presented !== supabaseServiceKey) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    )
+  }
+
   // Parse request body
   let templateName: string
   let recipientEmail: string
