@@ -186,16 +186,42 @@ Deno.serve(async (req) => {
 
         // Call the transactional email gateway directly. Under the new
         // signing-keys system, the gateway expects:
-        //   - `apikey` = a publishable/anon key (identifies the project)
-        //   - `Authorization: Bearer <service_role JWT>` (identifies the role)
-        // Passing the service role key in BOTH headers (the legacy pattern)
-        // is rejected as UNAUTHORIZED_INVALID_JWT_FORMAT.
+        //   - `apikey` = a publishable key (identifies the project)
+        //   - `Authorization: Bearer <secret-key>` (identifies the role)
+        // We prefer the new sb_secret_* / sb_publishable_* keys when
+        // available, and fall back to the legacy service_role / anon JWTs
+        // for projects that haven't migrated yet.
+        const secretKeysRaw = Deno.env.get("SUPABASE_SECRET_KEYS") ?? "";
+        const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "";
+        const firstKey = (raw: string) => {
+          const trimmed = raw.trim();
+          if (!trimmed) return "";
+          // Env may hold either a single key or a JSON array of keys.
+          if (trimmed.startsWith("[")) {
+            try {
+              const arr = JSON.parse(trimmed);
+              if (Array.isArray(arr) && arr.length > 0) {
+                const first = arr[0];
+                if (typeof first === "string") return first;
+                if (first && typeof first === "object" && typeof first.key === "string") return first.key;
+              }
+            } catch {
+              // fall through
+            }
+          }
+          return trimmed.split(/[\s,]+/)[0] ?? "";
+        };
+        const newSecretKey = firstKey(secretKeysRaw);
+        const newPublishableKey = firstKey(publishableKeysRaw);
+        const authBearer = newSecretKey || supabaseServiceKey;
+        const apikeyHeader = newPublishableKey || supabaseAnonKey || authBearer;
+
         const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-            "apikey": supabaseAnonKey,
+            "Authorization": `Bearer ${authBearer}`,
+            "apikey": apikeyHeader,
           },
           body: JSON.stringify({
             templateName: "shipping-reminder",
@@ -216,7 +242,7 @@ Deno.serve(async (req) => {
           throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
         }
         const emailRespBody = await emailResp.text();
-        console.log(`Reminder enqueued for ${rma.rma_number}: ${emailRespBody}`);
+        console.log(`Reminder enqueued for ${rma.rma_number}: ${emailRespBody.slice(0, 200)}`);
 
         const { error: updErr } = await supabase
           .from("rma_requests")
