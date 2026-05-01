@@ -184,15 +184,11 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        // Call the transactional email gateway directly. Under the new
-        // signing-keys system, sb_secret_* is an API key (not a JWT) and
-        // must be sent in the `apikey` header. Putting it in `Authorization:
-        // Bearer ...` triggers UNAUTHORIZED_INVALID_JWT_FORMAT because the
-        // gateway tries to parse it as a JWT.
-        //
-        // Working header combo for service-to-service calls:
-        //   apikey: <sb_secret_* OR legacy service_role JWT>
-        //   Authorization: Bearer <same value>
+        // Server-to-server call to the transactional email function.
+        // send-transactional-email runs with verify_jwt = false and enforces
+        // the service-role key check in code, so we pass the key in the
+        // `apikey` header (the new sb_secret_* keys are API keys, not JWTs,
+        // and must not be used as bearer tokens against the gateway).
         const serviceKey = supabaseServiceKey;
         const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
