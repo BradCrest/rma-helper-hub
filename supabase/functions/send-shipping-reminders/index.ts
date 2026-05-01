@@ -184,32 +184,32 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-            "apikey": supabaseServiceKey,
-          },
-          body: JSON.stringify({
-            templateName: "shipping-reminder",
-            recipientEmail: rma.customer_email,
-            idempotencyKey: `shipping-reminder-${rma.id}`,
-            templateData: {
-              customerName: rma.customer_name || "客戶",
-              rmaNumber: rma.rma_number,
-              productName: rma.product_name || "保固服務商品",
-              createdDate,
-              shippingUrl,
+        // Use supabase-js functions.invoke so the auth header is constructed
+        // in a format the gateway accepts under the new signing-keys system.
+        // The `supabase` client above is created with the service role key, so
+        // invoke() will pass it as the bearer token automatically.
+        const { data: emailData, error: emailErr } = await supabase.functions.invoke(
+          "send-transactional-email",
+          {
+            body: {
+              templateName: "shipping-reminder",
+              recipientEmail: rma.customer_email,
+              idempotencyKey: `shipping-reminder-${rma.id}`,
+              templateData: {
+                customerName: rma.customer_name || "客戶",
+                rmaNumber: rma.rma_number,
+                productName: rma.product_name || "保固服務商品",
+                createdDate,
+                shippingUrl,
+              },
             },
-          }),
-        });
+          },
+        );
 
-        if (!emailResp.ok) {
-          const errText = await emailResp.text();
-          throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
+        if (emailErr) {
+          throw new Error(`Email send failed: ${emailErr.message ?? String(emailErr)}`);
         }
-        await emailResp.text();
+        console.log(`Reminder enqueued for ${rma.rma_number}:`, emailData);
 
         const { error: updErr } = await supabase
           .from("rma_requests")
