@@ -184,12 +184,17 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
+        // Server-to-server call to the transactional email function.
+        // send-transactional-email runs with verify_jwt = false and enforces
+        // the service-role key check in code, so we pass the key in the
+        // `apikey` header (the new sb_secret_* keys are API keys, not JWTs,
+        // and must not be used as bearer tokens against the gateway).
+        const serviceKey = supabaseServiceKey;
         const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-            "apikey": supabaseServiceKey,
+            "apikey": serviceKey,
           },
           body: JSON.stringify({
             templateName: "shipping-reminder",
@@ -209,7 +214,8 @@ Deno.serve(async (req) => {
           const errText = await emailResp.text();
           throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
         }
-        await emailResp.text();
+        const emailRespBody = await emailResp.text();
+        console.log(`Reminder enqueued for ${rma.rma_number}: ${emailRespBody.slice(0, 200)}`);
 
         const { error: updErr } = await supabase
           .from("rma_requests")
