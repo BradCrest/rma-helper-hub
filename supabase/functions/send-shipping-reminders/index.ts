@@ -99,6 +99,20 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
 
+    // TEMP DIAG (no secret values, only presence/length/short prefix)
+    const diag = (name: string) => {
+      const v = Deno.env.get(name) ?? "";
+      return { set: v.length > 0, len: v.length, prefix: v.slice(0, 10) };
+    };
+    console.log("env_diag", JSON.stringify({
+      SUPABASE_SERVICE_ROLE_KEY: diag("SUPABASE_SERVICE_ROLE_KEY"),
+      SUPABASE_ANON_KEY: diag("SUPABASE_ANON_KEY"),
+      SUPABASE_PUBLISHABLE_KEY: diag("SUPABASE_PUBLISHABLE_KEY"),
+      SUPABASE_PUBLISHABLE_KEYS: diag("SUPABASE_PUBLISHABLE_KEYS"),
+      SUPABASE_SECRET_KEYS: diag("SUPABASE_SECRET_KEYS"),
+      SUPABASE_JWKS: diag("SUPABASE_JWKS"),
+    }));
+
     const auth = await authorize(req, supabaseUrl, supabaseServiceKey, supabaseAnonKey);
     if (auth.kind === "unauthorized") {
       return jsonResponse({ error: "Unauthorized" }, auth.status);
