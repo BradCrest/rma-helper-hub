@@ -199,43 +199,21 @@ Deno.serve(async (req) => {
         });
 
         // Call the transactional email gateway directly. Under the new
-        // signing-keys system, the gateway expects:
-        //   - `apikey` = a publishable key (identifies the project)
-        //   - `Authorization: Bearer <secret-key>` (identifies the role)
-        // We prefer the new sb_secret_* / sb_publishable_* keys when
-        // available, and fall back to the legacy service_role / anon JWTs
-        // for projects that haven't migrated yet.
-        const secretKeysRaw = Deno.env.get("SUPABASE_SECRET_KEYS") ?? "";
-        const publishableKeysRaw = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "";
-        const firstKey = (raw: string) => {
-          const trimmed = raw.trim();
-          if (!trimmed) return "";
-          // Env may hold either a single key or a JSON array of keys.
-          if (trimmed.startsWith("[")) {
-            try {
-              const arr = JSON.parse(trimmed);
-              if (Array.isArray(arr) && arr.length > 0) {
-                const first = arr[0];
-                if (typeof first === "string") return first;
-                if (first && typeof first === "object" && typeof first.key === "string") return first.key;
-              }
-            } catch {
-              // fall through
-            }
-          }
-          return trimmed.split(/[\s,]+/)[0] ?? "";
-        };
-        const newSecretKey = firstKey(secretKeysRaw);
-        const newPublishableKey = firstKey(publishableKeysRaw);
-        const authBearer = newSecretKey || supabaseServiceKey;
-        const apikeyHeader = newPublishableKey || supabaseAnonKey || authBearer;
-
+        // signing-keys system, sb_secret_* is an API key (not a JWT) and
+        // must be sent in the `apikey` header. Putting it in `Authorization:
+        // Bearer ...` triggers UNAUTHORIZED_INVALID_JWT_FORMAT because the
+        // gateway tries to parse it as a JWT.
+        //
+        // Working header combo for service-to-service calls:
+        //   apikey: <sb_secret_* OR legacy service_role JWT>
+        //   Authorization: Bearer <same value>
+        const serviceKey = supabaseServiceKey;
         const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${authBearer}`,
-            "apikey": apikeyHeader,
+            "apikey": serviceKey,
+            "Authorization": `Bearer ${serviceKey}`,
           },
           body: JSON.stringify({
             templateName: "shipping-reminder",
