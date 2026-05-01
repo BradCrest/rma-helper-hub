@@ -7,10 +7,69 @@ const corsHeaders = {
 
 const PUBLISHED_URL = "https://rma-helper-hub.lovable.app";
 const REMINDER_DELAY_HOURS = 48;
-// Only send automated reminders for RMAs created on/after this timestamp.
-// Historical RMAs (created before this) will NEVER receive automated reminders.
-// Manual admin-triggered sends (with rma_request_id in POST body) bypass this check.
 const REMINDER_ENABLED_AFTER = "2026-04-28T12:00:00Z";
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+/**
+ * Authorize the caller. Two paths are accepted:
+ *   1. Service role bearer token (used by cron / internal services)
+ *   2. A logged-in user JWT whose user has role admin or super_admin
+ *
+ * Anything else (no header, anon key, invalid token, non-admin user) → unauthorized.
+ *
+ * Returns: { kind: 'service' } | { kind: 'admin', userId } | { kind: 'unauthorized', status }
+ */
+async function authorize(req: Request, supabaseUrl: string, serviceKey: string, anonKey: string) {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader || !authHeader.toLowerCase().startsWith("bearer ")) {
+    return { kind: "unauthorized" as const, status: 401 };
+  }
+  const token = authHeader.slice(7).trim();
+  if (!token) return { kind: "unauthorized" as const, status: 401 };
+
+  // Path 1: service role (cron / internal)
+  if (token === serviceKey) {
+    return { kind: "service" as const };
+  }
+
+  // Reject anon key explicitly (we don't want anonymous callers triggering reminders)
+  if (token === anonKey) {
+    return { kind: "unauthorized" as const, status: 401 };
+  }
+
+  // Path 2: user JWT — verify and check admin role
+  try {
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return { kind: "unauthorized" as const, status: 401 };
+    }
+    const { data: roleData, error: roleErr } = await userClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userData.user.id);
+    if (roleErr || !roleData) {
+      return { kind: "unauthorized" as const, status: 403 };
+    }
+    const isAdmin = roleData.some((r: { role: string }) => r.role === "admin" || r.role === "super_admin");
+    if (!isAdmin) {
+      return { kind: "unauthorized" as const, status: 403 };
+    }
+    return { kind: "admin" as const, userId: userData.user.id };
+  } catch (e) {
+    console.error("authorize error:", e);
+    return { kind: "unauthorized" as const, status: 401 };
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,9 +79,16 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+
+    const auth = await authorize(req, supabaseUrl, supabaseServiceKey, supabaseAnonKey);
+    if (auth.kind === "unauthorized") {
+      return jsonResponse({ error: "Unauthorized" }, auth.status);
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Optional: allow admin to manually trigger for a specific RMA
+    // Optional manual override (admin or service-role only — already gated above)
     let targetRmaId: string | null = null;
     if (req.method === "POST") {
       try {
@@ -35,7 +101,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Find candidate RMAs: status='registered', no inbound shipping, >48h old, no reminder sent
     const cutoffIso = new Date(Date.now() - REMINDER_DELAY_HOURS * 3600 * 1000).toISOString();
 
     let query = supabase
@@ -51,7 +116,6 @@ Deno.serve(async (req) => {
         .is("shipping_reminder_sent_at", null)
         .lte("created_at", cutoffIso)
         .gte("created_at", REMINDER_ENABLED_AFTER)
-        // Skip software-only issues — these don't require shipping the device back.
         .neq("issue_type", "軟體問題");
     }
 
@@ -59,17 +123,11 @@ Deno.serve(async (req) => {
 
     if (candErr) {
       console.error("Error querying candidates:", candErr);
-      return new Response(JSON.stringify({ error: candErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: candErr.message }, 500);
     }
 
     if (!candidates || candidates.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, processed: 0, message: "No reminders to send" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: true, processed: 0, message: "No reminders to send" });
     }
 
     let sentCount = 0;
@@ -77,7 +135,6 @@ Deno.serve(async (req) => {
 
     for (const rma of candidates) {
       try {
-        // Check if customer has already submitted inbound shipping
         const { data: shipping } = await supabase
           .from("rma_shipping")
           .select("id")
@@ -95,15 +152,12 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Skip software-only issues — recipient doesn't need to ship anything back.
-        // Applies to both auto and manual triggers.
         if (rma.issue_type === "軟體問題") {
           console.log(`Skip ${rma.rma_number}: software-only issue`);
           errors.push({ rma_number: rma.rma_number, error: "skipped_software_issue" });
           continue;
         }
 
-        // Send transactional email
         const shippingUrl = `${PUBLISHED_URL}/shipping-form?rma=${encodeURIComponent(rma.rma_number)}`;
         const createdDate = new Date(rma.created_at).toLocaleDateString("zh-TW", {
           year: "numeric",
@@ -112,7 +166,6 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        // Direct fetch to send-transactional-email (more reliable than functions.invoke in cron context)
         const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
           headers: {
@@ -140,7 +193,6 @@ Deno.serve(async (req) => {
         }
         await emailResp.text();
 
-        // Mark as sent
         const { error: updErr } = await supabase
           .from("rma_requests")
           .update({ shipping_reminder_sent_at: new Date().toISOString() })
@@ -150,7 +202,6 @@ Deno.serve(async (req) => {
           console.error(`Failed to mark reminder sent for ${rma.rma_number}:`, updErr);
         }
 
-        // Slack notification (best-effort, don't fail the whole job)
         try {
           await supabase.functions.invoke("slack-notify", {
             body: {
@@ -178,21 +229,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        candidates: candidates.length,
-        sent: sentCount,
-        errors,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({
+      success: true,
+      candidates: candidates.length,
+      sent: sentCount,
+      errors,
+      caller: auth.kind,
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
     const message = error instanceof Error ? error.message : "Internal server error";
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: message }, 500);
   }
 });
