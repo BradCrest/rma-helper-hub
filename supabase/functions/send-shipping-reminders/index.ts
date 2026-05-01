@@ -184,32 +184,39 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        // Use supabase-js functions.invoke so the auth header is constructed
-        // in a format the gateway accepts under the new signing-keys system.
-        // The `supabase` client above is created with the service role key, so
-        // invoke() will pass it as the bearer token automatically.
-        const { data: emailData, error: emailErr } = await supabase.functions.invoke(
-          "send-transactional-email",
-          {
-            body: {
-              templateName: "shipping-reminder",
-              recipientEmail: rma.customer_email,
-              idempotencyKey: `shipping-reminder-${rma.id}`,
-              templateData: {
-                customerName: rma.customer_name || "客戶",
-                rmaNumber: rma.rma_number,
-                productName: rma.product_name || "保固服務商品",
-                createdDate,
-                shippingUrl,
-              },
-            },
+        // Call the transactional email gateway directly. Under the new
+        // signing-keys system, the gateway expects:
+        //   - `apikey` = a publishable/anon key (identifies the project)
+        //   - `Authorization: Bearer <service_role JWT>` (identifies the role)
+        // Passing the service role key in BOTH headers (the legacy pattern)
+        // is rejected as UNAUTHORIZED_INVALID_JWT_FORMAT.
+        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "apikey": supabaseAnonKey,
           },
-        );
+          body: JSON.stringify({
+            templateName: "shipping-reminder",
+            recipientEmail: rma.customer_email,
+            idempotencyKey: `shipping-reminder-${rma.id}`,
+            templateData: {
+              customerName: rma.customer_name || "客戶",
+              rmaNumber: rma.rma_number,
+              productName: rma.product_name || "保固服務商品",
+              createdDate,
+              shippingUrl,
+            },
+          }),
+        });
 
-        if (emailErr) {
-          throw new Error(`Email send failed: ${emailErr.message ?? String(emailErr)}`);
+        if (!emailResp.ok) {
+          const errText = await emailResp.text();
+          throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
         }
-        console.log(`Reminder enqueued for ${rma.rma_number}:`, emailData);
+        const emailRespBody = await emailResp.text();
+        console.log(`Reminder enqueued for ${rma.rma_number}: ${emailRespBody}`);
 
         const { error: updErr } = await supabase
           .from("rma_requests")
