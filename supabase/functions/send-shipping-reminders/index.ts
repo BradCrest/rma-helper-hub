@@ -33,9 +33,27 @@ async function authorize(req: Request, supabaseUrl: string, serviceKey: string, 
   const token = authHeader.slice(7).trim();
   if (!token) return { kind: "unauthorized" as const, status: 401 };
 
-  // Path 1: service role (cron / internal)
+  // Path 1: service role (cron / internal).
+  // Identify by exact-match against the env var, OR by decoding the JWT and
+  // checking the `role` claim. The env-var match handles legacy keys, the
+  // claim check handles new sb_secret_* keys whose string value may differ
+  // from what the function sees in env.
   if (token === serviceKey) {
     return { kind: "service" as const };
+  }
+  try {
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      if (payload?.role === "service_role") {
+        return { kind: "service" as const };
+      }
+      if (payload?.role === "anon") {
+        return { kind: "unauthorized" as const, status: 401 };
+      }
+    }
+  } catch {
+    // not a parseable JWT — fall through to user-JWT path
   }
 
   // Reject anon key explicitly (we don't want anonymous callers triggering reminders)
