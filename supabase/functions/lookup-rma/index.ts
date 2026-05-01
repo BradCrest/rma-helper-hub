@@ -6,20 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mask sensitive information
+// ---------- Masking helpers ----------
 function maskName(name: string): string {
   if (!name || name.length <= 1) return name;
   if (name.length === 2) return name[0] + '*';
   return name[0] + '*'.repeat(name.length - 2) + name[name.length - 1];
 }
-
 function maskPhone(phone: string): string {
   if (!phone || phone.length <= 4) return phone;
-  const visibleStart = 4;
-  const visibleEnd = 3;
-  return phone.substring(0, visibleStart) + '***' + phone.substring(phone.length - visibleEnd);
+  return phone.substring(0, 4) + '***' + phone.substring(phone.length - 3);
 }
-
 function maskEmail(email: string): string {
   if (!email) return email;
   const parts = email.split('@');
@@ -30,16 +26,25 @@ function maskEmail(email: string): string {
   return username[0] + '***@' + domain;
 }
 
-// Normalize phone number for flexible matching
-function normalizePhone(phone: string): string {
-  let digits = phone.replace(/\D/g, '');
-  if (digits.startsWith('886')) digits = digits.substring(3);
-  if (digits.startsWith('0')) digits = digits.substring(1);
-  return digits;
+// ---------- Normalization helpers ----------
+function normalizeRma(s: string): string {
+  return (s || '').trim().toUpperCase().replace(/-/g, '');
+}
+function normalizePhoneDigits(s: string): string {
+  return (s || '').replace(/\D/g, '');
+}
+function phoneLast3(s: string): string {
+  const d = normalizePhoneDigits(s);
+  return d.length >= 3 ? d.slice(-3) : d;
+}
+function normalizeEmail(s: string): string {
+  return (s || '').trim().toLowerCase();
+}
+function normalizeName(s: string): string {
+  return (s || '').trim();
 }
 
-// Verify the request is from an authenticated admin.
-// Returns true only if the JWT belongs to a user with admin/super_admin role.
+// ---------- Admin check ----------
 async function isAdminCaller(req: Request, supabaseUrl: string, anonKey: string): Promise<boolean> {
   try {
     const authHeader = req.headers.get('Authorization');
@@ -67,6 +72,24 @@ async function isAdminCaller(req: Request, supabaseUrl: string, anonKey: string)
   }
 }
 
+// ---------- Safe (anonymous) response shape ----------
+function buildSafeResult(rma: Record<string, unknown>, history: Array<{ status: string; created_at: string }>) {
+  return {
+    rma_number: rma.rma_number,
+    status: rma.status,
+    product_name: rma.product_name,
+    product_model: rma.product_model,
+    issue_type: rma.issue_type,
+    purchase_date: rma.purchase_date,
+    created_at: rma.created_at,
+    updated_at: rma.updated_at,
+    customer_name: maskName(rma.customer_name as string),
+    customer_phone: maskPhone(rma.customer_phone as string),
+    customer_email: maskEmail(rma.customer_email as string),
+    status_history: history.map(h => ({ status: h.status, created_at: h.created_at })),
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -78,202 +101,153 @@ serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '';
 
     const url = new URL(req.url);
-    const rmaNumber = url.searchParams.get('rma_number');
-    const customerName = url.searchParams.get('customer_name');
-    const customerPhone = url.searchParams.get('customer_phone');
+    const rmaNumberParam = url.searchParams.get('rma_number');
+    const customerNameParam = url.searchParams.get('customer_name');
+    const customerPhoneParam = url.searchParams.get('customer_phone');
+    const customerEmailParam = url.searchParams.get('customer_email');
     const requestedFullDetails = url.searchParams.get('full_details') === 'true';
 
-    // Only admins may receive full unmasked PII. Anonymous callers always get masked data.
-    const isAdmin = requestedFullDetails ? await isAdminCaller(req, supabaseUrl, anonKey) : false;
-    const includeFullDetails = requestedFullDetails && isAdmin;
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    if (requestedFullDetails && !isAdmin) {
-      console.warn('lookup-rma: full_details=true requested without admin auth — falling back to masked');
+    // ---------- Admin path ----------
+    if (requestedFullDetails) {
+      const isAdmin = await isAdminCaller(req, supabaseUrl, anonKey);
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Admin authentication required for full details' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Admin must still provide an identifier
+      if (!rmaNumberParam && !(customerNameParam && (customerPhoneParam || customerEmailParam))) {
+        return new Response(
+          JSON.stringify({ error: '請提供 RMA 編號或客戶姓名 + 電話/Email' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      let adminQuery = supabaseAdmin.from('rma_requests').select('*');
+      if (rmaNumberParam) {
+        const normalized = normalizeRma(rmaNumberParam);
+        // Fetch a small candidate set then strict-match in JS
+        const { data, error } = await adminQuery.ilike('rma_number', `%${normalized.slice(0, 8)}%`).limit(50);
+        if (error) {
+          console.error('Admin lookup error:', error);
+          return new Response(JSON.stringify({ error: '查詢失敗' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const filtered = (data || []).filter(r => normalizeRma(r.rma_number) === normalized);
+        return await respondAdmin(filtered, supabaseAdmin);
+      } else {
+        // name + phone/email (admin convenience: name exact, phone last3 or email exact)
+        const nameNorm = normalizeName(customerNameParam!);
+        const { data, error } = await adminQuery.eq('customer_name', nameNorm).limit(50);
+        if (error) {
+          return new Response(JSON.stringify({ error: '查詢失敗' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const filtered = (data || []).filter(r => {
+          if (customerEmailParam) return normalizeEmail(r.customer_email || '') === normalizeEmail(customerEmailParam);
+          if (customerPhoneParam) return phoneLast3(r.customer_phone || '') === phoneLast3(customerPhoneParam);
+          return false;
+        });
+        return await respondAdmin(filtered, supabaseAdmin);
+      }
     }
 
-    if (!rmaNumber && (!customerName || !customerPhone)) {
+    // ---------- Anonymous path (strict) ----------
+    // Required: full RMA OR full name; AND a second factor (phone last3 OR email exact).
+    const hasRma = !!rmaNumberParam && rmaNumberParam.trim().length > 0;
+    const hasName = !!customerNameParam && customerNameParam.trim().length > 0;
+    const hasPhone = !!customerPhoneParam && customerPhoneParam.trim().length > 0;
+    const hasEmail = !!customerEmailParam && customerEmailParam.trim().length > 0;
+
+    if (!hasRma && !hasName) {
       return new Response(
-        JSON.stringify({ error: '請提供 RMA 編號或客戶姓名及電話' }),
+        JSON.stringify({ error: '請提供 RMA 編號或姓名，並搭配電話或 Email 驗證' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!hasPhone && !hasEmail) {
+      return new Response(
+        JSON.stringify({ error: '需要提供電話或 Email 作為驗證' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    // Build candidate set
+    let candidates: any[] = [];
 
-    let query = supabaseAdmin.from('rma_requests').select('*');
-
-    if (rmaNumber) {
-      const normalizedInput = rmaNumber.trim().toUpperCase();
-      query = query.ilike('rma_number', `%${normalizedInput}%`);
-
-      const { data, error } = await query;
-      if (error) {
-        console.error('Database error:', error);
+    if (hasRma) {
+      const normalized = normalizeRma(rmaNumberParam!);
+      // Reject obviously partial inputs (RMA numbers in this system are length 11 like RC7EA060462,
+      // but we accept any length and rely on strict equality)
+      if (normalized.length < 6) {
         return new Response(
-          JSON.stringify({ error: '查詢失敗' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: '請輸入完整 RMA 編號' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      const inputWithoutDashes = normalizedInput.replace(/-/g, '');
-      const filtered = data?.filter(r =>
-        r.rma_number.replace(/-/g, '').toUpperCase().includes(inputWithoutDashes) ||
-        inputWithoutDashes.includes(r.rma_number.replace(/-/g, '').toUpperCase())
-      ) || [];
-
-      if (filtered.length === 0) {
-        return new Response(
-          JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const rmaIds = filtered.map(r => r.id);
-      const { data: historyData } = await supabaseAdmin
-        .from('rma_status_history')
-        .select('id, rma_request_id, status, created_at, notes')
-        .in('rma_request_id', rmaIds)
-        .order('created_at', { ascending: false });
-
-      const historyByRmaId: Record<string, any[]> = {};
-      (historyData || []).forEach(h => {
-        if (!historyByRmaId[h.rma_request_id]) historyByRmaId[h.rma_request_id] = [];
-        historyByRmaId[h.rma_request_id].push({
-          id: h.id,
-          status: h.status,
-          created_at: h.created_at,
-          notes: h.notes,
-        });
-      });
-
-      // For admin full-detail queries, also fetch latest inbound shipping per RMA
-      const inboundByRmaId: Record<string, any> = {};
-      if (includeFullDetails) {
-        const { data: shippingData } = await supabaseAdmin
-          .from('rma_shipping')
-          .select('id, rma_request_id, direction, carrier, tracking_number, ship_date, delivery_date, notes, photo_url, created_at')
-          .in('rma_request_id', rmaIds)
-          .eq('direction', 'inbound')
-          .order('created_at', { ascending: false });
-        (shippingData || []).forEach(s => {
-          if (!inboundByRmaId[s.rma_request_id]) {
-            inboundByRmaId[s.rma_request_id] = s;
-          }
-        });
-      }
-
-      const maskedResults = filtered.map(rma => ({
-        id: rma.id,
-        rma_number: rma.rma_number,
-        status: rma.status,
-        product_name: rma.product_name,
-        product_model: rma.product_model,
-        serial_number: rma.serial_number,
-        issue_type: rma.issue_type,
-        issue_description: includeFullDetails ? rma.issue_description : undefined,
-        customer_notes: includeFullDetails ? rma.customer_notes : undefined,
-        customer_type: includeFullDetails ? rma.customer_type : undefined,
-        mobile_phone: includeFullDetails ? rma.mobile_phone : undefined,
-        warranty_date: includeFullDetails ? rma.warranty_date : undefined,
-        purchase_date: rma.purchase_date,
-        created_at: rma.created_at,
-        updated_at: rma.updated_at,
-        updated_by: includeFullDetails ? rma.updated_by : undefined,
-        updated_by_email: includeFullDetails ? rma.updated_by_email : undefined,
-        customer_name: includeFullDetails ? rma.customer_name : maskName(rma.customer_name),
-        customer_phone: includeFullDetails ? rma.customer_phone : maskPhone(rma.customer_phone),
-        customer_email: includeFullDetails ? rma.customer_email : maskEmail(rma.customer_email),
-        customer_address: includeFullDetails ? rma.customer_address : null,
-        photo_urls: includeFullDetails ? rma.photo_urls : null,
-        status_history: historyByRmaId[rma.id] || [],
-        inbound_shipping: includeFullDetails ? (inboundByRmaId[rma.id] || null) : undefined,
-      }));
-
-      console.log(`Found ${maskedResults.length} RMA(s) for query: ${rmaNumber} (admin=${isAdmin})`);
-
-      return new Response(
-        JSON.stringify({ results: maskedResults }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } else if (customerName && customerPhone) {
       const { data, error } = await supabaseAdmin
         .from('rma_requests')
         .select('*')
-        .ilike('customer_name', `%${customerName.trim()}%`)
-        .order('created_at', { ascending: false });
-
+        .ilike('rma_number', `%${normalized.slice(0, 8)}%`)
+        .limit(50);
       if (error) {
-        console.error('Database error:', error);
-        return new Response(
-          JSON.stringify({ error: '查詢失敗' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.error('Lookup error:', error);
+        return new Response(JSON.stringify({ error: '查詢失敗' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-
-      const normalizedInputPhone = normalizePhone(customerPhone);
-      const filteredData = (data || []).filter(rma => {
-        const normalizedDbPhone = normalizePhone(rma.customer_phone || '');
-        return normalizedDbPhone.includes(normalizedInputPhone) ||
-               normalizedInputPhone.includes(normalizedDbPhone);
-      });
-
-      if (filteredData.length === 0) {
-        return new Response(
-          JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      candidates = (data || []).filter(r => normalizeRma(r.rma_number) === normalized);
+    } else {
+      // Name path: exact match only
+      const nameNorm = normalizeName(customerNameParam!);
+      const { data, error } = await supabaseAdmin
+        .from('rma_requests')
+        .select('*')
+        .eq('customer_name', nameNorm)
+        .limit(50);
+      if (error) {
+        return new Response(JSON.stringify({ error: '查詢失敗' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      candidates = data || [];
+    }
 
-      const rmaIds = filteredData.map(r => r.id);
-      const { data: historyData } = await supabaseAdmin
-        .from('rma_status_history')
-        .select('id, rma_request_id, status, created_at, notes')
-        .in('rma_request_id', rmaIds)
-        .order('created_at', { ascending: false });
+    // Apply second-factor verification
+    const verified = candidates.filter(r => {
+      if (hasEmail) {
+        if (normalizeEmail(r.customer_email || '') !== normalizeEmail(customerEmailParam!)) return false;
+      }
+      if (hasPhone) {
+        if (phoneLast3(r.customer_phone || '') !== phoneLast3(customerPhoneParam!)) return false;
+      }
+      return true;
+    });
 
-      const historyByRmaId: Record<string, any[]> = {};
-      (historyData || []).forEach(h => {
-        if (!historyByRmaId[h.rma_request_id]) historyByRmaId[h.rma_request_id] = [];
-        historyByRmaId[h.rma_request_id].push({
-          id: h.id,
-          status: h.status,
-          created_at: h.created_at,
-          notes: h.notes,
-        });
-      });
-
-      // Customer search by name+phone is intentionally always masked, regardless of admin flag,
-      // to prevent admins from accidentally exposing PII via customer-facing flows.
-      const maskedResults = filteredData.map(rma => ({
-        id: rma.id,
-        rma_number: rma.rma_number,
-        status: rma.status,
-        product_name: rma.product_name,
-        product_model: rma.product_model,
-        serial_number: rma.serial_number,
-        issue_type: rma.issue_type,
-        purchase_date: rma.purchase_date,
-        created_at: rma.created_at,
-        updated_at: rma.updated_at,
-        customer_name: maskName(rma.customer_name),
-        customer_phone: maskPhone(rma.customer_phone),
-        customer_email: maskEmail(rma.customer_email),
-        customer_address: null,
-        status_history: historyByRmaId[rma.id] || [],
-      }));
-
-      console.log(`Found ${maskedResults.length} RMA(s) for customer: ${customerName}`);
-
+    if (verified.length === 0) {
       return new Response(
-        JSON.stringify({ results: maskedResults }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (verified.length > 1) {
+      // Force user to provide a unique identifier (full RMA number)
+      return new Response(
+        JSON.stringify({ error: '查詢條件不夠精確，請使用完整 RMA 編號查詢', results: [] }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const rma = verified[0];
+    const { data: historyData } = await supabaseAdmin
+      .from('rma_status_history')
+      .select('status, created_at')
+      .eq('rma_request_id', rma.id)
+      .order('created_at', { ascending: false });
+
+    const safe = buildSafeResult(rma, historyData || []);
+    console.log(`Anonymous lookup OK for ${rma.rma_number}`);
     return new Response(
-      JSON.stringify({ error: '無效的請求' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ results: [safe] }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
@@ -284,3 +258,71 @@ serve(async (req) => {
     );
   }
 });
+
+// ---------- Admin response builder (full details) ----------
+async function respondAdmin(filtered: any[], supabaseAdmin: any): Promise<Response> {
+  if (filtered.length === 0) {
+    return new Response(
+      JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  const rmaIds = filtered.map(r => r.id);
+  const { data: historyData } = await supabaseAdmin
+    .from('rma_status_history')
+    .select('id, rma_request_id, status, created_at, notes')
+    .in('rma_request_id', rmaIds)
+    .order('created_at', { ascending: false });
+
+  const historyByRmaId: Record<string, any[]> = {};
+  (historyData || []).forEach((h: any) => {
+    if (!historyByRmaId[h.rma_request_id]) historyByRmaId[h.rma_request_id] = [];
+    historyByRmaId[h.rma_request_id].push({
+      id: h.id, status: h.status, created_at: h.created_at, notes: h.notes,
+    });
+  });
+
+  const { data: shippingData } = await supabaseAdmin
+    .from('rma_shipping')
+    .select('id, rma_request_id, direction, carrier, tracking_number, ship_date, delivery_date, notes, photo_url, created_at')
+    .in('rma_request_id', rmaIds)
+    .eq('direction', 'inbound')
+    .order('created_at', { ascending: false });
+
+  const inboundByRmaId: Record<string, any> = {};
+  (shippingData || []).forEach((s: any) => {
+    if (!inboundByRmaId[s.rma_request_id]) inboundByRmaId[s.rma_request_id] = s;
+  });
+
+  const results = filtered.map(rma => ({
+    id: rma.id,
+    rma_number: rma.rma_number,
+    status: rma.status,
+    product_name: rma.product_name,
+    product_model: rma.product_model,
+    serial_number: rma.serial_number,
+    issue_type: rma.issue_type,
+    issue_description: rma.issue_description,
+    customer_notes: rma.customer_notes,
+    customer_type: rma.customer_type,
+    mobile_phone: rma.mobile_phone,
+    warranty_date: rma.warranty_date,
+    purchase_date: rma.purchase_date,
+    created_at: rma.created_at,
+    updated_at: rma.updated_at,
+    updated_by: rma.updated_by,
+    updated_by_email: rma.updated_by_email,
+    customer_name: rma.customer_name,
+    customer_phone: rma.customer_phone,
+    customer_email: rma.customer_email,
+    customer_address: rma.customer_address,
+    photo_urls: rma.photo_urls,
+    status_history: historyByRmaId[rma.id] || [],
+    inbound_shipping: inboundByRmaId[rma.id] || null,
+  }));
+
+  return new Response(
+    JSON.stringify({ results }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
