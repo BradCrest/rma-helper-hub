@@ -88,7 +88,7 @@ export const TAB_STATUS_BUCKETS: Record<
   customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
   paymentConfirmation: ["quote_confirmed"],
   outboundShipping: ["paid", "no_repair"],
-  closing: ["shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "follow_up"],
+  closing: ["shipped_back", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "follow_up"],
   dashboardPending: ["registered"],
   dashboardInProgress: [
     "shipped",
