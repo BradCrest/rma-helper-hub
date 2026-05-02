@@ -104,3 +104,15 @@ verify_jwt = true
 [functions.notify-follow-up-due]
 verify_jwt = false
 
+[functions.submit-follow-up-survey]
+verify_jwt = false
+
+[functions.create-follow-up-survey]
+verify_jwt = false
+
+[functions.draft-follow-up-email]
+verify_jwt = true
+
+[functions.send-follow-up-email]
+verify_jwt = true
+
