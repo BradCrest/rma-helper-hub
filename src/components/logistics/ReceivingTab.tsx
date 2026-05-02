@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Package, Search, Eye, CheckCircle, AlertCircle, Mail, Paperclip, X, Loader2, FileText, ClipboardCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -124,7 +123,6 @@ function sanitizeForKey(name: string): string {
 }
 
 const ReceivingTab = () => {
-  const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -874,7 +872,7 @@ const ReceivingTab = () => {
                     variant="outline"
                     onClick={() => {
                       setDialogOpen(false);
-                      navigate("/admin/logistics?tab=fault");
+                      window.location.assign("/admin/logistics?tab=fault");
                     }}
                   >
                     前往故障登記
