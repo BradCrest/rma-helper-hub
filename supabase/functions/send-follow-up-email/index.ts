@@ -107,8 +107,8 @@ serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: authHeader,
-          apikey: anonKey,
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
         },
         body: JSON.stringify({
           templateName: "follow-up-care",
