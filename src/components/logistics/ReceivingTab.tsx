@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, Search, Eye, CheckCircle, AlertCircle, Mail, Paperclip, X, Loader2, FileText } from "lucide-react";
+import { Package, Search, Eye, CheckCircle, AlertCircle, Mail, Paperclip, X, Loader2, FileText, ClipboardCheck, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
