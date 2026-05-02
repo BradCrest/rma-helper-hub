@@ -1134,14 +1134,12 @@ export type Database = {
         | "quote_confirmed"
         | "paid"
         | "no_repair"
-        | "repairing"
         | "shipped_back"
-        | "follow_up"
-        | "closed"
+        | "shipped_back_new"
         | "shipped_back_refurbished"
         | "shipped_back_original"
-        | "shipped_back_new"
-        | "unknown"
+        | "follow_up"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1279,14 +1277,12 @@ export const Constants = {
         "quote_confirmed",
         "paid",
         "no_repair",
-        "repairing",
         "shipped_back",
-        "follow_up",
-        "closed",
+        "shipped_back_new",
         "shipped_back_refurbished",
         "shipped_back_original",
-        "shipped_back_new",
-        "unknown",
+        "follow_up",
+        "closed",
       ],
     },
   },
