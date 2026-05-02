@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { invokeTransactionalEmail } from "../_shared/transactional-email-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -184,39 +185,29 @@ Deno.serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        // Server-to-server call to the transactional email function.
-        // send-transactional-email runs with verify_jwt = false and enforces
-        // the service-role key check in code, so we pass the key in the
-        // `apikey` header (the new sb_secret_* keys are API keys, not JWTs,
-        // and must not be used as bearer tokens against the gateway).
-        const serviceKey = supabaseServiceKey;
-        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${serviceKey}`,
-            "apikey": serviceKey,
+        // Uses shared helper — service role auth is enforced inside the helper
+        // (sends both `Authorization: Bearer <key>` and `apikey: <key>`).
+        const emailRes = await invokeTransactionalEmail({
+          templateName: "shipping-reminder",
+          recipientEmail: rma.customer_email,
+          idempotencyKey: `shipping-reminder-${rma.id}`,
+          templateData: {
+            customerName: rma.customer_name || "客戶",
+            rmaNumber: rma.rma_number,
+            productName: rma.product_name || "保固服務商品",
+            createdDate,
+            shippingUrl,
           },
-          body: JSON.stringify({
-            templateName: "shipping-reminder",
-            recipientEmail: rma.customer_email,
-            idempotencyKey: `shipping-reminder-${rma.id}`,
-            templateData: {
-              customerName: rma.customer_name || "客戶",
-              rmaNumber: rma.rma_number,
-              productName: rma.product_name || "保固服務商品",
-              createdDate,
-              shippingUrl,
-            },
-          }),
         });
 
-        if (!emailResp.ok) {
-          const errText = await emailResp.text();
-          throw new Error(`Email send failed (${emailResp.status}): ${errText}`);
+        if (!emailRes.ok) {
+          throw new Error(`Email send failed (${emailRes.status}): ${emailRes.errorText ?? ""}`);
         }
-        const emailRespBody = await emailResp.text();
-        console.log(`Reminder enqueued for ${rma.rma_number}: ${emailRespBody.slice(0, 200)}`);
+        console.log(
+          `Reminder enqueued for ${rma.rma_number}: ${
+            (typeof emailRes.data === "string" ? emailRes.data : JSON.stringify(emailRes.data) ?? "").slice(0, 200)
+          }`,
+        );
 
         const { error: updErr } = await supabase
           .from("rma_requests")

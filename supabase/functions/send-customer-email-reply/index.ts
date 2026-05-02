@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+import { invokeTransactionalEmail } from "../_shared/transactional-email-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -169,44 +170,31 @@ serve(async (req) => {
     // Send via the transactional email system.
     // idempotencyKey includes a timestamp so the same admin can send multiple
     // distinct replies to the same Gmail thread.
+    // Uses shared helper — service role auth is enforced inside the helper;
+    // never forward the end-user's JWT for this server-to-server hop.
     const idempotencyKey = `customer-email-reply-${gmailMessageId}-${Date.now()}`;
-    // Server-to-server call: send-transactional-email enforces an in-code
-    // service-role check, so we must present the service role key here
-    // (not the end-user's JWT). Admin authorization was already verified above.
-    const sendRes = await fetch(
-      `${supabaseUrl}/functions/v1/send-transactional-email`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({
-          templateName: "customer-email-reply",
-          recipientEmail,
-          idempotencyKey,
-          templateData: {
-            subject,
-            customerName: recipientName || "您好",
-            rmaNumber: rmaNumber ?? "",
-            replyBody: body,
-            attachments: templateAttachments,
-          },
-        }),
+    const sendRes = await invokeTransactionalEmail({
+      templateName: "customer-email-reply",
+      recipientEmail,
+      idempotencyKey,
+      templateData: {
+        subject,
+        customerName: recipientName || "您好",
+        rmaNumber: rmaNumber ?? "",
+        replyBody: body,
+        attachments: templateAttachments,
       },
-    );
+    });
 
     if (!sendRes.ok) {
-      const errText = await sendRes.text();
       console.error(
         "send-transactional-email error:",
         sendRes.status,
-        errText,
+        sendRes.errorText,
       );
       return new Response(
         JSON.stringify({
-          error: `寄送失敗 (${sendRes.status})：${errText.slice(0, 500)}`,
+          error: `寄送失敗 (${sendRes.status})：${(sendRes.errorText ?? "").slice(0, 500)}`,
         }),
         {
           status: 500,
@@ -214,12 +202,11 @@ serve(async (req) => {
         },
       );
     }
-    const sendData = await sendRes.json().catch(() => null);
 
     return new Response(
       JSON.stringify({
         success: true,
-        send: sendData ?? null,
+        send: sendRes.data ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
