@@ -43,6 +43,13 @@ const FOLLOW_UP_RMA = {
   status: "follow_up",
 };
 
+const LEGACY_SHIPPED_BACK_RMA = {
+  ...SHIPPED_BACK_RMA,
+  id: "rma-003",
+  rma_number: "RMA-2024-003",
+  status: "shipped_back",
+};
+
 function setupMock(rmaList = [SHIPPED_BACK_RMA]) {
   mockFrom.mockImplementation((table: string) => {
     if (table === "rma_requests") {
@@ -95,6 +102,15 @@ describe("ClosingTab", () => {
     await waitFor(() => screen.getByText("RMA-2024-002"));
     expect(screen.queryByRole("button", { name: /追蹤中/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /結案/ })).toBeInTheDocument();
+  });
+
+  it("legacy shipped_back 狀態出現在列表且顯示「已寄回（舊）」badge", async () => {
+    setupMock([LEGACY_SHIPPED_BACK_RMA]);
+    render(<ClosingTab />);
+    await waitFor(() => {
+      expect(screen.getByText("RMA-2024-003")).toBeInTheDocument();
+      expect(screen.getByText("已寄回（舊）")).toBeInTheDocument();
+    });
   });
 
   it("標記追蹤中：呼叫 update-rma-status 並顯示 success toast", async () => {

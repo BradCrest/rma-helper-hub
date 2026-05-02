@@ -27,22 +27,31 @@ vi.mock("sonner", () => ({
   toast: { success: mockToastSuccess, error: mockToastError },
 }));
 
+// 真實 schema：actual_method 在 rma_repair_details，repair_fee 在 rma_requests
 const QUOTE_CONFIRMED_RMA = {
   id: "rma-001",
   rma_number: "RMA-2024-001",
   customer_name: "王小明",
   product_model: "CR-4",
-  actual_method: "purchase_b",
   repair_fee: 1800,
   updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  rma_repair_details: [{ actual_method: "purchase_b" }],
 };
 
 const FREE_RMA = {
   ...QUOTE_CONFIRMED_RMA,
   id: "rma-002",
   rma_number: "RMA-2024-002",
-  actual_method: "warranty_replace",
   repair_fee: 0,
+  rma_repair_details: [{ actual_method: "warranty_replace" }],
+};
+
+const NULL_FEE_RMA = {
+  ...QUOTE_CONFIRMED_RMA,
+  id: "rma-003",
+  rma_number: "RMA-2024-003",
+  repair_fee: null,
+  rma_repair_details: [{ actual_method: "purchase_b" }],
 };
 
 function setupMock(rmaList = [QUOTE_CONFIRMED_RMA]) {
@@ -92,6 +101,15 @@ describe("PaymentConfirmationTab", () => {
     });
   });
 
+  it("未設定金額：repair_fee=null 時顯示「未設定」而非「免費」", async () => {
+    setupMock([NULL_FEE_RMA]);
+    render(<PaymentConfirmationTab />);
+    await waitFor(() => {
+      expect(screen.getByText("未設定")).toBeInTheDocument();
+      expect(screen.queryByText("免費")).not.toBeInTheDocument();
+    });
+  });
+
   it("確認收款：選擇付款方式後呼叫 update-rma-status 並顯示 success toast", async () => {
     render(<PaymentConfirmationTab />);
     await waitFor(() => screen.getByText("RMA-2024-001"));
@@ -99,7 +117,6 @@ describe("PaymentConfirmationTab", () => {
     fireEvent.click(screen.getByRole("button", { name: /確認收款/ }));
     await waitFor(() => screen.getByText(/確認收款 — RMA-2024-001/));
 
-    // 選擇付款方式
     fireEvent.click(screen.getByRole("combobox"));
     await waitFor(() => screen.getByRole("option", { name: "匯款" }));
     fireEvent.click(screen.getByRole("option", { name: "匯款" }));

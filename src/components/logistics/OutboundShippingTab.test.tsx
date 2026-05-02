@@ -27,30 +27,38 @@ vi.mock("sonner", () => ({
   toast: { success: mockToastSuccess, error: mockToastError },
 }));
 
+// 真實 schema：actual_method 在 rma_repair_details，不在 rma_requests
 const PAID_RMA = {
   id: "rma-001",
   rma_number: "RMA-2024-001",
   customer_name: "王小明",
   product_model: "CR-4",
-  actual_method: "purchase_b",
   status: "paid",
   updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  rma_repair_details: [{ actual_method: "purchase_b" }],
 };
 
 const NO_REPAIR_RMA = {
   ...PAID_RMA,
   id: "rma-002",
   rma_number: "RMA-2024-002",
-  actual_method: "return_original",
   status: "no_repair",
+  rma_repair_details: [{ actual_method: "return_original" }],
 };
 
 const WARRANTY_RMA = {
   ...PAID_RMA,
   id: "rma-003",
   rma_number: "RMA-2024-003",
-  actual_method: "warranty_replace",
   status: "paid",
+  rma_repair_details: [{ actual_method: "warranty_replace" }],
+};
+
+const NO_REPAIR_DETAILS_RMA = {
+  ...PAID_RMA,
+  id: "rma-004",
+  rma_number: "RMA-2024-004",
+  rma_repair_details: [],
 };
 
 function setupMock(rmaList = [PAID_RMA]) {
@@ -102,6 +110,14 @@ describe("OutboundShippingTab", () => {
 
   it("return_original (no_repair) 推斷出貨類型為「寄回原機」", async () => {
     setupMock([NO_REPAIR_RMA]);
+    render(<OutboundShippingTab />);
+    await waitFor(() => {
+      expect(screen.getByText("寄回原機")).toBeInTheDocument();
+    });
+  });
+
+  it("無 rma_repair_details 記錄時 fallback 到「寄回原機」", async () => {
+    setupMock([NO_REPAIR_DETAILS_RMA]);
     render(<OutboundShippingTab />);
     await waitFor(() => {
       expect(screen.getByText("寄回原機")).toBeInTheDocument();
