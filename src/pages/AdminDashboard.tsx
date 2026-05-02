@@ -18,51 +18,34 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Get counts by status
-        const { data: pendingData } = await supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "registered");
-
-        const { data: processingData } = await supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]);
-
-        const { data: completedData } = await supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "closed");
-
-        // Get this month's count
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const { count: thisMonthCount } = await supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .gte("created_at", startOfMonth.toISOString());
-
-        setStats({
-          pending: pendingData ? 1 : 0,
-          processing: processingData ? 1 : 0,
-          completed: completedData ? 1 : 0,
-          thisMonth: thisMonthCount || 0,
-        });
-
-        // Re-fetch with actual counts
-        const [p, pr, c] = await Promise.all([
-          supabase.from("rma_requests").select("id").eq("status", "registered"),
-          supabase.from("rma_requests").select("id").in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]),
-          supabase.from("rma_requests").select("id").eq("status", "closed"),
+        const [p, pr, c, m] = await Promise.all([
+          supabase
+            .from("rma_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "registered"),
+          supabase
+            .from("rma_requests")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]),
+          supabase
+            .from("rma_requests")
+            .select("id", { count: "exact", head: true })
+            .in("status", ["closed", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "shipped_back", "follow_up"]),
+          supabase
+            .from("rma_requests")
+            .select("id", { count: "exact", head: true })
+            .gte("created_at", startOfMonth.toISOString()),
         ]);
 
         setStats({
-          pending: p.data?.length || 0,
-          processing: pr.data?.length || 0,
-          completed: c.data?.length || 0,
-          thisMonth: thisMonthCount || 0,
+          pending: p.count || 0,
+          processing: pr.count || 0,
+          completed: c.count || 0,
+          thisMonth: m.count || 0,
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
