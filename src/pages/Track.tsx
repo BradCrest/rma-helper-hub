@@ -41,14 +41,12 @@ const statusLabels: Record<RmaStatus, string> = {
   quote_confirmed: "確認報價",
   paid: "已付費",
   no_repair: "不維修",
-  repairing: "維修中",
   shipped_back: "已回寄",
   shipped_back_refurbished: "已寄回整新品",
   shipped_back_original: "已寄回原錶",
   shipped_back_new: "已寄出全新品",
   follow_up: "後續關懷",
   closed: "已結案",
-  unknown: "未知狀態",
 };
 
 const statusIcons: Record<RmaStatus, React.ReactNode> = {
@@ -60,14 +58,12 @@ const statusIcons: Record<RmaStatus, React.ReactNode> = {
   quote_confirmed: <Package className="w-5 h-5" />,
   paid: <CheckCircle2 className="w-5 h-5" />,
   no_repair: <XCircle className="w-5 h-5" />,
-  repairing: <Wrench className="w-5 h-5" />,
   shipped_back: <Truck className="w-5 h-5" />,
   shipped_back_refurbished: <Truck className="w-5 h-5" />,
   shipped_back_original: <Truck className="w-5 h-5" />,
   shipped_back_new: <Truck className="w-5 h-5" />,
   follow_up: <Clock className="w-5 h-5" />,
   closed: <CheckCircle2 className="w-5 h-5" />,
-  unknown: <AlertTriangle className="w-5 h-5" />,
 };
 
 const statusColors: Record<RmaStatus, string> = {
@@ -79,14 +75,12 @@ const statusColors: Record<RmaStatus, string> = {
   quote_confirmed: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   paid: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   no_repair: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  repairing: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
   shipped_back: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   shipped_back_refurbished: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   shipped_back_original: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   shipped_back_new: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  unknown: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
 };
 
 const Track = () => {

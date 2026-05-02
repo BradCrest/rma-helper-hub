@@ -49,7 +49,7 @@ import {
 import { evaluateWarranty } from "@/lib/warrantyPolicy";
 import WarrantyCalculator from "./WarrantyCalculator";
 
-type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "repairing" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished" | "unknown";
+type RmaStatus = "closed" | "contacting" | "follow_up" | "inspecting" | "no_repair" | "paid" | "quote_confirmed" | "received" | "registered" | "shipped" | "shipped_back" | "shipped_back_new" | "shipped_back_original" | "shipped_back_refurbished";
 
 interface RmaRequest {
   id: string;
