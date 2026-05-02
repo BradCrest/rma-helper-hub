@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
+import FaultRegistrationTab from "@/components/logistics/FaultRegistrationTab";
 import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmationTab";
 import PaymentConfirmationTab from "@/components/logistics/PaymentConfirmationTab";
 import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
@@ -48,13 +49,13 @@ const AdminLogistics = () => {
 
   const tabs = [
     { id: "receiving", label: "收件處理", icon: Package },
+    { id: "fault", label: "故障登記", icon: ClipboardCheck },
     { id: "customer", label: "待客戶確認", icon: Inbox },
     { id: "payment", label: "付款確認", icon: CreditCard },
     { id: "outbound", label: "出貨處理", icon: Truck },
     { id: "closing", label: "結案追蹤", icon: CheckSquare },
     { id: "followup", label: "客戶關懷", icon: Heart },
     { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
-    { id: "fault", label: "故障登記", icon: ClipboardCheck, disabled: true },
     { id: "sales", label: "銷貨匯入", icon: FileSpreadsheet, disabled: true },
     { id: "warranty", label: "保固審核", icon: ShieldCheck, disabled: true },
   ];
@@ -133,11 +134,7 @@ const AdminLogistics = () => {
           </TabsContent>
 
           <TabsContent value="fault" className="mt-0">
-            <div className="rma-card text-center py-12">
-              <ClipboardCheck className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground">故障登記</h3>
-              <p className="text-muted-foreground mt-2">此功能將在後續階段實作</p>
-            </div>
+            <FaultRegistrationTab />
           </TabsContent>
 
           <TabsContent value="followup" className="mt-0">
