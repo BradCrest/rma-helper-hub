@@ -135,37 +135,31 @@ serve(async (req) => {
           timeZone: "Asia/Taipei",
         });
 
-        const emailResp = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-            "apikey": supabaseServiceKey,
+        // Uses shared helper — service role auth is enforced inside the helper.
+        // Failures are logged but do NOT block RMA creation.
+        const emailRes = await invokeTransactionalEmail({
+          templateName: "rma-confirmation",
+          recipientEmail: product.customer_email,
+          idempotencyKey: `rma-confirm-${data.rma_number}`,
+          templateData: {
+            customerName: product.customer_name,
+            rmaNumber: data.rma_number,
+            productName: product.product_name || "保固服務商品",
+            productModel: product.product_model || "",
+            serialNumber: product.serial_number || "",
+            issueType: product.issue_type || "",
+            createdDate,
+            trackUrl,
+            shippingUrl,
           },
-          body: JSON.stringify({
-            templateName: "rma-confirmation",
-            recipientEmail: product.customer_email,
-            idempotencyKey: `rma-confirm-${data.rma_number}`,
-            templateData: {
-              customerName: product.customer_name,
-              rmaNumber: data.rma_number,
-              productName: product.product_name || "保固服務商品",
-              productModel: product.product_model || "",
-              serialNumber: product.serial_number || "",
-              issueType: product.issue_type || "",
-              createdDate,
-              trackUrl,
-              shippingUrl,
-            },
-            logMetadata: {
-              rma_number: data.rma_number,
-              rma_request_id: data.id,
-            },
-          }),
+          logMetadata: {
+            rma_number: data.rma_number,
+            rma_request_id: data.id,
+          },
         });
 
-        if (!emailResp.ok) {
-          console.error("Failed to send confirmation email:", await emailResp.text());
+        if (!emailRes.ok) {
+          console.error("Failed to send confirmation email:", emailRes.status, emailRes.errorText);
         } else {
           console.log("Confirmation email enqueued for RMA:", data.rma_number);
         }
