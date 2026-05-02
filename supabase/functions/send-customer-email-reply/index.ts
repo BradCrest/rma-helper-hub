@@ -206,7 +206,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        send: sendData ?? null,
+        send: sendRes.data ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
