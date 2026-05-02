@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, MessageSquareReply } from "lucide-react";
+import RmaReplyTab from "@/components/logistics/RmaReplyTab";
+import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X, Download } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,6 +60,26 @@ const SOURCE_LABELS: Record<SourceType, { label: string; icon: any; color: strin
 const AdminEmailKnowledge = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const VALID_TABS = ["knowledge", "rma-reply", "email"];
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    initialTab && VALID_TABS.includes(initialTab) ? initialTab : "knowledge"
+  );
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleTabChange = (next: string) => {
+    setActiveTab(next);
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  };
+
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<SourceType | "all">("all");
@@ -336,7 +360,24 @@ const AdminEmailKnowledge = () => {
         </DropdownMenu>
         <Link to="/" className="rma-btn-secondary text-sm"><Home className="w-4 h-4" /> 首頁</Link><button onClick={handleSignOut} className="rma-btn-secondary text-sm"><LogOut className="w-4 h-4" /> 登出</button></div></div></div></header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 rounded-lg mb-6">
+            <TabsTrigger value="knowledge" className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
+              <BookOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">知識庫建立</span>
+            </TabsTrigger>
+            <TabsTrigger value="rma-reply" className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
+              <MessageSquareReply className="w-4 h-4" />
+              <span className="hidden sm:inline">RMA 回覆</span>
+            </TabsTrigger>
+            <TabsTrigger value="email" className="flex items-center gap-2 px-4 py-2 data-[state=active]:bg-card data-[state=active]:shadow-sm">
+              <Mail className="w-4 h-4" />
+              <span className="hidden sm:inline">客戶來信</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="knowledge" className="mt-0 space-y-6">
         <div className="rma-card p-4 flex items-center justify-between bg-muted/30"><div className="flex items-center gap-3"><Mail className="w-5 h-5 text-muted-foreground" /><div><p className="font-medium text-foreground">Gmail 自動同步</p><p className="text-sm text-muted-foreground">即將推出 — 第二階段將支援 Gmail OAuth 自動抓取信件</p></div></div><button disabled className="rma-btn-secondary opacity-50 cursor-not-allowed">連接 Gmail（即將推出）</button></div>
 
         <KnowledgeFileUpload onUploaded={async () => { await fetchSources(); refreshEmbeddingMonitor(); recentUploadsRef.current?.scrollIntoView(); }} />
@@ -427,6 +468,16 @@ const AdminEmailKnowledge = () => {
             </div>
           )}
         </div>
+          </TabsContent>
+
+          <TabsContent value="rma-reply" className="mt-0">
+            <RmaReplyTab />
+          </TabsContent>
+
+          <TabsContent value="email" className="mt-0">
+            <CustomerEmailTab />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
