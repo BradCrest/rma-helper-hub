@@ -135,14 +135,54 @@ Outbound emails go through a queue: `send-transactional-email` writes to `email_
 
 `src/lib/serialNumberValidator.ts` — detects inputs that are **not** product serial numbers: EN13319 (EU diving standard) and NCC approval codes (CCA prefix). Called on blur in `RmaForm` and before multi-product submission.
 
+### Warranty policy (`src/lib/warrantyPolicy.ts`)
+
+Pure functions implementing the [2025/11/12 CREST policy](https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update). Three production batches:
+
+| Batch | Production dates | Warranty |
+|---|---|---|
+| `legacy_2018_2022` | Jan 2018 – Oct 2022 | None (special exchange only) |
+| `v2_2022_2025` | Nov 2022 – Nov 11 2025 | 2 years |
+| `v3_2025_onwards` | Nov 12 2025+ | 1 year |
+
+Key functions:
+- `parseSerialNumber(serial, model)` — extracts year/week from serial number using model-specific byte offsets (CR-4/CR-1: pos 4-5/6-7; CR-5L/CR-F: pos 5-6/7-8)
+- `detectBatch(productionDate)` — maps a date to the three batch constants
+- `calcWarrantyExpiry(batch, productionDate)` — returns expiry date (null for legacy)
+- `evaluateWarranty({ serialNumber, productModel, warrantyDate, manualBatchOverride, manualWarrantyOverride })` — full decision object; priority: serial → manualBatchOverride → warrantyDate fallback
+
+**Testing note**: When writing fixture data for "in-warranty" scenarios, use `serial_number: null` so `evaluateWarranty` falls back to `warranty_date`. If you use a real-looking serial like `"SN12345"`, the parser may decode a production date and override the `warranty_date` field.
+
+### Refurbished pricing (`src/lib/refurbishedPricing.ts`)
+
+- `REFURB_PRICES` — A/B/C tier prices for CR-4 and CR-5L (add new models here)
+- `getRefurbPrices(model)` — fuzzy match (case-insensitive, ignores hyphens/spaces); returns `{A:0,B:0,C:0}` for unknown models
+- `formatNT(amount)` — formats to `"NT$ X,XXX"` Taiwan locale
+- `buildDiagnosisNotificationBody({productModel, serialNumber, withinWarranty, diagnosis})` — warranty-aware email template
+- `ACTUAL_METHOD_LABELS` / `ActualMethod` type — `warranty_replace | purchase_a | purchase_b | purchase_c | return_original`
+
+### Status map (`src/lib/rmaStatusMap.ts`)
+
+Read-only reference module mapping every `RmaStatus` string to its Chinese label and which logistics tab / dashboard bucket it appears in. Used by `StatusMapDialog.tsx` for admin reference. **Not authoritative** — each tab's actual query is the source of truth.
+
+### Email template labels (`src/lib/emailTemplateLabels.ts`)
+
+`EMAIL_TEMPLATE_LABELS` — maps template technical names to Chinese display names. Add new templates here when creating them.
+
+### Shopify integration (`src/components/rma/ShopifyOrdersCard.tsx`)
+
+Calls the `shopify-find-orders-by-email` Edge Function to look up purchase history by customer email. Displayed in the RMA detail dialog to help admins verify purchase dates for warranty calculation.
+
 ## Testing
 
 Tests use **Vitest + React Testing Library + MSW**. MSW is configured in Node mode (`msw/node`) via `src/mocks/server.ts`, started in `src/test-setup.ts`.
 
 **Important quirks discovered during test authoring:**
 - Use `fireEvent.submit(form)` (not `userEvent.click(submitButton)`) to test JS validation logic — jsdom enforces HTML `required` attributes and blocks `onSubmit` when clicking a submit button with unfilled required fields.
-- The agreement "checkbox" in `RmaForm` is a `<div onClick>`, not a real `<input>`. To toggle it in tests: `label.querySelector('div')` then `fireEvent.click(div)`.
+- The agreement "checkbox" in `RmaForm` is a `<div onClick>`, not a real `<input>`. To toggle it in tests: find the label via `screen.getByText("服務條款").closest("label")`, then click `label.querySelector("div")`. (The terms text is split across `<Link>` elements so `getByText("我同意服務條款和隱私政策 *")` no longer works.)
 - `MultiProductForm` uses the same placeholder strings as `RmaForm` single mode (e.g. `"請輸入產品序號"`, `"請詳細描述問題..."`), so these cannot distinguish modes. Use `"故障問題 *"` (with asterisk, single mode only) or `screen.getByRole("option", { name: "選擇故障問題" })` (native `<option>`, absent in multi mode which uses Radix UI Select).
+- `toHaveValue(expect.stringContaining(...))` does NOT work — jest-dom's `toHaveValue` doesn't accept asymmetric matchers. Use `(element as HTMLTextAreaElement).value.toContain(...)` instead.
+- When testing warranty-aware components (`ReceivingTab`, `AwaitingConfirmationTab`), use `serial_number: null` in "in-warranty" fixtures. Otherwise `evaluateWarranty` may parse the serial number, compute a past expiry, and override `warranty_date`.
 
 Add MSW handlers for new Edge Functions in `src/mocks/handlers.ts`. Use `server.use(overrideHandler)` inside individual tests to test error scenarios — MSW resets handlers after each test automatically.
 
@@ -153,6 +193,6 @@ Add MSW handlers for new Edge Functions in `src/mocks/handlers.ts`. Use `server.
 npx supabase gen types typescript --project-id xrbvyfoewbwywrwocrpf > src/integrations/supabase/types.ts
 ```
 
-## In-progress feature (from `.lovable/plan.md`)
+## Edge Function count
 
-The `send-customer-email-reply` Edge Function and `CustomerEmailTab.tsx` send section are being built to allow admins to reply directly to customer emails (not just RMA threads) with attachments. Storage path: `rma-attachments/email-replies/{gmailMessageId}/`. No new DB tables — reuses `send-transactional-email` with the `customer-email-reply` template.
+36 Deno functions (added `shopify-find-orders-by-email` for Shopify order lookup by customer email).
