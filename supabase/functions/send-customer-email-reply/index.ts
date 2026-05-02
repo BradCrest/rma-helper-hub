@@ -170,14 +170,17 @@ serve(async (req) => {
     // idempotencyKey includes a timestamp so the same admin can send multiple
     // distinct replies to the same Gmail thread.
     const idempotencyKey = `customer-email-reply-${gmailMessageId}-${Date.now()}`;
+    // Server-to-server call: send-transactional-email enforces an in-code
+    // service-role check, so we must present the service role key here
+    // (not the end-user's JWT). Admin authorization was already verified above.
     const sendRes = await fetch(
       `${supabaseUrl}/functions/v1/send-transactional-email`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: authHeader,
-          apikey: anonKey,
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
         },
         body: JSON.stringify({
           templateName: "customer-email-reply",
