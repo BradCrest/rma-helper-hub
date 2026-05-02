@@ -486,8 +486,9 @@ const FaultRegistrationDialog = ({ rma, open, onOpenChange, onSaved }: Props) =>
 
             {/* Warranty calculator (serial-based) */}
             <WarrantyCalculator
-              defaultSerial={rma.serial_number || ""}
-              defaultModel={rma.product_model || ""}
+              serialNumber={rma.serial_number}
+              productModel={rma.product_model}
+              warrantyDate={rma.warranty_date}
             />
 
             {/* === 下半部：表單欄位 === */}
