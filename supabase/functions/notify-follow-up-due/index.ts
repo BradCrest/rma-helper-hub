@@ -58,7 +58,9 @@ serve(async (req) => {
       });
     }
 
-    // Build Slack message
+    // Build Slack message; include link to admin follow-up tab if SITE_URL set
+    const siteUrl = Deno.env.get("SITE_URL");
+    const tabLink = siteUrl ? `${siteUrl.replace(/\/$/, "")}/admin/logistics?tab=followup` : null;
     const lines = due.slice(0, 20).map((r) => {
       const days = Math.floor(
         (Date.now() - new Date(r.follow_up_due_at!).getTime()) / 86400000
@@ -67,7 +69,10 @@ serve(async (req) => {
       return `• \`${r.rma_number}\` — ${r.customer_name} (${r.product_model ?? "—"}) · ${overdueText}`;
     });
     const more = due.length > 20 ? `\n_…還有 ${due.length - 20} 筆_` : "";
-    const text = `📞 *後續關懷提醒* — 共 ${due.length} 筆需要聯繫客戶\n${lines.join("\n")}${more}`;
+    const cta = tabLink
+      ? `\n→ <${tabLink}|前往「客戶關懷」分頁處理>`
+      : `\n→ 前往「後勤管理 → 客戶關懷」分頁處理`;
+    const text = `📞 *後續關懷提醒* — 共 ${due.length} 筆需要聯繫客戶\n${lines.join("\n")}${more}${cta}`;
 
     const slackUrl = Deno.env.get("SLACK_WEBHOOK_URL");
     if (slackUrl) {
