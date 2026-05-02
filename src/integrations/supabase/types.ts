@@ -532,6 +532,50 @@ export type Database = {
           },
         ]
       }
+      rma_followup_surveys: {
+        Row: {
+          comments: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          rma_id: string
+          satisfaction: number | null
+          sent_at: string
+          submitted_at: string | null
+          token: string
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rma_id: string
+          satisfaction?: number | null
+          sent_at?: string
+          submitted_at?: string | null
+          token?: string
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rma_id?: string
+          satisfaction?: number | null
+          sent_at?: string
+          submitted_at?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rma_followup_surveys_rma_id_fkey"
+            columns: ["rma_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rma_repair_details: {
         Row: {
           actual_cost: number | null
