@@ -90,7 +90,6 @@ export const TAB_STATUS_BUCKETS: Record<
     "contacting",
     "quote_confirmed",
     "paid",
-    "repairing",
   ],
   dashboardCompleted: [
     "shipped_back",
