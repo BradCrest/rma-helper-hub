@@ -102,44 +102,33 @@ serve(async (req) => {
       `CREST 保固服務 — 關於您 RMA ${rma.rma_number} 的後續關懷`;
 
     const idempotencyKey = `follow-up-care-${rmaId}-${Date.now()}`;
-    const sendRes = await fetch(
-      `${supabaseUrl}/functions/v1/send-transactional-email`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({
-          templateName: "follow-up-care",
-          recipientEmail: rma.customer_email,
-          idempotencyKey,
-          templateData: {
-            subject: finalSubject,
-            customerName: rma.customer_name ?? "您好",
-            rmaNumber: rma.rma_number,
-            productModel: rma.product_model ?? "",
-            messageBody,
-            surveyUrl,
-          },
-        }),
+    // Uses shared helper — service role auth is enforced inside the helper;
+    // never forward the end-user's JWT for this server-to-server hop.
+    const sendRes = await invokeTransactionalEmail({
+      templateName: "follow-up-care",
+      recipientEmail: rma.customer_email,
+      idempotencyKey,
+      templateData: {
+        subject: finalSubject,
+        customerName: rma.customer_name ?? "您好",
+        rmaNumber: rma.rma_number,
+        productModel: rma.product_model ?? "",
+        messageBody,
+        surveyUrl,
       },
-    );
+    });
 
     if (!sendRes.ok) {
-      const errText = await sendRes.text();
-      console.error("send-transactional-email error:", sendRes.status, errText);
+      console.error("send-transactional-email error:", sendRes.status, sendRes.errorText);
       return new Response(JSON.stringify({
-        error: `寄送失敗 (${sendRes.status})：${errText.slice(0, 500)}`,
+        error: `寄送失敗 (${sendRes.status})：${(sendRes.errorText ?? "").slice(0, 500)}`,
       }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const sendData = await sendRes.json().catch(() => null);
 
     return new Response(JSON.stringify({
-      success: true, send: sendData ?? null, surveyUrl,
+      success: true, send: sendRes.data ?? null, surveyUrl,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     console.error("send-follow-up-email error:", e);

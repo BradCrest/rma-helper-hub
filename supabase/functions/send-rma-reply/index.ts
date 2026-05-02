@@ -232,41 +232,28 @@ serve(async (req) => {
     }
 
 
-    // Send via the transactional email system (noreply@notify.crestdiving.com)
-    // Server-to-server call: send-transactional-email enforces an in-code
-    // service-role check, so present the service role key here (not the
-    // end-user's JWT). Admin authorization was already verified above.
-    const sendRes = await fetch(
-      `${supabaseUrl}/functions/v1/send-transactional-email`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({
-          templateName: "rma-reply",
-          recipientEmail: rma.customer_email,
-          idempotencyKey: `rma-reply-${inserted.id}`,
-          templateData: {
-            subject,
-            customerName: rma.customer_name || "客戶",
-            rmaNumber: rma.rma_number,
-            replyBody: body,
-            replyUrl,
-            attachments: templateAttachments,
-          },
-        }),
+    // Send via the transactional email system (noreply@notify.crestdiving.com).
+    // Uses shared helper — service role auth is enforced inside the helper;
+    // never forward the end-user's JWT for this server-to-server hop.
+    const sendRes = await invokeTransactionalEmail({
+      templateName: "rma-reply",
+      recipientEmail: rma.customer_email,
+      idempotencyKey: `rma-reply-${inserted.id}`,
+      templateData: {
+        subject,
+        customerName: rma.customer_name || "客戶",
+        rmaNumber: rma.rma_number,
+        replyBody: body,
+        replyUrl,
+        attachments: templateAttachments,
       },
-    );
+    });
 
     if (!sendRes.ok) {
-      const errText = await sendRes.text();
-      console.error("send-transactional-email error:", sendRes.status, errText);
+      console.error("send-transactional-email error:", sendRes.status, sendRes.errorText);
       return new Response(
         JSON.stringify({
-          error: `寄送失敗 (${sendRes.status})：${errText.slice(0, 500)}`,
+          error: `寄送失敗 (${sendRes.status})：${(sendRes.errorText ?? "").slice(0, 500)}`,
         }),
         {
           status: 500,
@@ -274,14 +261,13 @@ serve(async (req) => {
         },
       );
     }
-    const sendData = await sendRes.json().catch(() => null);
 
     return new Response(
       JSON.stringify({
         success: true,
         threadMessageId: inserted.id,
         replyUrl,
-        send: sendData ?? null,
+        send: sendRes.data ?? null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
