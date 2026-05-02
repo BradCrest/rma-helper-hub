@@ -159,7 +159,7 @@ export function getStatusVisibility(status: RmaStatus): {
  * 已知缺口（顯示在 Dialog 底部資訊欄）。
  */
 export const KNOWN_GAPS: string[] = [
-  "no_repair、shipped_back*、follow_up 三組狀態目前不在任何後勤分頁的預設視窗，只能於「RMA 列表」用篩選查找。",
   "contacting 同時出現在「待客戶確認」和舊版「客戶處理」分頁；CustomerHandlingTab 仍在 codebase 但未掛上 tabs。",
-  "Dashboard「處理中」桶包含 7 種狀態，「已完成」僅統計 closed，shipped_back* 未計入完成。",
+  "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，但建議後續逐步遷移至 shipped_back_* 的新版狀態。",
+  "repairing 狀態目前不在任何後勤分頁，只能於「RMA 列表」查找。",
 ];

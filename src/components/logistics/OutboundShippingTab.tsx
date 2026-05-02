@@ -63,11 +63,24 @@ const OutboundShippingTab = () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from("rma_requests")
-      .select("id, rma_number, customer_name, product_model, actual_method, status, updated_at")
+      .select("id, rma_number, customer_name, product_model, status, updated_at, rma_repair_details(actual_method)")
       .in("status", ["paid", "no_repair"])
       .order("updated_at", { ascending: true });
-    if (error) toast.error("載入資料失敗");
-    else setRmas(data ?? []);
+    if (error) {
+      toast.error("載入資料失敗");
+    } else {
+      setRmas((data ?? []).map((r) => ({
+        id: r.id,
+        rma_number: r.rma_number,
+        customer_name: r.customer_name,
+        product_model: r.product_model,
+        status: r.status,
+        updated_at: r.updated_at,
+        actual_method: Array.isArray(r.rma_repair_details)
+          ? (r.rma_repair_details[0]?.actual_method ?? null)
+          : null,
+      })));
+    }
     setIsLoading(false);
   };
 

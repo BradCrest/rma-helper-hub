@@ -25,13 +25,14 @@ interface RmaRequest {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  shipped_back: "已寄回（舊）",
   shipped_back_new: "已寄出新品",
   shipped_back_refurbished: "已寄出整新機",
   shipped_back_original: "已寄回原機",
   follow_up: "追蹤中",
 };
 
-const SHIPPED_BACK_STATUSES = ["shipped_back_new", "shipped_back_refurbished", "shipped_back_original"];
+const SHIPPED_BACK_STATUSES = ["shipped_back", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original"];
 
 const ClosingTab = () => {
   const [rmas, setRmas] = useState<RmaRequest[]>([]);
@@ -47,7 +48,7 @@ const ClosingTab = () => {
     const { data, error } = await supabase
       .from("rma_requests")
       .select("id, rma_number, customer_name, product_model, status, updated_at")
-      .in("status", [...SHIPPED_BACK_STATUSES, "follow_up"])
+      .in("status", [...SHIPPED_BACK_STATUSES, "follow_up"] as string[])
       .order("updated_at", { ascending: true });
     if (error) toast.error("載入資料失敗");
     else setRmas(data ?? []);
