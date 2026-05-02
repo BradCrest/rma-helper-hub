@@ -52,7 +52,8 @@ function renderForm() {
   const form = utils.container.querySelector("form")!;
   // 同意 checkbox 是 <div onClick>，需打到 div 本身而非外層 label
   const clickAgree = () => {
-    const label = screen.getByText("我同意服務條款和隱私政策 *").closest("label")!;
+    // 條款文字已拆成連結，改用連結文字定位 label
+    const label = screen.getByText("服務條款").closest("label")!;
     const div = label.querySelector("div")!;
     fireEvent.click(div);
   };

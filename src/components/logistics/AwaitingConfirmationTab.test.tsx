@@ -52,6 +52,9 @@ const WARRANTY_RMA = {
   ...BASE_RMA,
   id: "rma-002",
   rma_number: "RMA-2024-002",
+  // serial_number 設 null：避免 evaluateWarranty 從序號解析批次並算出已過保的到期日
+  // 讓它 fallback 到 warranty_date: "2099-12-31" 判斷保固內
+  serial_number: null,
   warranty_date: "2099-12-31",
   has_unread_customer_reply: false,
 };

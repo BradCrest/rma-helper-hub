@@ -43,7 +43,8 @@ function renderForm() {
   );
   const form = utils.container.querySelector("form")!;
   const clickAgree = () => {
-    const label = screen.getByText("我同意服務條款和隱私政策 *").closest("label")!;
+    // 條款文字已拆成連結，改用連結文字定位 label
+    const label = screen.getByText("服務條款").closest("label")!;
     fireEvent.click(label.querySelector("div")!);
   };
   return { ...utils, form, clickAgree };

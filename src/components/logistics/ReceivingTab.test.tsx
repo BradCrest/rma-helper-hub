@@ -337,7 +337,8 @@ describe("ReceivingTab - Phase 2 通知客戶診斷結果", () => {
   });
 
   it("保固內時，信件預覽顯示免費換新模板，不顯示 ABC 價格", async () => {
-    const warrantyRma = { ...BASE_RMA, warranty_date: "2099-12-31" };
+    // serial_number 設 null：避免 evaluateWarranty 從 "SN12345" 解析批次後算出已過保的到期日
+    const warrantyRma = { ...BASE_RMA, serial_number: null, warranty_date: "2099-12-31" };
     setupSupabaseMock({ rmaList: [warrantyRma] });
     render(<ReceivingTab />);
     await openNotifyDialog();
