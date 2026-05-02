@@ -1,43 +1,37 @@
-## 問題
+## 檢查結果總覽
 
-`send-follow-up-email`（客戶關懷寄送）在呼叫下游 `send-transactional-email` 時，沿用了使用者 JWT 而非 `SUPABASE_SERVICE_ROLE_KEY`，跟先前 `send-customer-email-reply`、`send-rma-reply` 撞到的 401 問題完全一樣。目前實機按下「寄出客戶關懷信」會回 `401 Unauthorized`。
+針對所有會呼叫 `send-transactional-email` 的函式，確認上游身分驗證（誰可以呼叫我）與下游伺服器對伺服器呼叫的 header 模式：
 
-## 修正範圍
+| 函式 | 上游驗證 | 下游 header | 狀態 |
+|---|---|---|---|
+| `send-customer-email-reply` | user JWT → admin role | `Bearer serviceKey` + `apikey: serviceKey` | ✅ 正確 |
+| `send-rma-reply` | user JWT → admin role | `Bearer serviceKey` + `apikey: serviceKey` | ✅ 正確 |
+| `send-follow-up-email` | user JWT → admin role | `Bearer serviceKey` + `apikey: serviceKey` | ✅ 已修正 |
+| `submit-rma` | 公開（客戶提交） | `Bearer serviceKey` + `apikey: serviceKey` | ✅ 正確 |
+| `send-shipping-reminders` | CRON_SECRET 或 admin JWT | 僅 `apikey: serviceKey`（無 Bearer） | ⚠️ 可運作但與其他 4 個風格不一致 |
 
-只修一個檔案：`supabase/functions/send-follow-up-email/index.ts`
+`send-transactional-email` 第 63-69 行邏輯：`presented = bearer || apikey`，**任一 header 帶上正確的 service role key 即可通過**。所以五個函式目前**都能正常工作**，沒有功能性 bug。
 
-### 變更內容（第 105-113 行附近）
+## 建議的小幅統一（純風格）
 
-呼叫 `send-transactional-email` 的 fetch headers，從：
-
-```ts
-headers: {
-  "Content-Type": "application/json",
-  Authorization: authHeader,
-  apikey: anonKey,
-},
-```
-
-改為使用 service role key 做 server-to-server 呼叫：
+只動一個檔案：`supabase/functions/send-shipping-reminders/index.ts` 第 193-198 行，補上 `Authorization: Bearer ${serviceKey}` header，讓五個函式呼叫下游時的 header 格式完全一致：
 
 ```ts
 headers: {
   "Content-Type": "application/json",
-  Authorization: `Bearer ${serviceKey}`,
-  apikey: serviceKey,
+  "Authorization": `Bearer ${serviceKey}`,
+  "apikey": serviceKey,
 },
 ```
 
-### 不動的部分
+修改後重新部署 `send-shipping-reminders`。
 
-- 上游 admin 身分驗證（第 27-50 行）保持不變 — 仍然要求前端帶 user JWT 並驗證為 admin/super_admin。
-- 對 `create-follow-up-survey` 的呼叫（第 82-91 行）保持用 `authHeader` — 那個函式需要 user 身分。
-- 不修改 `send-transactional-email` 本身。
+## 不變的部分
 
-## 部署
-
-修改後重新部署 `send-follow-up-email`。
+- 不修改 `send-transactional-email` 本身（OR 邏輯保留向後相容）。
+- 各函式上游的 admin/JWT 驗證邏輯均維持不變。
+- 不新增 wrapper、不抽 helper（五個 call site 簡單明確，抽出反而增加耦合與部署複雜度）。
 
 ## 驗證
 
-部署完成後，請於後台「客戶關懷」操作一次寄信流程，確認 200 OK 並收到郵件。
+部署後，等下一次 `send-shipping-reminders` 排程觸發（或手動測試），確認郵件正常寄出、無 401。
