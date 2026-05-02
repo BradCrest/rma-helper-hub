@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, MessageSquareReply } from "lucide-react";
 import RmaReplyTab from "@/components/logistics/RmaReplyTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
-import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X, Download } from "lucide-react";
+import { ChevronLeft, Home, LogOut, Plus, Trash2, Edit2, Loader2, Mail, FileText, MessageSquare, Save, X, Download, BookOpen, MessageSquareReply } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
