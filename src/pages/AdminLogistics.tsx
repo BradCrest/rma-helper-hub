@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply, CreditCard, Truck, CheckSquare } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
 import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmationTab";
@@ -10,12 +10,32 @@ import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
 import ClosingTab from "@/components/logistics/ClosingTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 import RmaReplyTab from "@/components/logistics/RmaReplyTab";
+import FollowUpTab from "@/components/logistics/FollowUpTab";
 import StatusMapDialog from "@/components/logistics/StatusMapDialog";
+
+const VALID_TABS = ["rma-reply", "email", "receiving", "customer", "payment", "outbound", "closing", "followup", "supplier", "fault", "sales", "warranty"];
 
 const AdminLogistics = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("rma-reply");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    initialTab && VALID_TABS.includes(initialTab) ? initialTab : "rma-reply"
+  );
+
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleTabChange = (next: string) => {
+    setActiveTab(next);
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -30,9 +50,9 @@ const AdminLogistics = () => {
     { id: "payment", label: "付款確認", icon: CreditCard },
     { id: "outbound", label: "出貨處理", icon: Truck },
     { id: "closing", label: "結案追蹤", icon: CheckSquare },
+    { id: "followup", label: "客戶關懷", icon: Heart },
     { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
     { id: "fault", label: "故障登記", icon: ClipboardCheck, disabled: true },
-    { id: "followup", label: "客戶關懷", icon: Heart, disabled: true },
     { id: "sales", label: "銷貨匯入", icon: FileSpreadsheet, disabled: true },
     { id: "warranty", label: "保固審核", icon: ShieldCheck, disabled: true },
   ];
@@ -67,7 +87,7 @@ const AdminLogistics = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-muted/50 p-1 rounded-lg mb-6">
             {tabs.map((tab) => (
               <TabsTrigger
@@ -127,11 +147,7 @@ const AdminLogistics = () => {
           </TabsContent>
 
           <TabsContent value="followup" className="mt-0">
-            <div className="rma-card text-center py-12">
-              <Heart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground">客戶關懷</h3>
-              <p className="text-muted-foreground mt-2">此功能將在後續階段實作</p>
-            </div>
+            <FollowUpTab />
           </TabsContent>
 
           <TabsContent value="sales" className="mt-0">
