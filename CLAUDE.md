@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚫 Claude Code 禁區（絕對不要修改）
+## 🚫 絕對禁區（任何工具都不得修改）
 
 | 檔案 | 原因 |
 |------|------|
@@ -11,42 +11,99 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `supabase/config.toml` | 改 project_id 會導致部署失敗 |
 | `.env` | Lovable Cloud 自動管理 |
 | `supabase/migrations/*.sql`（已執行的）| Migration 不可逆，新增欄位請建新 migration |
-| Edge Functions（`supabase/functions/`）| Lovable 負責，有自動部署流程；Claude 若要 patch 請在 Lovable push 後再改 |
-| DB schema / RLS policy | Lovable 有 migration 審核流程，Claude 改 SQL 容易漏 RLS |
+
+## ⚠️ Lovable 主導區（需 Brad/Lovable 明確交辦才能 patch）
+
+Edge Functions（`supabase/functions/`）和 DB schema / RLS policy / 新 migration 的主導權在 Lovable，原因是 Lovable 擁有自動部署流程與 migration 審核流程。
+
+Claude Code 或 Codex 僅在 **Brad 或 Lovable 明確交辦** 時才可 patch 這些檔案，且 patch 完成後必須標注「請 Lovable 部署或 review 最終版本」。
 
 ---
 
-## 分工原則（Lovable vs Claude Code）
+## 分工原則（Lovable / Claude Code / Codex）
 
 | 類型 | 負責方 | 原因 |
 |------|--------|------|
 | UI / shadcn 元件 / Tailwind 樣式 | **Lovable** | 即時預覽、視覺回饋快 |
 | 新頁面、表單、Dialog | **Lovable** | 同上 |
-| Edge Functions（Deno）| **Lovable** | 有自動部署，Claude 改完還需手動部署 |
+| Edge Functions（Deno）| **Lovable** | 有自動部署，其他工具改完還需手動部署 |
 | DB migration / RLS policy | **Lovable** | 有 migration 審核流程 |
+| Admin UI 功能擴充（批次操作、設定頁 toggle）| **Lovable** | UI + Edge Function 可一次完成，部署即生效 |
+| 知識庫 UI 批次匯入（多檔上傳 + source_type 選擇）| **Lovable** | 比 CLI script 可重複使用，`KnowledgeFileUpload` 已有基礎 |
+| Edge Function 邏輯 bug / patch | **Lovable** | 有自動部署；Claude Code 只在 Lovable 無暇時接手 |
 | 純函式邏輯（csvParser、validator）| **Claude Code** | 最需要單元測試，Claude 寫測試比較細 |
 | Vitest 測試補強 | **Claude Code** | Lovable 預設不主動寫測試 |
 | 文件（README、CLAUDE.md、PR 說明）| **Claude Code** | 不影響 runtime，零風險 |
 | 跨檔案重構 / 抽 hook / 命名統一 | **Claude Code** | 適合 review-driven 流程 |
-| Bug 修復 | 看狀況 | UI bug → Lovable；邏輯 bug → 誰先看到誰修 |
+| Edge Function system prompt / 邏輯 patch（Lovable 無暇時）| **Claude Code** | 限時 patch，完成後由 Lovable 接手正式版 |
+| 定義清楚的批次修改（型別補全、rename）| **Codex** | 範圍明確、可非同步跑，不需互動確認 |
+| 平行 feature branch 開發 | **Codex** | 在獨立 branch 工作，不阻塞 main |
+| PR code review / 安全掃描 | **Codex** | 非同步、可重複觸發，不佔 Claude 上下文 |
+| CI 觸發的自動修復（lint、型別錯誤）| **Codex** | 僅限 allowlist 路徑；適合無人值守的雲端沙箱環境 |
+| Bug 修復 | 看狀況 | UI bug → Lovable；Edge Function bug → Lovable；純邏輯 bug → Claude Code；範圍明確可隔離 → Codex |
 
 ---
 
-## Lovable ↔ Claude Code 協作流程
+## 三方協作流程
 
-### Claude Code 開始工作前（必做）
+### 任何人開始工作前（必做）
+
+**在 main 上工作（Lovable / Claude Code）：**
 ```bash
+git status                    # 確認 worktree 乾淨，有未提交內容先 stash 或 commit
 git checkout main
 git pull --rebase origin main
 ```
 
+**在 feature branch 上工作（Codex / Claude Code）：**
+```bash
+git fetch origin
+git rebase origin/main        # 將 main 的最新變更合併進當前 branch
+```
+
+> 若 worktree 有未提交的變更，`git checkout` 會失敗。請先執行 `git stash` 保存，完成切換後再 `git stash pop`。
+
+### 各工具的工作方式
+
+| 工具 | 工作模式 | Branch 策略 |
+|------|---------|-------------|
+| **Lovable** | 互動式、即時預覽 | 直接 push 到 `main` |
+| **Claude Code** | 互動式、本機 review-driven | 可在 `main` 直接改，或開 feature branch |
+| **Codex** | 非同步、雲端沙箱 | 一律開 feature branch，完成後開 PR |
+
 ### 衝突時的優先權
-- **UI / 元件 / 樣式檔**：保留 Lovable 版本，Claude 的改動丟棄或重做
-- **測試檔 / 文件 / 純邏輯模組**：保留 Claude 版本（Lovable 通常不動這些）
-- **Edge Functions**：以 Lovable 版本為主，Claude 在其上 patch
+- **UI / 元件 / 樣式檔**：保留 Lovable 版本，其他工具的改動丟棄或重做
+- **測試檔 / 文件 / 純邏輯模組**：保留 Claude Code 版本（Lovable 通常不動這些）
+- **Edge Functions**：以 Lovable 版本為主，Claude Code 在其上 patch；Codex 不碰 Edge Functions
+- **Codex PR**：由 Claude Code 負責 review 後再 merge，不直接 auto-merge
 
 ### 「Lovable 工作中」暫停規則
-Lovable 做大改動期間，Claude Code 暫停開 PR。等 Lovable push 完畢、執行 `git pull --rebase` 後再繼續。同時有多個 PR 開著容易產生 merge conflict。
+Lovable 做大改動期間，Claude Code 暫停開 PR，Codex 的 PR 暫停 merge（可繼續跑、繼續開）。等 Lovable push 完畢、執行 `git pull --rebase` 後再繼續。
+
+### Codex 禁區
+除了上方絕對禁區與 Lovable 主導區外，Codex 額外不碰：
+- 任何需要本機 dev server 驗證的 UI 改動（`src/components/**`、`src/pages/**`）
+- `supabase/functions/`（無法在沙箱部署驗證）
+- `supabase/migrations/**`
+- `.env` / Supabase 設定檔
+
+### Codex Auto-Fix Allowlist
+
+Codex 可自動修復（CI 觸發或明確授權）的路徑：
+
+- `src/lib/**`
+- `src/**/*.test.ts` / `src/**/*.test.tsx`
+- `docs/**`
+- `README.md`
+- 非 runtime 的工具腳本（`scripts/**`），且須明確要求
+
+以下路徑**需要 Brad 明確審核才可 auto-fix**，Codex 不得自行判斷修改：
+
+- `src/components/**`
+- `src/pages/**`
+- `supabase/functions/**`
+- `supabase/migrations/**`
+- `.env` / Supabase 設定檔
 
 ---
 

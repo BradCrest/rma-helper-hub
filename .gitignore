@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Codex / tool analysis artifacts
+graphify-out/
+supabase/functions/graphify-out/
