@@ -43,6 +43,22 @@ describe("parseCSVWithDiagnostics", () => {
     expect(records[0].status).toBe("registered");
   });
 
+  it("「維修中」應被 skip 並附上原因說明，不得匯入為 repairing", () => {
+    const csv = [HEADER, makeRow({ 1: "維修中" })].join("\n");
+    const result = parseCSVWithDiagnostics(csv);
+    expect(result.records).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toContain("維修中");
+  });
+
+  it("「原錶維修中」應被 skip 並附上原因說明，不得匯入為 repairing", () => {
+    const csv = [HEADER, makeRow({ 1: "原錶維修中" })].join("\n");
+    const result = parseCSVWithDiagnostics(csv);
+    expect(result.records).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toContain("原錶維修中");
+  });
+
   it("缺少 rma_number 應被跳過並記錄原因", () => {
     const csv = [HEADER, makeRow({ 0: "" })].join("\n");
     const result = parseCSVWithDiagnostics(csv);

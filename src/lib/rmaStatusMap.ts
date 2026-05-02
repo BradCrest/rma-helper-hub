@@ -4,7 +4,7 @@
  * 來源：實際盤點以下檔案的篩選邏輯
  *   - src/components/logistics/ReceivingTab.tsx
  *   - src/components/logistics/AwaitingConfirmationTab.tsx
- *   - src/components/logistics/CustomerHandlingTab.tsx（舊版）
+ *   （CustomerHandlingTab.tsx 已刪除，為舊流程殘留）
  *   - src/pages/AdminDashboard.tsx
  *
  * 僅供 StatusMapDialog 顯示對照用。
@@ -160,7 +160,7 @@ export function getStatusVisibility(status: RmaStatus): {
  * 已知缺口（顯示在 Dialog 底部資訊欄）。
  */
 export const KNOWN_GAPS: string[] = [
-  "contacting 同時出現在「待客戶確認」和舊版「客戶處理」分頁；CustomerHandlingTab 仍在 codebase 但未掛上 tabs。",
-  "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，但建議後續逐步遷移至 shipped_back_* 的新版狀態。",
-  "repairing 狀態目前不在任何後勤分頁，只能於「RMA 列表」查找。",
+  "repairing / unknown 仍在 DB enum，需 Lovable 執行 migration audit 後才能從 enum / AdminDashboard / rmaStatusMap 移除。",
+  "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，建議後續逐步遷移至 shipped_back_* 的新版狀態。",
+  "csvParser 已封鎖「維修中」/「原錶維修中」匯入（加入 skipped），但 DB 中既有 repairing 記錄需人工處理。",
 ];

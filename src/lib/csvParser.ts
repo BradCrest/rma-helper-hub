@@ -147,8 +147,6 @@ const STATUS_MAP: Record<string, string> = {
   '確認報價': 'quote_confirmed',
   '已付費': 'paid',
   '不維修': 'no_repair',
-  '維修中': 'repairing',
-  '原錶維修中': 'repairing',
   '已寄出整新品': 'shipped_back_refurbished',
   '已寄回整新品': 'shipped_back_refurbished',
   '已寄出原錶': 'shipped_back_original',
@@ -158,6 +156,12 @@ const STATUS_MAP: Record<string, string> = {
   '已回寄': 'shipped_back',
   '後續關懷': 'follow_up',
   '結案': 'closed',
+};
+
+// Statuses that have been removed from the current workflow and must not be silently imported
+const DEPRECATED_STATUS_REASONS: Record<string, string> = {
+  '維修中': '「維修中」已從現行流程移除，請確認正確狀態後重新匯入（例如：已付費、不維修、已寄回原錶）',
+  '原錶維修中': '「原錶維修中」已從現行流程移除，請確認正確狀態後重新匯入',
 };
 
 // Parse a date string in various formats
@@ -307,6 +311,17 @@ export function parseCSVWithDiagnostics(csvContent: string): ParseResult {
       skipped.push({
         lineNumber: i + 1,
         reason: '報修單號為空或無效 (NA)',
+        rawContent: line.substring(0, 100),
+      });
+      continue;
+    }
+
+    // Block deprecated statuses from being silently imported
+    const rawStatus = (columns[1] || '').trim();
+    if (DEPRECATED_STATUS_REASONS[rawStatus]) {
+      skipped.push({
+        lineNumber: i + 1,
+        reason: DEPRECATED_STATUS_REASONS[rawStatus],
         rawContent: line.substring(0, 100),
       });
       continue;
