@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply, CreditCard, Truck, CheckSquare } from "lucide-react";
+import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, CreditCard, Truck, CheckSquare } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,12 +8,11 @@ import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmation
 import PaymentConfirmationTab from "@/components/logistics/PaymentConfirmationTab";
 import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
 import ClosingTab from "@/components/logistics/ClosingTab";
-import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
-import RmaReplyTab from "@/components/logistics/RmaReplyTab";
 import FollowUpTab from "@/components/logistics/FollowUpTab";
 import StatusMapDialog from "@/components/logistics/StatusMapDialog";
 
-const VALID_TABS = ["rma-reply", "email", "receiving", "customer", "payment", "outbound", "closing", "followup", "supplier", "fault", "sales", "warranty"];
+const VALID_TABS = ["receiving", "customer", "payment", "outbound", "closing", "followup", "supplier", "fault", "sales", "warranty"];
+const MOVED_TABS = ["rma-reply", "email"];
 
 const AdminLogistics = () => {
   const { user, signOut } = useAuth();
@@ -21,11 +20,16 @@ const AdminLogistics = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState(
-    initialTab && VALID_TABS.includes(initialTab) ? initialTab : "rma-reply"
+    initialTab && VALID_TABS.includes(initialTab) ? initialTab : "receiving"
   );
 
+  // Redirect old bookmarks: rma-reply / email tabs moved to /admin/email-knowledge
   useEffect(() => {
     const t = searchParams.get("tab");
+    if (t && MOVED_TABS.includes(t)) {
+      navigate(`/admin/email-knowledge?tab=${t}`, { replace: true });
+      return;
+    }
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -43,8 +47,6 @@ const AdminLogistics = () => {
   };
 
   const tabs = [
-    { id: "rma-reply", label: "RMA 回覆", icon: MessageSquareReply },
-    { id: "email", label: "客戶來信", icon: Mail },
     { id: "receiving", label: "收件處理", icon: Package },
     { id: "customer", label: "待客戶確認", icon: Inbox },
     { id: "payment", label: "付款確認", icon: CreditCard },
@@ -101,14 +103,6 @@ const AdminLogistics = () => {
               </TabsTrigger>
             ))}
           </TabsList>
-
-          <TabsContent value="rma-reply" className="mt-0">
-            <RmaReplyTab />
-          </TabsContent>
-
-          <TabsContent value="email" className="mt-0">
-            <CustomerEmailTab />
-          </TabsContent>
 
           <TabsContent value="receiving" className="mt-0">
             <ReceivingTab />
