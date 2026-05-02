@@ -141,7 +141,7 @@ const AdminDashboard = () => {
                 <Mail className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">客戶往來知識庫</h3>
+                <h3 className="font-semibold text-foreground">客戶回覆及知識庫</h3>
                 <p className="text-sm text-muted-foreground">FAQ、客服範本、AI 對話查詢</p>
               </div>
             </div>

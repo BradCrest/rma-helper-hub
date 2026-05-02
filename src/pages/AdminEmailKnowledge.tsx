@@ -254,7 +254,7 @@ const AdminEmailKnowledge = () => {
         triggerDownload("\uFEFF" + csv, `${baseName}.csv`, "text/csv;charset=utf-8");
       } else {
         const lines: string[] = [];
-        lines.push(`# 客戶往來知識庫匯出`);
+        lines.push(`# 客戶回覆及知識庫匯出`);
         lines.push(`匯出時間：${now.toLocaleString("zh-TW")}`);
         lines.push(`共 ${data.length} 筆${scope === "filtered" ? "（已套用篩選）" : ""}`);
         lines.push("");
@@ -336,7 +336,7 @@ const AdminEmailKnowledge = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶往來知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
+      <header className="bg-card shadow-sm border-b border-border"><div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between h-16"><div className="flex items-center gap-4"><Link to="/admin/dashboard" className="text-muted-foreground hover:text-foreground"><ChevronLeft className="w-5 h-5" /></Link><h1 className="text-xl font-bold text-foreground">📧 客戶回覆及知識庫</h1></div><div className="flex items-center gap-3"><span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="rma-btn-secondary text-sm" title="匯出知識庫"><Download className="w-4 h-4" /> 匯出</button>
