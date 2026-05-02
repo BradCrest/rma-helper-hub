@@ -124,6 +124,7 @@ function sanitizeForKey(name: string): string {
 }
 
 const ReceivingTab = () => {
+  const navigate = useNavigate();
   const [rmaList, setRmaList] = useState<RmaRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -857,6 +858,27 @@ const ReceivingTab = () => {
                   </Button>
                   <Button onClick={handleSaveRepairDetail} disabled={saving}>
                     {saving ? "儲存中..." : "儲存記錄"}
+                  </Button>
+                </div>
+
+                {/* Hint: redirect to fault registration tab for full decision flow */}
+                <div className="mt-4 p-3 rounded-md bg-primary/5 border border-primary/20 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ClipboardCheck className="w-4 h-4 text-primary" />
+                    <span className="text-muted-foreground">
+                      完成收件後請至「故障登記」分頁登錄完整檢測與處置決策
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      navigate("/admin/logistics?tab=fault");
+                    }}
+                  >
+                    前往故障登記
+                    <ArrowRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
