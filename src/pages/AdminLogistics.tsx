@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply } from "lucide-react";
+import { LogOut, Home, Package, Inbox, Factory, ClipboardCheck, Heart, FileSpreadsheet, ShieldCheck, Mail, MessageSquareReply, CreditCard, Truck, CheckSquare } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReceivingTab from "@/components/logistics/ReceivingTab";
 import AwaitingConfirmationTab from "@/components/logistics/AwaitingConfirmationTab";
+import PaymentConfirmationTab from "@/components/logistics/PaymentConfirmationTab";
+import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
+import ClosingTab from "@/components/logistics/ClosingTab";
 import CustomerEmailTab from "@/components/logistics/CustomerEmailTab";
 import RmaReplyTab from "@/components/logistics/RmaReplyTab";
 import StatusMapDialog from "@/components/logistics/StatusMapDialog";
@@ -24,6 +27,9 @@ const AdminLogistics = () => {
     { id: "email", label: "客戶來信", icon: Mail },
     { id: "receiving", label: "收件處理", icon: Package },
     { id: "customer", label: "待客戶確認", icon: Inbox },
+    { id: "payment", label: "付款確認", icon: CreditCard },
+    { id: "outbound", label: "出貨處理", icon: Truck },
+    { id: "closing", label: "結案追蹤", icon: CheckSquare },
     { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
     { id: "fault", label: "故障登記", icon: ClipboardCheck, disabled: true },
     { id: "followup", label: "客戶關懷", icon: Heart, disabled: true },
@@ -90,6 +96,18 @@ const AdminLogistics = () => {
 
           <TabsContent value="customer" className="mt-0">
             <AwaitingConfirmationTab />
+          </TabsContent>
+
+          <TabsContent value="payment" className="mt-0">
+            <PaymentConfirmationTab />
+          </TabsContent>
+
+          <TabsContent value="outbound" className="mt-0">
+            <OutboundShippingTab />
+          </TabsContent>
+
+          <TabsContent value="closing" className="mt-0">
+            <ClosingTab />
           </TabsContent>
 
           <TabsContent value="supplier" className="mt-0">

@@ -51,7 +51,10 @@ export const RMA_STATUS_LABELS: Record<RmaStatus, string> = {
 export type LogisticsTabKey =
   | "receiving"
   | "awaitingConfirmation"
-  | "customerHandlingLegacy";
+  | "customerHandlingLegacy"
+  | "paymentConfirmation"
+  | "outboundShipping"
+  | "closing";
 
 export type DashboardBucketKey =
   | "dashboardPending"
@@ -62,6 +65,9 @@ export const LOGISTICS_TAB_LABELS: Record<LogisticsTabKey, string> = {
   receiving: "收件處理",
   awaitingConfirmation: "待客戶確認",
   customerHandlingLegacy: "客戶處理（舊）",
+  paymentConfirmation: "付款確認",
+  outboundShipping: "出貨處理",
+  closing: "結案追蹤",
 };
 
 export const DASHBOARD_BUCKET_LABELS: Record<DashboardBucketKey, string> = {
@@ -80,6 +86,9 @@ export const TAB_STATUS_BUCKETS: Record<
   receiving: ["shipped", "received", "inspecting"],
   awaitingConfirmation: ["contacting"],
   customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
+  paymentConfirmation: ["quote_confirmed"],
+  outboundShipping: ["paid", "no_repair"],
+  closing: ["shipped_back", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "follow_up"],
   dashboardPending: ["registered"],
   dashboardInProgress: [
     "shipped",
@@ -90,7 +99,14 @@ export const TAB_STATUS_BUCKETS: Record<
     "paid",
     "repairing",
   ],
-  dashboardCompleted: ["closed"],
+  dashboardCompleted: [
+    "shipped_back",
+    "shipped_back_new",
+    "shipped_back_refurbished",
+    "shipped_back_original",
+    "follow_up",
+    "closed",
+  ],
 };
 
 /**
@@ -144,7 +160,7 @@ export function getStatusVisibility(status: RmaStatus): {
  * 已知缺口（顯示在 Dialog 底部資訊欄）。
  */
 export const KNOWN_GAPS: string[] = [
-  "no_repair、shipped_back*、follow_up 三組狀態目前不在任何後勤分頁的預設視窗，只能於「RMA 列表」用篩選查找。",
   "contacting 同時出現在「待客戶確認」和舊版「客戶處理」分頁；CustomerHandlingTab 仍在 codebase 但未掛上 tabs。",
-  "Dashboard「處理中」桶包含 7 種狀態，「已完成」僅統計 closed，shipped_back* 未計入完成。",
+  "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，但建議後續逐步遷移至 shipped_back_* 的新版狀態。",
+  "repairing 狀態目前不在任何後勤分頁，只能於「RMA 列表」查找。",
 ];
