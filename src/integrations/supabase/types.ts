@@ -593,6 +593,7 @@ export type Database = {
           customer_phone: string
           customer_type: string | null
           diagnosis_category: string | null
+          follow_up_due_at: string | null
           has_unread_customer_reply: boolean
           id: string
           initial_diagnosis: string | null
@@ -626,6 +627,7 @@ export type Database = {
           customer_phone: string
           customer_type?: string | null
           diagnosis_category?: string | null
+          follow_up_due_at?: string | null
           has_unread_customer_reply?: boolean
           id?: string
           initial_diagnosis?: string | null
@@ -659,6 +661,7 @@ export type Database = {
           customer_phone?: string
           customer_type?: string | null
           diagnosis_category?: string | null
+          follow_up_due_at?: string | null
           has_unread_customer_reply?: boolean
           id?: string
           initial_diagnosis?: string | null

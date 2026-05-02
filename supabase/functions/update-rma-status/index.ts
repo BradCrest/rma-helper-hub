@@ -10,6 +10,8 @@ const corsHeaders = {
 interface StatusUpdateRequest {
   rma_id: string;
   new_status: string;
+  notes?: string | null;
+  follow_up_due_at?: string | null;
 }
 
 serve(async (req) => {
@@ -75,10 +77,21 @@ serve(async (req) => {
 
     const oldStatus = rmaData.status;
 
-    // Update status
+    // Build update payload
+    const updatePayload: Record<string, unknown> = { status: body.new_status };
+    if (body.new_status === "follow_up") {
+      // Set follow_up_due_at if provided, else default to now() + 7 days
+      updatePayload.follow_up_due_at =
+        body.follow_up_due_at ??
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (body.new_status === "closed") {
+      // Clear follow_up_due_at when closing
+      updatePayload.follow_up_due_at = null;
+    }
+
     const { error: updateError } = await supabase
       .from("rma_requests")
-      .update({ status: body.new_status })
+      .update(updatePayload)
       .eq("id", body.rma_id);
 
     if (updateError) {
