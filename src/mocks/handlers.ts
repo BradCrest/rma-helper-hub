@@ -37,6 +37,16 @@ export const handlers = [
   http.post(`${SUPABASE_URL}/auth/v1/token`, () =>
     HttpResponse.json({ access_token: "mock-token", token_type: "bearer" })
   ),
+
+  // update-rma-status
+  http.post(`${SUPABASE_URL}/functions/v1/update-rma-status`, () =>
+    HttpResponse.json({ success: true })
+  ),
+
+  // submit-outbound-shipping
+  http.post(`${SUPABASE_URL}/functions/v1/submit-outbound-shipping`, () =>
+    HttpResponse.json({ success: true, message: "回寄資訊已成功提交" })
+  ),
 ];
 
 // ── 錯誤情境用的 override handlers ────────────────────────────────────────

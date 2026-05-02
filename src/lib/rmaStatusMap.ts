@@ -51,7 +51,10 @@ export const RMA_STATUS_LABELS: Record<RmaStatus, string> = {
 export type LogisticsTabKey =
   | "receiving"
   | "awaitingConfirmation"
-  | "customerHandlingLegacy";
+  | "customerHandlingLegacy"
+  | "paymentConfirmation"
+  | "outboundShipping"
+  | "closing";
 
 export type DashboardBucketKey =
   | "dashboardPending"
@@ -62,6 +65,9 @@ export const LOGISTICS_TAB_LABELS: Record<LogisticsTabKey, string> = {
   receiving: "收件處理",
   awaitingConfirmation: "待客戶確認",
   customerHandlingLegacy: "客戶處理（舊）",
+  paymentConfirmation: "付款確認",
+  outboundShipping: "出貨處理",
+  closing: "結案追蹤",
 };
 
 export const DASHBOARD_BUCKET_LABELS: Record<DashboardBucketKey, string> = {
@@ -80,6 +86,9 @@ export const TAB_STATUS_BUCKETS: Record<
   receiving: ["shipped", "received", "inspecting"],
   awaitingConfirmation: ["contacting"],
   customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
+  paymentConfirmation: ["quote_confirmed"],
+  outboundShipping: ["paid", "no_repair"],
+  closing: ["shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "follow_up"],
   dashboardPending: ["registered"],
   dashboardInProgress: [
     "shipped",
@@ -90,7 +99,13 @@ export const TAB_STATUS_BUCKETS: Record<
     "paid",
     "repairing",
   ],
-  dashboardCompleted: ["closed"],
+  dashboardCompleted: [
+    "shipped_back_new",
+    "shipped_back_refurbished",
+    "shipped_back_original",
+    "follow_up",
+    "closed",
+  ],
 };
 
 /**
