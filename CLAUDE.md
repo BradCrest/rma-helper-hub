@@ -68,8 +68,15 @@ git rebase origin/main        # 將 main 的最新變更合併進當前 branch
 | 工具 | 工作模式 | Branch 策略 |
 |------|---------|-------------|
 | **Lovable** | 互動式、即時預覽 | 直接 push 到 `main` |
-| **Claude Code** | 互動式、本機 review-driven | 可在 `main` 直接改，或開 feature branch |
+| **Claude Code** | 互動式、本機 review-driven | 依路徑規則（見下方） |
 | **Codex** | 非同步、雲端沙箱 | 一律開 feature branch，完成後開 PR |
+
+#### Claude Code Branch 規則
+
+| 路徑 | Branch 策略 | 原因 |
+|------|------------|------|
+| `src/**/*.test.ts(x)`、`src/lib/**`、`docs/**`、`CLAUDE.md` | 直接 commit `main` | 零 runtime 風險，與 Lovable 同步最快 |
+| `src/components/**`、`src/pages/**` | 開 feature branch + PR，等 Brad review | UI 改動需視覺確認，避免蓋掉 Lovable 版本 |
 
 ### 衝突時的優先權
 - **UI / 元件 / 樣式檔**：保留 Lovable 版本，其他工具的改動丟棄或重做
