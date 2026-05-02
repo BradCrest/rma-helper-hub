@@ -86,14 +86,12 @@ const statusLabels: Record<RmaStatus, string> = {
   quote_confirmed: "確認報價",
   paid: "已付費",
   no_repair: "不維修",
-  repairing: "維修中",
   shipped_back: "已回寄",
   shipped_back_refurbished: "已寄回整新品",
   shipped_back_original: "已寄回原錶",
   shipped_back_new: "已寄出全新品",
   follow_up: "後續關懷",
   closed: "已結案",
-  unknown: "未知狀態",
 };
 
 const statusColors: Record<RmaStatus, string> = {
@@ -105,17 +103,15 @@ const statusColors: Record<RmaStatus, string> = {
   quote_confirmed: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
   paid: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   no_repair: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-  repairing: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
   shipped_back: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   shipped_back_refurbished: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
   shipped_back_original: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
   shipped_back_new: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   follow_up: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
   closed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  unknown: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
 };
 
-const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "repairing", "shipped_back", "shipped_back_refurbished", "shipped_back_original", "shipped_back_new", "follow_up", "closed", "unknown"];
+const allStatuses: RmaStatus[] = ["registered", "shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "no_repair", "shipped_back", "shipped_back_refurbished", "shipped_back_original", "shipped_back_new", "follow_up", "closed"];
 
 // Status allowed days (null = no limit)
 const statusAllowedDays: Record<RmaStatus, number | null> = {
@@ -127,14 +123,12 @@ const statusAllowedDays: Record<RmaStatus, number | null> = {
   quote_confirmed: 3,
   paid: 3,
   no_repair: 2,
-  repairing: 14,
   shipped_back: 7,
   shipped_back_refurbished: 7,
   shipped_back_original: 7,
   shipped_back_new: 7,
   follow_up: 14,
   closed: null,
-  unknown: null,
 };
 
 // Calculate days in current status
@@ -2092,7 +2086,7 @@ const AdminRmaList = () => {
                       </div>
                     )}
                   </div>
-                ) : (selectedRma.status === "received" || selectedRma.status === "inspecting" || selectedRma.status === "contacting" || selectedRma.status === "quote_confirmed" || selectedRma.status === "paid" || selectedRma.status === "repairing") ? (
+                ) : (selectedRma.status === "received" || selectedRma.status === "inspecting" || selectedRma.status === "contacting" || selectedRma.status === "quote_confirmed" || selectedRma.status === "paid") ? (
                   // Show form for adding outbound shipping
                   <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                     <div>

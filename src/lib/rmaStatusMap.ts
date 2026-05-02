@@ -20,14 +20,12 @@ export type RmaStatus =
   | "quote_confirmed"
   | "paid"
   | "no_repair"
-  | "repairing"
   | "shipped_back"
   | "shipped_back_new"
   | "shipped_back_refurbished"
   | "shipped_back_original"
   | "follow_up"
-  | "closed"
-  | "unknown";
+  | "closed";
 
 export const RMA_STATUS_LABELS: Record<RmaStatus, string> = {
   registered: "已登錄",
@@ -38,14 +36,12 @@ export const RMA_STATUS_LABELS: Record<RmaStatus, string> = {
   quote_confirmed: "已確認方案",
   paid: "已付款",
   no_repair: "不維修",
-  repairing: "處理中",
   shipped_back: "已寄回（舊）",
   shipped_back_new: "寄回新品",
   shipped_back_refurbished: "寄回整新機",
   shipped_back_original: "寄回原機",
   follow_up: "後續追蹤",
   closed: "已結案",
-  unknown: "未知",
 };
 
 export type LogisticsTabKey =
@@ -94,7 +90,6 @@ export const TAB_STATUS_BUCKETS: Record<
     "contacting",
     "quote_confirmed",
     "paid",
-    "repairing",
   ],
   dashboardCompleted: [
     "shipped_back",
@@ -157,8 +152,8 @@ export function getStatusVisibility(status: RmaStatus): {
  * 已知缺口（顯示在 Dialog 底部資訊欄）。
  */
 export const KNOWN_GAPS: string[] = [
-  "repairing / unknown 仍在 DB enum，需 Lovable 執行 migration audit 後才能從 enum / AdminDashboard / rmaStatusMap 移除。",
+  "repairing / unknown 已於 2026-05 從 DB enum 與前端移除；47 筆 repairing 已遷移為 received，請於收件處理分頁重新分流。",
   "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，建議後續逐步遷移至 shipped_back_* 的新版狀態。",
-  "csvParser 已封鎖「維修中」/「原錶維修中」匯入（加入 skipped），但 DB 中既有 repairing 記錄需人工處理。",
+  "csvParser 已封鎖「維修中」/「原錶維修中」匯入（加入 skipped）。",
   "CustomerHandlingTab（舊流程 contacting→quote_confirmed→paid）已於 commit 066ebde 刪除，查 git history 可找到完整舊流程。",
 ];

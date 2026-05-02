@@ -27,7 +27,7 @@ const AdminDashboard = () => {
         const { data: processingData } = await supabase
           .from("rma_requests")
           .select("id", { count: "exact", head: true })
-          .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "repairing"]);
+          .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]);
 
         const { data: completedData } = await supabase
           .from("rma_requests")
@@ -54,7 +54,7 @@ const AdminDashboard = () => {
         // Re-fetch with actual counts
         const [p, pr, c] = await Promise.all([
           supabase.from("rma_requests").select("id").eq("status", "registered"),
-          supabase.from("rma_requests").select("id").in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid", "repairing"]),
+          supabase.from("rma_requests").select("id").in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]),
           supabase.from("rma_requests").select("id").eq("status", "closed"),
         ]);
 
