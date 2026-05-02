@@ -232,16 +232,17 @@ serve(async (req) => {
 
 
     // Send via the transactional email system (noreply@notify.crestdiving.com)
-    // Call via fetch directly so we can forward the user's JWT (admin.functions.invoke
-    // would send the service-role key, which the gateway rejects as invalid JWT format).
+    // Server-to-server call: send-transactional-email enforces an in-code
+    // service-role check, so present the service role key here (not the
+    // end-user's JWT). Admin authorization was already verified above.
     const sendRes = await fetch(
       `${supabaseUrl}/functions/v1/send-transactional-email`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: authHeader,
-          apikey: anonKey,
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
         },
         body: JSON.stringify({
           templateName: "rma-reply",

@@ -1,59 +1,64 @@
-# 修正 AdminDashboard 統計數字
+## 問題
 
-## 變更內容（`src/pages/AdminDashboard.tsx`，第 18–73 行）
+按下「以 noreply 寄出」時，`send-customer-email-reply` Edge Function 呼叫 `send-transactional-email` 收到 **401 Unauthorized**。
 
-合併兩輪 fetch 為單一 `Promise.all`，全部使用 `count: exact, head: true`，並修正「已完成」分類：
+## 根本原因
 
-```tsx
-useEffect(() => {
-  const fetchStats = async () => {
-    try {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
+`send-transactional-email/index.ts` 第 57–77 行強制要求呼叫者的 `Authorization: Bearer <token>` 或 `apikey` 必須等於 **service role key**（程式內檢查，與 gateway 的 `verify_jwt` 無關）：
 
-      const [p, pr, c, m] = await Promise.all([
-        supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "registered"),
-        supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["shipped", "received", "inspecting", "contacting", "quote_confirmed", "paid"]),
-        supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .in("status", ["closed", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "shipped_back", "follow_up"]),
-        supabase
-          .from("rma_requests")
-          .select("id", { count: "exact", head: true })
-          .gte("created_at", startOfMonth.toISOString()),
-      ]);
-
-      setStats({
-        pending: p.count || 0,
-        processing: pr.count || 0,
-        completed: c.count || 0,
-        thisMonth: m.count || 0,
-      });
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
-  };
-
-  fetchStats();
-}, []);
+```ts
+if (!presented || presented !== supabaseServiceKey) {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, ... })
+}
 ```
 
-## 修正項目對照
+但 `send-customer-email-reply/index.ts` 第 173–195 行卻把**前端使用者的 JWT** 轉發過去：
 
-1. **處理中**：原本陣列已不含 `repairing`（先前 cleanup 已處理），維持移除狀態。
-2. **已完成**：從只計 `closed` 擴大為 `closed` / `shipped_back_new` / `shipped_back_refurbished` / `shipped_back_original` / `shipped_back` / `follow_up`，正確涵蓋已出貨的案件。
-3. **效能**：移除第二輪 `.select("id")` + `.length` 的重複 fetch，將四個查詢合併為單一 `Promise.all`，全部用 `count: exact, head: true`（不傳輸 row 資料）。
-4. **本月新增（thisMonth）**：一併納入同一個 `Promise.all`，避免序列等待。
+```ts
+Authorization: authHeader,   // ← 使用者 JWT，不是 service role
+apikey: anonKey,             // ← anon key，也不是 service role
+```
 
-## 不變更
+→ 永遠 401。
 
-- UI 卡片、版面、其他 stats key 全保留。
-- 重新 fetch 的觸發時機（mount 一次）不變。
+備註：`send-rma-reply/index.ts` 第 237–260 行有相同模式，目前應該也是壞的（只是用戶這次測的是客戶來信回覆）。一併修掉避免下次踩雷。
+
+## 修改範圍
+
+### 1. `supabase/functions/send-customer-email-reply/index.ts`
+
+把呼叫 `send-transactional-email` 的 fetch headers 改成用 service role：
+
+```ts
+headers: {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${serviceKey}`,
+  apikey: serviceKey,
+},
+```
+
+（`serviceKey` 已在第 41 行宣告。）
+
+使用者授權檢查（第 44–76 行）保持不變——這個 function 仍會用使用者 JWT 驗證 admin 身份，只是「server → server」呼叫下游 function 時改用 service role。
+
+### 2. `supabase/functions/send-rma-reply/index.ts`
+
+同樣的修改：第 237–260 行的 fetch headers 改用 service role key（變數應該是 `supabaseServiceKey` 或類似，需先確認該檔內已宣告）。若尚未從環境讀取，需在檔案上方加一行：
+
+```ts
+const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+```
+
+並把第 235 行的註解（"forward the user's JWT…"）一併更新，反映新的設計。
+
+## 不在範圍內
+
+- 不動 `send-transactional-email`：它的 service-role-only 設計是刻意的（防止任意登入使用者直接呼叫寄信）。
+- 不動 `config.toml`：`send-transactional-email` 的 `verify_jwt` 預設值即可。
+- 不動前端：問題在 server-to-server 那一段。
+
+## 驗證
+
+- 部署後，於後勤管理 → 客戶來信 → 按「以 noreply 寄出」，應該不再跳「Edge Function returned a non-2xx status code」。
+- 同時驗證後勤管理 → RMA 回覆 → 寄信，也應該正常。
+- 觀察 `send-transactional-email` 的 edge function logs，不應再看到 `401 Unauthorized` 來自這兩個來源。
