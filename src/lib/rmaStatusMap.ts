@@ -51,7 +51,6 @@ export const RMA_STATUS_LABELS: Record<RmaStatus, string> = {
 export type LogisticsTabKey =
   | "receiving"
   | "awaitingConfirmation"
-  | "customerHandlingLegacy"
   | "paymentConfirmation"
   | "outboundShipping"
   | "closing";
@@ -64,7 +63,6 @@ export type DashboardBucketKey =
 export const LOGISTICS_TAB_LABELS: Record<LogisticsTabKey, string> = {
   receiving: "收件處理",
   awaitingConfirmation: "待客戶確認",
-  customerHandlingLegacy: "客戶處理（舊）",
   paymentConfirmation: "付款確認",
   outboundShipping: "出貨處理",
   closing: "結案追蹤",
@@ -85,7 +83,6 @@ export const TAB_STATUS_BUCKETS: Record<
 > = {
   receiving: ["shipped", "received", "inspecting"],
   awaitingConfirmation: ["contacting"],
-  customerHandlingLegacy: ["contacting", "quote_confirmed", "paid"],
   paymentConfirmation: ["quote_confirmed"],
   outboundShipping: ["paid", "no_repair"],
   closing: ["shipped_back", "shipped_back_new", "shipped_back_refurbished", "shipped_back_original", "follow_up"],
@@ -163,4 +160,5 @@ export const KNOWN_GAPS: string[] = [
   "repairing / unknown 仍在 DB enum，需 Lovable 執行 migration audit 後才能從 enum / AdminDashboard / rmaStatusMap 移除。",
   "shipped_back（舊版匯入狀態）現在歸入「結案追蹤」，建議後續逐步遷移至 shipped_back_* 的新版狀態。",
   "csvParser 已封鎖「維修中」/「原錶維修中」匯入（加入 skipped），但 DB 中既有 repairing 記錄需人工處理。",
+  "CustomerHandlingTab（舊流程 contacting→quote_confirmed→paid）已於 commit 066ebde 刪除，查 git history 可找到完整舊流程。",
 ];
