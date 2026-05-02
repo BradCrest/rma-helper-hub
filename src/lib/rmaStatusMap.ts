@@ -100,6 +100,7 @@ export const TAB_STATUS_BUCKETS: Record<
     "repairing",
   ],
   dashboardCompleted: [
+    "shipped_back",
     "shipped_back_new",
     "shipped_back_refurbished",
     "shipped_back_original",
