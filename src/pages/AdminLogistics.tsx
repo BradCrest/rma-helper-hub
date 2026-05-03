@@ -127,11 +127,7 @@ const AdminLogistics = () => {
           </TabsContent>
 
           <TabsContent value="supplier" className="mt-0">
-            <div className="rma-card text-center py-12">
-              <Factory className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground">供應商維修管理</h3>
-              <p className="text-muted-foreground mt-2">此功能將在後續階段實作</p>
-            </div>
+            <SupplierRepairTab />
           </TabsContent>
 
           <TabsContent value="fault" className="mt-0">
