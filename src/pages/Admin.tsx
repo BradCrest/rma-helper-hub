@@ -77,6 +77,8 @@ const Admin = () => {
         if (error) {
           if (error.message.includes("Invalid login credentials")) {
             toast.error("帳號或密碼錯誤");
+          } else if (error.message.includes("Email not confirmed")) {
+            toast.error("信箱尚未驗證。若已通過管理員審核，請聯繫管理員手動確認您的帳號。");
           } else {
             toast.error("登入失敗，請稍後再試");
           }
