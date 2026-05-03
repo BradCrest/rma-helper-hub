@@ -51,17 +51,17 @@ const Admin = () => {
           return;
         }
 
-        // Create pending admin registration
+        // Create pending admin registration via edge function (bypasses RLS for unverified users)
         if (userId) {
-          const { error: regError } = await supabase
-            .from("pending_admin_registrations")
-            .insert({
-              user_id: userId,
-              email: email,
-            });
+          const { error: regError } = await supabase.functions.invoke(
+            "submit-admin-registration",
+            { body: { user_id: userId, email } }
+          );
 
           if (regError) {
             console.error("Error creating pending registration:", regError);
+            toast.error("申請送出失敗，請聯繫管理員 / Failed to submit request, please contact an admin");
+            return;
           }
         }
 
