@@ -215,9 +215,9 @@ describe("RmaForm — 寄件人身分切換", () => {
     const user = userEvent.setup();
     renderForm();
     // 單筆模式的原生 <select> 有 <option>選擇故障問題</option>
-    expect(screen.getByRole("option", { name: "選擇故障問題" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /選擇故障問題/ })).toBeInTheDocument();
     await user.click(screen.getByLabelText(/經銷\/代理商多筆/));
-    expect(screen.queryByRole("option", { name: "選擇故障問題" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /選擇故障問題/ })).not.toBeInTheDocument();
   });
 
   it("切換回「一般消費者」後問題描述欄位應重新出現", async () => {
