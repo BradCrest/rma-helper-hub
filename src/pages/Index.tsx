@@ -54,6 +54,9 @@ const Index = () => {
                     <p className="text-sm font-semibold text-primary">
                       CREST 潛水電腦錶保固與維修政策調整公告
                     </p>
+                    <p className="text-xs text-primary/70 mt-0.5">
+                      CREST Dive Computer Warranty &amp; Repair Policy Update
+                    </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       點擊查看完整公告 / View Full Announcement
                     </p>
@@ -64,7 +67,7 @@ const Index = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 sm:justify-center">
-            <AlertDialogAction className="px-8">確定</AlertDialogAction>
+            <AlertDialogAction className="px-8">確定 / OK</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -76,14 +79,17 @@ const Index = () => {
         <section className="py-8 md:py-12 border-b border-border bg-card">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row gap-8 items-start">
-              {/* 左欄 - 現有內容 */}
+              {/* Left column */}
               <div className="flex-1">
                 <div className="mb-4">
                   <img src={logo} alt="CREST Logo" className="h-12 md:h-16 w-auto" />
                 </div>
-                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-1">
                   CREST 產品申請保固服務系統
                 </h2>
+                <p className="text-base text-muted-foreground mb-4">
+                  CREST Product Warranty Service Portal
+                </p>
                 <a
                   href={POLICY_URL}
                   target="_blank"
@@ -93,26 +99,30 @@ const Index = () => {
                   <Megaphone className="h-4 w-4 text-primary shrink-0" />
                   <span className="text-sm font-semibold text-primary">
                     CREST 潛水電腦錶保固與維修政策調整公告
+                    <span className="block text-xs font-normal text-primary/70 mt-0.5">
+                      CREST Dive Computer Warranty &amp; Repair Policy Update
+                    </span>
                   </span>
                   <ExternalLink className="h-4 w-4 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
                 </a>
                 <TabNavigation />
               </div>
 
-              {/* 右欄 - 收件地址資訊 */}
+              {/* Right column - shipping address */}
               <div className="w-full md:w-[420px] border-2 border-foreground rounded-lg p-6">
                 <p className="text-sm text-foreground mb-4">
-                  為避免影響您的保修時程，請將產品正確寄至以下地址。
+                  為避免影響您的保修時程，請將產品正確寄至以下地址。<br />
+                  <span className="text-muted-foreground">To avoid delays, please ship your product to the address below.</span>
                 </p>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">本公司收件地址如下：</p>
+                    <p className="text-sm font-semibold text-foreground">本公司收件地址：</p>
                     <p className="text-sm text-foreground">
                       242039 新北市新莊區化成路11巷86號1樓
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-foreground">英文地址：</p>
+                    <p className="text-sm font-semibold text-foreground">English address:</p>
                     <p className="text-sm text-muted-foreground">
                       No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039
                     </p>
@@ -127,11 +137,14 @@ const Index = () => {
         <section className="py-8 md:py-12">
           <div className="container mx-auto px-4">
             <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-foreground mb-2">
+              <h3 className="text-2xl font-bold text-foreground mb-1">
                 產品保固服務登記
               </h3>
+              <p className="text-muted-foreground mb-1">
+                Product Warranty Service Registration
+              </p>
               <p className="text-muted-foreground">
-                請填寫以下資料送出您的RMA申請
+                請填寫以下資料送出您的 RMA 申請 / Please complete the form below to submit your RMA application
               </p>
             </div>
 

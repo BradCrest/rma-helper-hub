@@ -24,7 +24,7 @@ const Unsubscribe = () => {
 
   useEffect(() => {
     if (!token) {
-      setState({ kind: "invalid", message: "缺少退訂連結代碼。" });
+      setState({ kind: "invalid", message: "缺少退訂連結代碼。/ Missing unsubscribe token." });
       return;
     }
     (async () => {
@@ -35,7 +35,7 @@ const Unsubscribe = () => {
         );
         const data = await res.json();
         if (!res.ok) {
-          setState({ kind: "invalid", message: data.error || "連結無效或已過期。" });
+          setState({ kind: "invalid", message: data.error || "連結無效或已過期。/ Link is invalid or expired." });
           return;
         }
         if (data.valid === false && data.reason === "already_unsubscribed") {
@@ -44,7 +44,7 @@ const Unsubscribe = () => {
         }
         setState({ kind: "valid" });
       } catch (err) {
-        setState({ kind: "invalid", message: "無法驗證連結，請稍後再試。" });
+        setState({ kind: "invalid", message: "無法驗證連結，請稍後再試。/ Unable to verify link, please try again later." });
       }
     })();
   }, [token]);
@@ -62,10 +62,10 @@ const Unsubscribe = () => {
       } else if (data?.reason === "already_unsubscribed") {
         setState({ kind: "already" });
       } else {
-        setState({ kind: "error", message: data?.error || "退訂失敗。" });
+        setState({ kind: "error", message: data?.error || "退訂失敗。/ Unsubscribe failed." });
       }
     } catch (err: any) {
-      setState({ kind: "error", message: err?.message || "退訂失敗，請稍後再試。" });
+      setState({ kind: "error", message: err?.message || "退訂失敗，請稍後再試。/ Unsubscribe failed, please try again." });
     }
   };
 
@@ -73,39 +73,46 @@ const Unsubscribe = () => {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>取消訂閱通知</CardTitle>
+          <CardTitle>取消訂閱通知 / Unsubscribe from Notifications</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {state.kind === "loading" && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> 驗證中...
+              <Loader2 className="h-4 w-4 animate-spin" /> 驗證中… / Verifying…
             </div>
           )}
           {state.kind === "valid" && (
             <>
               <p className="text-sm text-muted-foreground">
-                點擊下方按鈕確認取消訂閱來自 CREST 保固服務的通知信件。
+                點擊下方按鈕確認取消訂閱來自 CREST 保固服務的通知信件。<br />
+                Click the button below to confirm unsubscribing from CREST service notifications.
               </p>
               <Button onClick={handleConfirm} className="w-full">
-                確認取消訂閱
+                確認取消訂閱 / Confirm Unsubscribe
               </Button>
             </>
           )}
           {state.kind === "submitting" && (
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> 處理中...
+              <Loader2 className="h-4 w-4 animate-spin" /> 處理中… / Processing…
             </div>
           )}
           {state.kind === "success" && (
             <div className="flex items-start gap-2 text-green-600">
               <CheckCircle2 className="h-5 w-5 mt-0.5" />
-              <p className="text-sm">您已成功取消訂閱，未來將不再收到通知信件。</p>
+              <p className="text-sm">
+                您已成功取消訂閱，未來將不再收到通知信件。<br />
+                You have successfully unsubscribed and will no longer receive notification emails.
+              </p>
             </div>
           )}
           {state.kind === "already" && (
             <div className="flex items-start gap-2 text-muted-foreground">
               <CheckCircle2 className="h-5 w-5 mt-0.5" />
-              <p className="text-sm">您先前已經取消訂閱了。</p>
+              <p className="text-sm">
+                您先前已經取消訂閱了。<br />
+                You have already unsubscribed previously.
+              </p>
             </div>
           )}
           {(state.kind === "invalid" || state.kind === "error") && (

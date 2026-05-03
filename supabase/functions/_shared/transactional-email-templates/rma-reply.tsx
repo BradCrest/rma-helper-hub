@@ -47,15 +47,22 @@ const RmaReplyEmail = ({
   <Html lang="zh-Hant" dir="ltr">
     <Head />
     <Preview>
-      {rmaNumber ? `[${rmaNumber}] ` : ''}您的維修申請進度回覆
+      {rmaNumber ? `[${rmaNumber}] ` : ''}維修申請進度回覆 / Service Request Update
     </Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>維修申請進度回覆</Heading>
-        <Text style={text}>您好 {customerName}，</Text>
+        <Heading style={h1}>
+          維修申請進度回覆<br />
+          <span style={h1Sub}>Service Request Update</span>
+        </Heading>
+        <Text style={text}>
+          您好 {customerName}，<br />
+          <span style={textEn}>Dear {customerName},</span>
+        </Text>
         <Text style={text}>
           關於您的維修申請{' '}
-          <strong style={strong}>{rmaNumber}</strong>，我們的回覆如下：
+          <strong style={strong}>{rmaNumber}</strong>，我們的回覆如下：<br />
+          <span style={textEn}>Regarding your service request <strong style={strong}>{rmaNumber}</strong>, please see our reply below:</span>
         </Text>
 
         <Section style={replyBox}>
@@ -65,7 +72,7 @@ const RmaReplyEmail = ({
         {attachments && attachments.length > 0 ? (
           <Section style={attachmentBox}>
             <Text style={attachmentTitle}>
-              📎 附件（{attachments.length}）
+              📎 附件 / Attachments（{attachments.length}）
             </Text>
             {attachments.map((a, idx) => (
               <Section key={idx} style={attachmentRow}>
@@ -78,7 +85,7 @@ const RmaReplyEmail = ({
               </Section>
             ))}
             <Text style={attachmentNote}>
-              附件下載連結 30 天內有效。
+              附件下載連結 30 天內有效。/ Attachment download links are valid for 30 days.
             </Text>
           </Section>
         ) : null}
@@ -86,30 +93,31 @@ const RmaReplyEmail = ({
         {replyUrl ? (
           <>
             <Text style={text}>
-              若您針對這個回覆有進一步的疑問或說明，請點擊下方按鈕填寫，您的回覆會直接記錄到本筆維修申請中。
+              若您針對這個回覆有進一步的疑問或說明，請點擊下方按鈕填寫，您的回覆會直接記錄到本筆維修申請中。<br />
+              <span style={textEn}>If you have further questions or comments, please click the button below. Your reply will be recorded directly in this service request.</span>
             </Text>
             <Section style={btnSection}>
               <Button style={btn} href={replyUrl}>
-                填寫我的回覆
+                填寫我的回覆 / Submit My Reply
               </Button>
             </Section>
             <Text style={smallText}>
-              或複製此連結到瀏覽器開啟：
-              <br />
+              或複製此連結到瀏覽器開啟 / Or copy this link to your browser:<br />
               <Link href={replyUrl} style={linkStyle}>
                 {replyUrl}
               </Link>
               <br />
-              （連結 30 天內有效，僅可使用一次）
+              （連結 30 天內有效，僅可使用一次 / Link valid for 30 days, single use only）
             </Text>
           </>
         ) : null}
 
         <Hr style={hr} />
         <Text style={notice}>
-          此信件由系統自動寄出，請勿直接回覆此 Email。如需進一步聯繫，請使用上方按鈕回覆，所有對話皆會集中於本筆申請紀錄中。
+          此信件由系統自動寄出，請勿直接回覆此 Email。如需進一步聯繫，請使用上方按鈕回覆，所有對話皆會集中於本筆申請紀錄中。<br />
+          This email was sent automatically. Please do not reply directly. To respond, please use the button above — all communications will be recorded in your service request.
         </Text>
-        <Text style={footer}>{SITE_NAME} 客服團隊</Text>
+        <Text style={footer}>{SITE_NAME} 客服團隊 / Customer Service</Text>
       </Container>
     </Body>
   </Html>
@@ -119,7 +127,7 @@ export const template = {
   component: RmaReplyEmail,
   subject: (data: Record<string, any>) =>
     (data?.subject as string) ||
-    `Re: [${data?.rmaNumber ?? ''}] 您的維修申請進度回覆`,
+    `Re: [${data?.rmaNumber ?? ''}] 維修申請進度回覆 / Service Request Update`,
   displayName: 'RMA 回覆給客戶',
   previewData: {
     customerName: '王小明',
@@ -157,13 +165,16 @@ const h1 = {
   fontWeight: 'bold',
   color: '#0f172a',
   margin: '0 0 24px',
+  lineHeight: '1.4',
 }
+const h1Sub = { fontSize: '15px', fontWeight: 'normal' as const, color: '#64748b' }
 const text = {
   fontSize: '14px',
   color: '#1f2937',
   lineHeight: '1.6',
   margin: '0 0 14px',
 }
+const textEn = { fontSize: '13px', color: '#64748b' }
 const strong = { color: '#0f172a' }
 const replyBox = {
   background: '#f9fafb',
@@ -198,7 +209,7 @@ const smallText = {
   margin: '0 0 24px',
 }
 const hr = { border: 'none', borderTop: '1px solid #e5e7eb', margin: '24px 0' }
-const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px' }
+const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px', lineHeight: '1.6' }
 const footer = { fontSize: '13px', color: '#6b7280', margin: '8px 0 0' }
 const attachmentBox = {
   background: '#f1f5f9',

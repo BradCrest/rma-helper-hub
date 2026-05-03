@@ -32,48 +32,58 @@ const ShippingReminderEmail = ({
 }: ShippingReminderProps) => (
   <Html lang="zh-TW" dir="ltr">
     <Head />
-    <Preview>提醒您：請填寫保固服務寄件資訊 (RMA: {rmaNumber})</Preview>
+    <Preview>提醒您：請填寫保固服務寄件資訊 / Reminder: Please Submit Your Shipping Information (RMA: {rmaNumber})</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>提醒您：請填寫寄件資訊</Heading>
-        <Text style={text}>{customerName} 您好，</Text>
+        <Heading style={h1}>
+          提醒您：請填寫寄件資訊<br />
+          <span style={h1Sub}>Reminder: Please Submit Shipping Information</span>
+        </Heading>
         <Text style={text}>
-          感謝您申請 {SITE_NAME}。我們注意到您的保固服務申請已建立超過 48 小時，但尚未收到您的寄件資訊。
-          為了讓我們盡快為您處理，請點擊下方按鈕填寫寄件資訊。
+          {customerName} 您好，<br />
+          <span style={textEn}>Dear {customerName},</span>
+        </Text>
+        <Text style={text}>
+          感謝您申請 {SITE_NAME}。我們注意到您的保固服務申請已建立超過 48 小時，但尚未收到您的寄件資訊。為了讓我們盡快為您處理，請點擊下方按鈕填寫寄件資訊。<br />
+          <span style={textEn}>Thank you for submitting your service request. We noticed that your application was created over 48 hours ago, but we have not yet received your shipping information. Please click the button below to submit it so we can process your request promptly.</span>
         </Text>
 
         <Section style={infoBox}>
-          <Text style={infoLine}><strong>RMA 編號：</strong>{rmaNumber}</Text>
-          <Text style={infoLine}><strong>商品：</strong>{productName}</Text>
+          <Text style={infoLine}><strong>RMA 編號 / RMA No.：</strong>{rmaNumber}</Text>
+          <Text style={infoLine}><strong>商品 / Product：</strong>{productName}</Text>
           {createdDate ? (
-            <Text style={infoLine}><strong>申請日期：</strong>{createdDate}</Text>
+            <Text style={infoLine}><strong>申請日期 / Date：</strong>{createdDate}</Text>
           ) : null}
         </Section>
 
         <Section style={{ textAlign: 'center', margin: '30px 0' }}>
           <Button style={button} href={shippingUrl}>
-            立即填寫寄件資訊
+            立即填寫寄件資訊 / Submit Shipping Info
           </Button>
         </Section>
 
         <Hr style={hr} />
 
-        <Heading as="h2" style={h2}>寄件須知</Heading>
+        <Heading as="h2" style={h2}>
+          寄件須知 / Shipping Instructions
+        </Heading>
         <Text style={text}>
           本公司收件地址如下：<br />
           <strong>242039 新北市新莊區化成路11巷86號1樓</strong>
         </Text>
         <Text style={text}>
-          英文地址：<br />
+          English address:<br />
           <strong>No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</strong>
         </Text>
         <Text style={warning}>
-          ⚠️ 為避免遺失，本服務中心 <strong>無法接受親送</strong>，請務必透過物流寄送。
+          ⚠️ 為避免遺失，本服務中心 <strong>無法接受親送</strong>，請務必透過物流寄送。<br />
+          <span style={warningEn}>To prevent loss, we <strong>do not accept walk-in drop-offs</strong>. Please ship your product via a courier service.</span>
         </Text>
 
         <Hr style={hr} />
         <Text style={footer}>
           如有任何疑問，請回覆此信件或聯繫我們。<br />
+          <span style={textEn}>If you have any questions, please reply to this email or contact us.</span><br />
           {SITE_NAME}
         </Text>
       </Container>
@@ -84,7 +94,7 @@ const ShippingReminderEmail = ({
 export const template = {
   component: ShippingReminderEmail,
   subject: (data: Record<string, any>) =>
-    `CREST 提醒您：請填寫保固服務寄件資訊${data?.rmaNumber ? ` (${data.rmaNumber})` : ''}`,
+    `CREST 提醒：請填寫保固服務寄件資訊 / Reminder: Submit Shipping Info${data?.rmaNumber ? ` (${data.rmaNumber})` : ''}`,
   displayName: '48 小時未寄件提醒',
   previewData: {
     customerName: '王小明',
@@ -97,9 +107,11 @@ export const template = {
 
 const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, "PingFang TC", "Microsoft JhengHei", sans-serif' }
 const container = { padding: '24px', maxWidth: '560px', margin: '0 auto' }
-const h1 = { fontSize: '22px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 20px' }
+const h1 = { fontSize: '22px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 20px', lineHeight: '1.4' }
+const h1Sub = { fontSize: '15px', fontWeight: 'normal' as const, color: '#64748b' }
 const h2 = { fontSize: '16px', fontWeight: 'bold', color: '#0f172a', margin: '20px 0 10px' }
 const text = { fontSize: '14px', color: '#334155', lineHeight: '1.6', margin: '0 0 16px' }
+const textEn = { fontSize: '13px', color: '#64748b' }
 const infoBox = {
   backgroundColor: '#f1f5f9',
   borderRadius: '8px',
@@ -125,7 +137,8 @@ const warning = {
   borderRadius: '6px',
   padding: '10px 14px',
   margin: '12px 0',
-  lineHeight: '1.5',
+  lineHeight: '1.6',
 }
+const warningEn = { fontSize: '12px', color: '#b91c1c' }
 const hr = { borderColor: '#e2e8f0', margin: '24px 0' }
 const footer = { fontSize: '12px', color: '#94a3b8', margin: '20px 0 0', lineHeight: '1.5' }
