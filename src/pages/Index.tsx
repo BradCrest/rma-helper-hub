@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, ExternalLink, Megaphone } from "lucide-react";
 
-const POLICY_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update?srsltid=AfmBOooKlXrXFW6s3doVBFQ3uTxkt4jOHtAHbLU";
+const POLICY_URL = "https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update?srsltid=AfmBOooKlXrXFW6s3doVBFQ3uTxkt4jOHtALfSlmoU4RxRqDQTgAHbLU";
 
 const Index = () => {
   const [showNotice, setShowNotice] = useState(true);
@@ -53,6 +53,9 @@ const Index = () => {
                   <div className="flex-1 text-left">
                     <p className="text-sm font-semibold text-primary">
                       CREST 潛水電腦錶保固與維修政策調整公告
+                    </p>
+                    <p className="text-xs text-primary/70 mt-0.5">
+                      CREST Dive Computer Warranty &amp; Repair Policy Update
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       點擊查看完整公告 / View Full Announcement

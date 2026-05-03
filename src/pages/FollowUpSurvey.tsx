@@ -135,7 +135,7 @@ const FollowUpSurvey = () => {
                   type="button"
                   onClick={() => setSatisfaction(n)}
                   className="p-2 transition-transform hover:scale-110"
-                  aria-label={`${n} 顆星`}
+                  aria-label={`${n} 顆星 / ${n} star${n > 1 ? 's' : ''}`}
                 >
                   <Star
                     className={`w-9 h-9 ${

@@ -326,7 +326,7 @@ const RmaConfirmation = () => {
                   <div key={index} className="aspect-square rounded-lg border border-border overflow-hidden bg-muted">
                     <img
                       src={url}
-                      alt={`產品照片 ${index + 1}`}
+                      alt={`產品照片 ${index + 1} / Product Photo ${index + 1}`}
                       className="w-full h-full object-cover"
                     />
                   </div>
