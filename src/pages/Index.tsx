@@ -99,6 +99,9 @@ const Index = () => {
                   <Megaphone className="h-4 w-4 text-primary shrink-0" />
                   <span className="text-sm font-semibold text-primary">
                     CREST 潛水電腦錶保固與維修政策調整公告
+                    <span className="block text-xs font-normal text-primary/70 mt-0.5">
+                      CREST Dive Computer Warranty &amp; Repair Policy Update
+                    </span>
                   </span>
                   <ExternalLink className="h-4 w-4 text-primary shrink-0 group-hover:translate-x-0.5 transition-transform" />
                 </a>
