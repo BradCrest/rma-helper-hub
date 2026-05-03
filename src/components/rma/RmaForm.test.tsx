@@ -69,20 +69,20 @@ beforeEach(() => {
 describe("RmaForm 渲染", () => {
   it("應顯示表單標題", () => {
     renderForm();
-    expect(screen.getByText("建立新的 RMA")).toBeInTheDocument();
+    expect(screen.getByText(/建立新的 RMA/)).toBeInTheDocument();
   });
 
   it("應顯示四個寄件人身分選項", () => {
     renderForm();
-    expect(screen.getByLabelText("一般消費者")).toBeInTheDocument();
-    expect(screen.getByLabelText("經銷商")).toBeInTheDocument();
-    expect(screen.getByLabelText("代理商")).toBeInTheDocument();
-    expect(screen.getByLabelText("經銷/代理商多筆")).toBeInTheDocument();
+    expect(screen.getByLabelText(/一般消費者/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^經銷商/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^代理商/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/經銷\/代理商多筆/)).toBeInTheDocument();
   });
 
   it("預設選取「一般消費者」", () => {
     renderForm();
-    expect(screen.getByLabelText<HTMLInputElement>("一般消費者").checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>(/一般消費者/).checked).toBe(true);
   });
 
   it("應顯示必填欄位（姓名、Email、電話、問題描述）", () => {
@@ -100,9 +100,9 @@ describe("RmaForm 渲染", () => {
 
   it("故障問題 select 應包含所有問題類型", () => {
     renderForm();
-    expect(screen.getByRole("option", { name: "螢幕問題" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "電池問題" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "其他" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /螢幕問題/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /電池問題/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^其他/ })).toBeInTheDocument();
   });
 });
 
@@ -198,7 +198,7 @@ describe("RmaForm — 寄件人身分切換", () => {
   it("切換到「經銷/代理商多筆」後按鈕文字應變為「預覽」", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.click(screen.getByLabelText("經銷/代理商多筆"));
+    await user.click(screen.getByLabelText(/經銷\/代理商多筆/));
     expect(screen.getByRole("button", { name: /預覽/ })).toBeInTheDocument();
   });
 
@@ -206,9 +206,9 @@ describe("RmaForm — 寄件人身分切換", () => {
     const user = userEvent.setup();
     renderForm();
     // 單筆模式有「故障問題 *」（含星號），MultiProductForm 只有「故障問題」（無星號）
-    expect(screen.getByText("故障問題 / Issue Type *")).toBeInTheDocument();
-    await user.click(screen.getByLabelText("經銷/代理商多筆"));
-    expect(screen.queryByText("故障問題 / Issue Type *")).not.toBeInTheDocument();
+    expect(screen.getByText(/故障問題.*\*/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/經銷\/代理商多筆/));
+    expect(screen.queryByText(/故障問題.*\*/)).not.toBeInTheDocument();
   });
 
   it("切換到「經銷/代理商多筆」後單筆故障問題 select 應消失", async () => {
@@ -216,15 +216,15 @@ describe("RmaForm — 寄件人身分切換", () => {
     renderForm();
     // 單筆模式的原生 <select> 有 <option>選擇故障問題</option>
     expect(screen.getByRole("option", { name: "選擇故障問題" })).toBeInTheDocument();
-    await user.click(screen.getByLabelText("經銷/代理商多筆"));
+    await user.click(screen.getByLabelText(/經銷\/代理商多筆/));
     expect(screen.queryByRole("option", { name: "選擇故障問題" })).not.toBeInTheDocument();
   });
 
   it("切換回「一般消費者」後問題描述欄位應重新出現", async () => {
     const user = userEvent.setup();
     renderForm();
-    await user.click(screen.getByLabelText("經銷/代理商多筆"));
-    await user.click(screen.getByLabelText("一般消費者"));
+    await user.click(screen.getByLabelText(/經銷\/代理商多筆/));
+    await user.click(screen.getByLabelText(/一般消費者/));
     expect(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail...")).toBeInTheDocument();
   });
 });
