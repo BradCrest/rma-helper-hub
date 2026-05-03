@@ -181,6 +181,23 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Supplier & Refurbished Stats */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rma-card">
+            <p className="text-sm text-muted-foreground">在外維修中（送供應商）</p>
+            <p className="text-3xl font-bold text-primary mt-1">{stats.atFactory}</p>
+            <p className="text-xs text-muted-foreground mt-1">at_factory + repaired</p>
+          </div>
+          <div className="rma-card">
+            <p className="text-sm text-muted-foreground">整新品庫存</p>
+            <div className="flex items-baseline gap-4 mt-1">
+              <span className="text-2xl font-bold text-emerald-600">A {stats.refurbA}</span>
+              <span className="text-2xl font-bold text-blue-600">B {stats.refurbB}</span>
+              <span className="text-2xl font-bold text-amber-600">C {stats.refurbC}</span>
+            </div>
+          </div>
+        </div>
+
         {/* Embedding Manager & AI Analysis */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <EmbeddingManager />
