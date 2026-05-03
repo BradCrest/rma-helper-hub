@@ -34,8 +34,9 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    // Get the current user (pass token explicitly)
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
     if (userError || !user) {
       console.log('Error getting user:', userError);
       return new Response(
@@ -44,12 +45,12 @@ serve(async (req) => {
       );
     }
 
-    // Check if the requesting user is an admin
+    // Check if the requesting user is an admin or super_admin
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
-      .eq('role', 'admin')
+      .in('role', ['admin', 'super_admin'])
       .maybeSingle();
 
     if (roleError || !roleData) {
