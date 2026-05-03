@@ -36,7 +36,7 @@ const RmaCustomerReply = () => {
         if (error) throw error;
         setInfo(data as ThreadInfo);
       } catch (e: any) {
-        toast.error("讀取失敗：" + (e?.message || ""));
+        toast.error("讀取失敗 / Failed to load: " + (e?.message || ""));
         setInfo({ status: "not_found" });
       } finally {
         setLoading(false);
@@ -55,7 +55,7 @@ const RmaCustomerReply = () => {
       if ((data as any)?.error) throw new Error((data as any).error);
       setDone(true);
     } catch (e: any) {
-      toast.error("送出失敗：" + (e?.message || ""));
+      toast.error("送出失敗 / Submission failed: " + (e?.message || ""));
     } finally {
       setSubmitting(false);
     }
@@ -74,9 +74,10 @@ const RmaCustomerReply = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="rma-card max-w-lg w-full text-center py-12">
           <CheckCircle2 className="w-16 h-16 mx-auto text-emerald-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">已成功送出</h1>
+          <h1 className="text-2xl font-bold mb-2">已成功送出 / Reply Submitted</h1>
           <p className="text-muted-foreground">
-            感謝您的回覆，CREST 客服團隊將會在 1–2 個工作天內與您聯繫。
+            感謝您的回覆，CREST 客服團隊將會在 1–2 個工作天內與您聯繫。<br />
+            Thank you for your reply. Our team will get back to you within 1–2 business days.
           </p>
         </div>
       </div>
@@ -88,8 +89,11 @@ const RmaCustomerReply = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="rma-card max-w-lg w-full text-center py-12">
           <AlertTriangle className="w-16 h-16 mx-auto text-amber-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">連結無效</h1>
-          <p className="text-muted-foreground">查無此回覆連結，請確認網址是否正確。</p>
+          <h1 className="text-2xl font-bold mb-2">連結無效 / Invalid Link</h1>
+          <p className="text-muted-foreground">
+            查無此回覆連結，請確認網址是否正確。<br />
+            This reply link could not be found. Please verify the URL.
+          </p>
         </div>
       </div>
     );
@@ -100,9 +104,10 @@ const RmaCustomerReply = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="rma-card max-w-lg w-full text-center py-12">
           <AlertTriangle className="w-16 h-16 mx-auto text-amber-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">連結已過期</h1>
+          <h1 className="text-2xl font-bold mb-2">連結已過期 / Link Expired</h1>
           <p className="text-muted-foreground">
-            此回覆連結已超過有效期限，請直接來信或致電 CREST 客服。
+            此回覆連結已超過有效期限，請直接來信或致電 CREST 客服。<br />
+            This reply link has expired. Please contact CREST customer service directly.
           </p>
         </div>
       </div>
@@ -114,9 +119,10 @@ const RmaCustomerReply = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="rma-card max-w-lg w-full text-center py-12">
           <CheckCircle2 className="w-16 h-16 mx-auto text-emerald-500 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">您已透過此連結回覆過了</h1>
+          <h1 className="text-2xl font-bold mb-2">您已透過此連結回覆過了 / Already Replied</h1>
           <p className="text-muted-foreground">
-            若您還有其他問題，請直接來信或致電 CREST 客服，我們會儘快與您聯繫。
+            若您還有其他問題，請直接來信或致電 CREST 客服，我們會儘快與您聯繫。<br />
+            If you have further questions, please contact CREST customer service and we will respond promptly.
           </p>
         </div>
       </div>
@@ -127,20 +133,20 @@ const RmaCustomerReply = () => {
     <div className="min-h-screen bg-muted/20 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="rma-card">
-          <h1 className="text-xl font-bold mb-1">回覆 CREST 客服</h1>
+          <h1 className="text-xl font-bold mb-1">回覆 CREST 客服 / Reply to CREST Support</h1>
           <p className="text-sm text-muted-foreground">
-            維修申請編號 <span className="font-mono font-semibold text-foreground">{info?.rmaNumber}</span>
+            維修申請編號 / RMA No. <span className="font-mono font-semibold text-foreground">{info?.rmaNumber}</span>
             {info?.productName ? ` · ${info.productName} ${info.productModel || ""}` : ""}
           </p>
         </div>
 
         <div className="rma-card space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">您原本的問題</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">您原本的問題 / Your Original Issue</h2>
           <div className="bg-muted/30 border-l-2 border-l-muted-foreground/30 p-3 rounded-r text-sm whitespace-pre-wrap">
             {info?.originalIssue || "—"}
           </div>
 
-          <h2 className="text-sm font-semibold text-muted-foreground pt-2">客服的回覆</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground pt-2">客服的回覆 / Support Reply</h2>
           {info?.adminSubject && (
             <div className="text-sm font-medium">{info.adminSubject}</div>
           )}
@@ -150,20 +156,21 @@ const RmaCustomerReply = () => {
         </div>
 
         <div className="rma-card space-y-3">
-          <h2 className="text-sm font-semibold">您的回覆</h2>
+          <h2 className="text-sm font-semibold">您的回覆 / Your Reply</h2>
           <Textarea
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder="請輸入您針對上述回覆的進一步說明、追問或意見…"
+            placeholder="請輸入您針對上述回覆的進一步說明、追問或意見… / Please enter your follow-up questions or comments…"
             rows={8}
           />
           <p className="text-xs text-muted-foreground">
-            送出後此連結將失效；如需再次回覆，請等待客服的下一封 Email。
+            送出後此連結將失效；如需再次回覆，請等待客服的下一封 Email。<br />
+            This link will expire after submission. For further replies, please wait for the next email from our team.
           </p>
           <div className="flex justify-end">
             <Button onClick={handleSubmit} disabled={submitting || !reply.trim()}>
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              送出回覆
+              送出回覆 / Submit
             </Button>
           </div>
         </div>

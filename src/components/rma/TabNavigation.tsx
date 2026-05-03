@@ -12,21 +12,21 @@ interface TabItem {
 const tabs: TabItem[] = [
   {
     id: "submit",
-    label: "送出RMA申請",
+    label: "送出 RMA 申請 / Submit RMA",
     path: "/",
     icon: <ArrowRight className="w-4 h-4" />,
     variant: "primary",
   },
   {
     id: "track",
-    label: "狀態追蹤",
+    label: "狀態追蹤 / Track",
     path: "/track",
     icon: <Search className="w-4 h-4" />,
     variant: "secondary",
   },
   {
     id: "shipping",
-    label: "新增寄件資訊",
+    label: "新增寄件資訊 / Add Shipping Info",
     path: "/shipping",
     icon: <Globe className="w-4 h-4" />,
     variant: "secondary",

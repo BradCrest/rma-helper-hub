@@ -43,12 +43,21 @@ const CustomerEmailReplyEmail = ({
 }: CustomerEmailReplyProps) => (
   <Html lang="zh-Hant" dir="ltr">
     <Head />
-    <Preview>來自 {SITE_NAME} 客服的回覆</Preview>
+    <Preview>來自 {SITE_NAME} 客服的回覆 / Reply from CREST Customer Service</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>客服回覆</Heading>
-        <Text style={text}>{customerName}，您好，</Text>
-        <Text style={text}>感謝您的來信，以下是我們的回覆：</Text>
+        <Heading style={h1}>
+          客服回覆<br />
+          <span style={h1Sub}>Customer Service Reply</span>
+        </Heading>
+        <Text style={text}>
+          {customerName}，您好，<br />
+          <span style={textEn}>Dear {customerName},</span>
+        </Text>
+        <Text style={text}>
+          感謝您的來信，以下是我們的回覆：<br />
+          <span style={textEn}>Thank you for contacting us. Please see our reply below:</span>
+        </Text>
 
         <Section style={replyBox}>
           <Text style={replyText}>{replyBody}</Text>
@@ -56,14 +65,14 @@ const CustomerEmailReplyEmail = ({
 
         {rmaNumber ? (
           <Text style={text}>
-            參考編號：<strong style={strong}>{rmaNumber}</strong>
+            參考編號 / Reference No.：<strong style={strong}>{rmaNumber}</strong>
           </Text>
         ) : null}
 
         {attachments && attachments.length > 0 ? (
           <Section style={attachmentBox}>
             <Text style={attachmentTitle}>
-              📎 附件（{attachments.length}）
+              📎 附件 / Attachments（{attachments.length}）
             </Text>
             {attachments.map((a, idx) => (
               <Section key={idx} style={attachmentRow}>
@@ -75,15 +84,18 @@ const CustomerEmailReplyEmail = ({
                 ) : null}
               </Section>
             ))}
-            <Text style={attachmentNote}>附件下載連結 30 天內有效。</Text>
+            <Text style={attachmentNote}>
+              附件下載連結 30 天內有效。/ Attachment download links are valid for 30 days.
+            </Text>
           </Section>
         ) : null}
 
         <Hr style={hr} />
         <Text style={notice}>
-          此信件由系統自動寄出，請勿直接回覆此 Email。如需進一步聯繫，請來信至本公司客服信箱，我們將儘速為您處理。
+          此信件由系統自動寄出，請勿直接回覆此 Email。如需進一步聯繫，請來信至本公司客服信箱，我們將儘速為您處理。<br />
+          This email was sent automatically. Please do not reply directly. For further assistance, please contact our customer service team and we will respond as soon as possible.
         </Text>
-        <Text style={footer}>{SITE_NAME} 客服團隊</Text>
+        <Text style={footer}>{SITE_NAME} 客服團隊 / Customer Service</Text>
       </Container>
     </Body>
   </Html>
@@ -92,7 +104,7 @@ const CustomerEmailReplyEmail = ({
 export const template = {
   component: CustomerEmailReplyEmail,
   subject: (data: Record<string, any>) =>
-    (data?.subject as string) || `來自 ${SITE_NAME} 客服的回覆`,
+    (data?.subject as string) || `來自 ${SITE_NAME} 客服的回覆 / Reply from CREST Customer Service`,
   displayName: '客戶來信回覆',
   previewData: {
     customerName: '王小明',
@@ -115,8 +127,10 @@ const main = {
     '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang TC","Microsoft JhengHei",sans-serif',
 }
 const container = { maxWidth: '600px', margin: '0 auto', padding: '32px 24px' }
-const h1 = { fontSize: '22px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 24px' }
+const h1 = { fontSize: '22px', fontWeight: 'bold', color: '#0f172a', margin: '0 0 24px', lineHeight: '1.4' }
+const h1Sub = { fontSize: '15px', fontWeight: 'normal' as const, color: '#64748b' }
 const text = { fontSize: '14px', color: '#1f2937', lineHeight: '1.6', margin: '0 0 14px' }
+const textEn = { fontSize: '13px', color: '#64748b' }
 const strong = { color: '#0f172a' }
 const replyBox = {
   background: '#f9fafb',
@@ -133,7 +147,7 @@ const replyText = {
   whiteSpace: 'pre-wrap' as const,
 }
 const hr = { border: 'none', borderTop: '1px solid #e5e7eb', margin: '24px 0' }
-const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px' }
+const notice = { fontSize: '12px', color: '#6b7280', margin: '0 0 8px', lineHeight: '1.6' }
 const footer = { fontSize: '13px', color: '#6b7280', margin: '8px 0 0' }
 const attachmentBox = {
   background: '#f1f5f9',

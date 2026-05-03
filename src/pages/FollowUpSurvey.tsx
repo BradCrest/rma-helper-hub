@@ -29,7 +29,7 @@ const FollowUpSurvey = () => {
 
   useEffect(() => {
     if (!token) {
-      setLoadError("無效的問卷連結");
+      setLoadError("無效的問卷連結 / Invalid survey link");
       setIsLoading(false);
       return;
     }
@@ -43,7 +43,7 @@ const FollowUpSurvey = () => {
         if (data?.error) throw new Error(data.error);
         setInfo(data as SurveyInfo);
       } catch (e: any) {
-        setLoadError(e?.message || "找不到問卷");
+        setLoadError(e?.message || "找不到問卷 / Survey not found");
       } finally {
         setIsLoading(false);
       }
@@ -60,9 +60,9 @@ const FollowUpSurvey = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setDone(true);
-      toast.success("感謝您的回饋!");
+      toast.success("感謝您的回饋！/ Thank you for your feedback!");
     } catch (e: any) {
-      toast.error(e?.message || "送出失敗");
+      toast.error(e?.message || "送出失敗 / Submission failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -80,7 +80,7 @@ const FollowUpSurvey = () => {
     return (
       <Centered>
         <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
-        <h1 className="text-xl font-semibold mb-2">問卷無法開啟</h1>
+        <h1 className="text-xl font-semibold mb-1">問卷無法開啟 / Survey Unavailable</h1>
         <p className="text-muted-foreground">{loadError}</p>
       </Centered>
     );
@@ -90,9 +90,11 @@ const FollowUpSurvey = () => {
     return (
       <Centered>
         <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-        <h1 className="text-xl font-semibold mb-2">感謝您的回饋!</h1>
-        <p className="text-muted-foreground">
-          您的意見已成功送出,我們會持續改進服務品質。
+        <h1 className="text-xl font-semibold mb-1">感謝您的回饋！</h1>
+        <p className="text-base font-medium text-muted-foreground mb-2">Thank you for your feedback!</p>
+        <p className="text-sm text-muted-foreground">
+          您的意見已成功送出，我們會持續改進服務品質。<br />
+          Your response has been submitted. We will continue to improve our service.
         </p>
       </Centered>
     );
@@ -105,23 +107,26 @@ const FollowUpSurvey = () => {
       <div className="max-w-xl mx-auto">
         <header className="text-center mb-8">
           <h1 className="text-2xl font-bold text-slate-900">CREST 保固服務</h1>
-          <p className="text-sm text-muted-foreground mt-1">滿意度問卷</p>
+          <p className="text-sm text-muted-foreground mt-1">滿意度問卷 / Satisfaction Survey</p>
         </header>
 
         <div className="bg-card border rounded-2xl shadow-sm p-6 sm:p-8 space-y-6">
           {rma && (
             <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-1">
-              <div><span className="text-muted-foreground">RMA 編號:</span> <span className="font-mono">{rma.rma_number}</span></div>
-              <div><span className="text-muted-foreground">客戶:</span> {rma.customer_name}</div>
+              <div><span className="text-muted-foreground">RMA 編號 / RMA No.:</span> <span className="font-mono">{rma.rma_number}</span></div>
+              <div><span className="text-muted-foreground">客戶 / Customer:</span> {rma.customer_name}</div>
               {rma.product_model && (
-                <div><span className="text-muted-foreground">產品:</span> {rma.product_model}</div>
+                <div><span className="text-muted-foreground">產品 / Product:</span> {rma.product_model}</div>
               )}
             </div>
           )}
 
           <div>
-            <p className="text-base font-medium mb-3">
-              請為這次的保固服務評分(1–5 分)
+            <p className="text-base font-medium mb-1">
+              請為這次的保固服務評分（1–5 分）
+            </p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Please rate your warranty service experience (1–5)
             </p>
             <div className="flex items-center justify-center gap-2">
               {[1, 2, 3, 4, 5].map((n) => (
@@ -143,18 +148,18 @@ const FollowUpSurvey = () => {
               ))}
             </div>
             <p className="text-center text-sm text-muted-foreground mt-2">
-              目前評分:{satisfaction} / 5
+              目前評分 / Current rating: {satisfaction} / 5
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
-              其他意見(選填)
+            <label className="block text-sm font-medium mb-1">
+              其他意見（選填）/ Additional Comments (optional)
             </label>
             <Textarea
               value={comments}
               onChange={(e) => setComments(e.target.value)}
-              placeholder="歡迎告訴我們任何想法,協助我們持續進步..."
+              placeholder="歡迎告訴我們任何想法，協助我們持續進步… / Please share any thoughts to help us improve…"
               rows={5}
               maxLength={2000}
             />
@@ -170,15 +175,15 @@ const FollowUpSurvey = () => {
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />送出中…</>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />送出中… / Submitting…</>
             ) : (
-              "送出問卷"
+              "送出問卷 / Submit Survey"
             )}
           </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © CREST 保固服務 — 感謝您的支持
+          © CREST 保固服務 — 感謝您的支持 / Thank you for your support
         </p>
       </div>
     </div>
