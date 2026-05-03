@@ -1,0 +1,32 @@
+/* CREST RMA 管理員手冊 — 自訂樣式 */
+
+:root {
+  --vp-c-brand-1: #1d4ed8;
+  --vp-c-brand-2: #2563eb;
+  --vp-c-brand-3: #3b82f6;
+  --vp-c-brand-soft: #dbeafe;
+}
+
+/* 表格樣式優化 */
+.vp-doc table {
+  width: 100%;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-bg-soft);
+  font-weight: 600;
+}
+
+/* Badge 樣式（用於行內狀態標示）*/
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+/* 警告容器 */
+.vp-doc .warning {
+  border-left: 4px solid var(--vp-c-warning-1);
+}
