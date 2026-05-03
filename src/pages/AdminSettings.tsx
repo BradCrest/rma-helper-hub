@@ -246,29 +246,24 @@ const AdminSettings = () => {
   const handleApproveRegistration = async (registration: PendingRegistration) => {
     setProcessingId(registration.id);
     try {
-      // Add the admin role
-      const { error: insertError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: registration.user_id,
-          role: 'admin'
-        });
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast.error("請先登入");
+        return;
+      }
 
-      if (insertError) throw insertError;
+      const { data, error } = await supabase.functions.invoke(
+        'approve-admin-registration',
+        {
+          body: { registration_id: registration.id },
+          headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+        }
+      );
 
-      // Update the pending registration status
-      const { error: updateError } = await supabase
-        .from('pending_admin_registrations')
-        .update({
-          status: 'approved',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', registration.id);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      if (updateError) throw updateError;
-
-      toast.success(`已批准 ${registration.email} 為管理員`);
+      toast.success(`已批准 ${registration.email} 為管理員（信箱已自動驗證）`);
       fetchAdmins();
       fetchPendingRegistrations();
     } catch (error: any) {
