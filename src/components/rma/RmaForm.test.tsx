@@ -87,9 +87,9 @@ describe("RmaForm 渲染", () => {
 
   it("應顯示必填欄位（姓名、Email、電話、問題描述）", () => {
     renderForm();
-    expect(screen.getByPlaceholderText("請輸入客戶姓名")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("請輸入電子郵件")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("請輸入客戶電話")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("請詳細描述問題...")).toBeInTheDocument();
   });
 
@@ -118,35 +118,35 @@ describe("RmaForm 驗證 — 未填必填欄位", () => {
     const { form, clickAgree } = renderForm();
     clickAgree();
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請輸入客戶姓名");
+    expect(mockToastError).toHaveBeenCalledWith("請輸入客戶姓名 / Please enter customer name");
   });
 
   it("填姓名但未填 Email 時應顯示錯誤", async () => {
     const user = userEvent.setup();
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請輸入電子郵件");
+    expect(mockToastError).toHaveBeenCalledWith("請輸入電子郵件 / Please enter email address");
   });
 
   it("填 Email 但未填電話時應顯示錯誤", async () => {
     const user = userEvent.setup();
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請輸入客戶電話");
+    expect(mockToastError).toHaveBeenCalledWith("請輸入客戶電話 / Please enter customer phone");
   });
 
   it("未選故障問題時應顯示錯誤", async () => {
     const user = userEvent.setup();
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     fireEvent.submit(form);
     expect(mockToastError).toHaveBeenCalledWith("請選擇故障問題");
   });
@@ -155,9 +155,9 @@ describe("RmaForm 驗證 — 未填必填欄位", () => {
     const user = userEvent.setup();
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     fireEvent.submit(form);
     expect(mockToastError).toHaveBeenCalledWith("請描述問題");
@@ -168,7 +168,7 @@ describe("RmaForm — 序號驗證 Dialog", () => {
   it("輸入 EN13319 後 blur 應清空欄位並顯示警告 Dialog", async () => {
     const user = userEvent.setup();
     renderForm();
-    const serialInput = screen.getByPlaceholderText("請輸入產品序號");
+    const serialInput = screen.getByPlaceholderText("請輸入產品序號 / Enter serial number");
     await user.type(serialInput, "EN13319");
     fireEvent.blur(serialInput);
     expect(serialInput).toHaveValue("");
@@ -178,7 +178,7 @@ describe("RmaForm — 序號驗證 Dialog", () => {
   it("輸入 CCA 開頭序號後 blur 應顯示警告 Dialog", async () => {
     const user = userEvent.setup();
     renderForm();
-    const serialInput = screen.getByPlaceholderText("請輸入產品序號");
+    const serialInput = screen.getByPlaceholderText("請輸入產品序號 / Enter serial number");
     await user.type(serialInput, "CCA-1234567890");
     fireEvent.blur(serialInput);
     expect(screen.getByText("這不是產品序號")).toBeInTheDocument();
@@ -187,7 +187,7 @@ describe("RmaForm — 序號驗證 Dialog", () => {
   it("正常序號 blur 後不應出現 Dialog", async () => {
     const user = userEvent.setup();
     renderForm();
-    const serialInput = screen.getByPlaceholderText("請輸入產品序號");
+    const serialInput = screen.getByPlaceholderText("請輸入產品序號 / Enter serial number");
     await user.type(serialInput, "CREST-ABC123");
     fireEvent.blur(serialInput);
     expect(screen.queryByText("這不是產品序號")).not.toBeInTheDocument();
@@ -206,9 +206,9 @@ describe("RmaForm — 寄件人身分切換", () => {
     const user = userEvent.setup();
     renderForm();
     // 單筆模式有「故障問題 *」（含星號），MultiProductForm 只有「故障問題」（無星號）
-    expect(screen.getByText("故障問題 *")).toBeInTheDocument();
+    expect(screen.getByText("故障問題 / Issue Type *")).toBeInTheDocument();
     await user.click(screen.getByLabelText("經銷/代理商多筆"));
-    expect(screen.queryByText("故障問題 *")).not.toBeInTheDocument();
+    expect(screen.queryByText("故障問題 / Issue Type *")).not.toBeInTheDocument();
   });
 
   it("切換到「經銷/代理商多筆」後單筆故障問題 select 應消失", async () => {
@@ -239,9 +239,9 @@ describe("RmaForm — 成功提交", () => {
 
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
     fireEvent.submit(form);
@@ -269,9 +269,9 @@ describe("RmaForm — 成功提交", () => {
 
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
     fireEvent.submit(form);
@@ -290,9 +290,9 @@ describe("RmaForm — 成功提交", () => {
 
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
     fireEvent.submit(form);

@@ -56,9 +56,9 @@ async function fillAndSubmit(
   clickAgree: () => void
 ) {
   clickAgree();
-  await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-  await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-  await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+  await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+  await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+  await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
   await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
   await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
   fireEvent.submit(form);
@@ -173,10 +173,10 @@ describe("RmaForm 整合測試 — 序號欄位", () => {
 
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
-    await user.type(screen.getByPlaceholderText("請輸入產品序號"), "CREST-ABC123");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入產品序號 / Enter serial number"), "CREST-ABC123");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
     fireEvent.submit(form);
