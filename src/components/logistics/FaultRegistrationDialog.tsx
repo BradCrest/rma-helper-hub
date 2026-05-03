@@ -339,7 +339,29 @@ const FaultRegistrationDialog = ({ rma, open, onOpenChange, onSaved }: Props) =>
         .eq("id", rma.id);
       if (rqErr) throw rqErr;
 
-      // 3) Optional status transition via edge function (so rma_status_history logs the actor)
+      // 3) If decision is supplier_repair, ensure a pending supplier-repair row exists
+      if (alsoTransition && decisionVal === "supplier_repair") {
+        const { data: existing } = await supabase
+          .from("rma_supplier_repairs")
+          .select("id")
+          .eq("rma_request_id", rma.id)
+          .maybeSingle();
+        if (!existing) {
+          const { getDefaultSupplier, SUPPLIER_LABELS } = await import("@/lib/supplierMapping");
+          const supplierKey = getDefaultSupplier(rma.product_model);
+          const { error: srErr } = await supabase.from("rma_supplier_repairs").insert({
+            rma_request_id: rma.id,
+            supplier_status: "pending_send",
+            supplier_name: supplierKey ? SUPPLIER_LABELS[supplierKey] : null,
+            invoice_reference: supplierRef.trim() || null,
+            factory_repair_cost_estimated: feeNumber,
+            repair_count: 1,
+          });
+          if (srErr) throw srErr;
+        }
+      }
+
+      // 4) Optional status transition via edge function (so rma_status_history logs the actor)
       if (alsoTransition && transition?.nextStatus && transition.nextStatus !== rma.status) {
         const {
           data: { session },

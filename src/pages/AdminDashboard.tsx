@@ -13,6 +13,10 @@ const AdminDashboard = () => {
     processing: 0,
     completed: 0,
     thisMonth: 0,
+    atFactory: 0,
+    refurbA: 0,
+    refurbB: 0,
+    refurbC: 0,
   });
 
   useEffect(() => {
@@ -22,7 +26,7 @@ const AdminDashboard = () => {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const [p, pr, c, m] = await Promise.all([
+        const [p, pr, c, m, factory, refurb] = await Promise.all([
           supabase
             .from("rma_requests")
             .select("id", { count: "exact", head: true })
@@ -39,13 +43,26 @@ const AdminDashboard = () => {
             .from("rma_requests")
             .select("id", { count: "exact", head: true })
             .gte("created_at", startOfMonth.toISOString()),
+          supabase
+            .from("rma_supplier_repairs")
+            .select("id", { count: "exact", head: true })
+            .in("supplier_status", ["at_factory", "repaired"]),
+          supabase
+            .from("refurbished_inventory")
+            .select("grade")
+            .eq("status", "in_stock"),
         ]);
 
+        const grades = (refurb.data || []) as { grade: string }[];
         setStats({
           pending: p.count || 0,
           processing: pr.count || 0,
           completed: c.count || 0,
           thisMonth: m.count || 0,
+          atFactory: factory.count || 0,
+          refurbA: grades.filter((g) => g.grade === "A").length,
+          refurbB: grades.filter((g) => g.grade === "B").length,
+          refurbC: grades.filter((g) => g.grade === "C").length,
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
@@ -161,6 +178,23 @@ const AdminDashboard = () => {
           <div className="rma-card text-center">
             <p className="text-3xl font-bold text-primary">{stats.thisMonth}</p>
             <p className="text-sm text-muted-foreground mt-1">本月總數</p>
+          </div>
+        </div>
+
+        {/* Supplier & Refurbished Stats */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rma-card">
+            <p className="text-sm text-muted-foreground">在外維修中（送供應商）</p>
+            <p className="text-3xl font-bold text-primary mt-1">{stats.atFactory}</p>
+            <p className="text-xs text-muted-foreground mt-1">at_factory + repaired</p>
+          </div>
+          <div className="rma-card">
+            <p className="text-sm text-muted-foreground">整新品庫存</p>
+            <div className="flex items-baseline gap-4 mt-1">
+              <span className="text-2xl font-bold text-emerald-600">A {stats.refurbA}</span>
+              <span className="text-2xl font-bold text-blue-600">B {stats.refurbB}</span>
+              <span className="text-2xl font-bold text-amber-600">C {stats.refurbC}</span>
+            </div>
           </div>
         </div>
 
