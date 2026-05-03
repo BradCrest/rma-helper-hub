@@ -7,6 +7,9 @@ verify_jwt = true
 [functions.submit-admin-registration]
 verify_jwt = false
 
+[functions.approve-admin-registration]
+verify_jwt = true
+
 [functions.lookup-user]
 verify_jwt = true
 
