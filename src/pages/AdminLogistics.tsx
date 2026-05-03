@@ -10,6 +10,7 @@ import PaymentConfirmationTab from "@/components/logistics/PaymentConfirmationTa
 import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
 import ClosingTab from "@/components/logistics/ClosingTab";
 import FollowUpTab from "@/components/logistics/FollowUpTab";
+import SupplierRepairTab from "@/components/logistics/SupplierRepairTab";
 import StatusMapDialog from "@/components/logistics/StatusMapDialog";
 
 const VALID_TABS = ["receiving", "customer", "payment", "outbound", "closing", "followup", "supplier", "fault", "sales", "warranty"];
