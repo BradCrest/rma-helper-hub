@@ -4,6 +4,9 @@ project_id = "xrbvyfoewbwywrwocrpf"
 [functions.list-admins]
 verify_jwt = true
 
+[functions.submit-admin-registration]
+verify_jwt = false
+
 [functions.lookup-user]
 verify_jwt = true
 
