@@ -1,143 +1,220 @@
-# 故障登記分頁（檢測與處置決策中心）
 
-## 目標
-新增 `FaultRegistrationTab`，作為收件後的單一決策入口，列出 `received` / `inspecting` 的 RMA，由後勤一次完成「檢測 → 故障分類 → 保固判斷 → 處置決策 → 狀態分流」。「待客戶確認」和「出貨處理」回歸純粹角色。
+# 供應商維修追蹤 + 整新品庫存（整合版）
 
----
-
-## 一、現況盤點（不會動到的東西）
-
-- 既有 enum 完整可用：`registered, shipped, received, inspecting, contacting, quote_confirmed, paid, no_repair, shipped_back*, follow_up, closed` — **不新增 enum，不做 migration**
-- `rma_requests` 已有 `initial_diagnosis`、`diagnosis_category`、`warranty_status`、`repair_fee`
-- `rma_repair_details` 已有 `planned_method`、`actual_method`、`estimated_cost`、`actual_cost`、`replacement_model`、`replacement_serial`、`internal_reference`
-- `ReceivingTab` 目前混合了「收件」+「初步診斷」+「方案決策」 — 我們會把「方案決策」職責搬到新分頁，`ReceivingTab` 只保留收件確認與最初步的故障歸類（避免破壞既有 test）
-- `refurbishedPricing.ts` 已有 `ActualMethod` 與 `ACTUAL_METHOD_LABELS`，直接重用
-- `supplier_repair` enum 不存在 → 依需求暫不引入，先把決策結果記在 `rma_repair_details.planned_method = 'supplier_repair'` + 內部備註，狀態維持 `inspecting`
+依你的調整，以下是最終實作計劃。
 
 ---
 
-## 二、新增分頁：`src/components/logistics/FaultRegistrationTab.tsx`
+## Step 1：Migration（新建）
 
-### 2.1 列表（Table）
-查詢條件：`status IN ('received','inspecting')`，依 `received_date` / `updated_at` 倒序。
+```sql
+-- 1a. rma_supplier_repairs 補欄位
+ALTER TABLE rma_supplier_repairs
+  ADD COLUMN IF NOT EXISTS supplier_name                 text,
+  ADD COLUMN IF NOT EXISTS factory_repair_cost_estimated numeric(10,2),
+  ADD COLUMN IF NOT EXISTS invoice_reference             text;
+-- factory_repair_cost 保留為實際費用
 
-| 欄位 | 來源 |
-|---|---|
-| RMA 編號 | `rma_number` |
-| 客戶姓名 | `customer_name` |
-| 產品型號 | `product_model` |
-| 序號 | `serial_number` |
-| 目前狀態 | `status`（badge：received=灰, inspecting=藍） |
-| 故障類型 | `diagnosis_category` |
-| 保固判斷 | `warranty_status` + `evaluateWarranty()` 結果（badge：保固內=綠, 過保=橘, 人損=紅, 未判定=灰） |
-| 處置決策 | `rma_repair_details.planned_method`（badge，未填時顯示「待決策」） |
-| 更新時間 | `updated_at`（相對時間） |
-| 操作 | 「檢視 / 登記」按鈕開 dialog |
+-- 1b. 批次表（多台機器一次寄出）
+CREATE TABLE IF NOT EXISTS supplier_repair_batches (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  supplier_name       text NOT NULL,
+  status              text NOT NULL DEFAULT 'draft',
+                      -- draft | shipped | received
+  shipped_at          timestamptz,
+  tracking_number_out text,
+  expected_return_at  date,
+  received_at         timestamptz,
+  tracking_number_in  text,
+  notes               text,
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
 
-頂部加搜尋框（RMA 編號、客戶姓名、序號）+「只顯示未決策」toggle。
+ALTER TABLE rma_supplier_repairs
+  ADD COLUMN IF NOT EXISTS batch_id uuid
+    REFERENCES supplier_repair_batches(id) ON DELETE SET NULL;
 
-### 2.2 詳細 Dialog `<FaultRegistrationDialog>`
+-- 1c. 整新品庫存表
+CREATE TABLE IF NOT EXISTS refurbished_inventory (
+  id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_model             text NOT NULL,
+  serial_number             text,
+  grade                     text NOT NULL CHECK (grade IN ('A','B','C')),
+  source_rma_id             uuid REFERENCES rma_requests(id)         ON DELETE SET NULL,
+  source_supplier_repair_id uuid REFERENCES rma_supplier_repairs(id) ON DELETE SET NULL,
+  cost                      numeric(10,2),
+  status                    text NOT NULL DEFAULT 'in_stock',
+                            -- in_stock | used_warranty | sold | scrapped
+  used_for_rma_id           uuid REFERENCES rma_requests(id) ON DELETE SET NULL,
+  notes                     text,
+  received_date             date NOT NULL DEFAULT current_date,
+  released_date             date,
+  created_at                timestamptz NOT NULL DEFAULT now(),
+  updated_at                timestamptz NOT NULL DEFAULT now()
+);
 
-讀取：`rma_requests` + `rma_repair_details` + Shopify 訂單卡（重用 `ShopifyOrdersCard`）。
+-- RLS（沿用 is_admin(auth.uid()) 模式，與既有表一致）
+ALTER TABLE supplier_repair_batches  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE refurbished_inventory    ENABLE ROW LEVEL SECURITY;
 
-#### 上半部：唯讀資訊
-- 客戶 / 產品 / 序號 / 購買日期
-- 客戶原始描述 `issue_type` + `issue_description` + 照片 grid（重用既有元件）
-- `WarrantyCalculator` 區塊（讓 admin 看 serial 自動推算保固）
+CREATE POLICY "Admins can view supplier batches"   ON supplier_repair_batches FOR SELECT USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can insert supplier batches" ON supplier_repair_batches FOR INSERT WITH CHECK (is_admin(auth.uid()));
+CREATE POLICY "Admins can update supplier batches" ON supplier_repair_batches FOR UPDATE USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can delete supplier batches" ON supplier_repair_batches FOR DELETE USING (is_admin(auth.uid()));
 
-#### 下半部：表單欄位
-
-| 欄位 | UI | 寫入位置 |
-|---|---|---|
-| 故障類型 `diagnosis_category` | Select：螢幕／電池／進水／外觀損壞／無法開機／感測器異常／充電異常／其他 | `rma_requests.diagnosis_category` |
-| 檢測結果 | Textarea | `rma_requests.initial_diagnosis` |
-| 是否可復現 | RadioGroup：是／否／不確定 | 併入 `initial_diagnosis` 文字開頭 `[可復現:是]`（避免新增欄位）|
-| 保固判斷 `warranty_status` | Select：保固內／過保／人損不保／無法判定 | `rma_requests.warranty_status` |
-| **處置決策** `planned_method` | RadioGroup：`internal_repair` / `supplier_repair` / `warranty_replace` / `purchase_a` / `purchase_b` / `purchase_c` / `return_no_repair` / `return_no_fault` | `rma_repair_details.planned_method` |
-| 報價金額 | NumberInput（`purchase_*` 時自動帶 `getRefurbPrices`，可手動覆寫；`warranty_replace` 預設 0）| `rma_requests.repair_fee` + `rma_repair_details.estimated_cost` |
-| 上游維修單號 | Input（僅 `supplier_repair` 顯示） | `rma_repair_details.internal_reference` |
-| 內部備註 | Textarea | append 到 `initial_diagnosis` 結尾，`---內部備註---` 分隔 |
-| 附件 / 照片 | 重用 `rma-photos` bucket 的上傳元件 | `rma_requests.photo_urls` 追加 |
-
-底部按鈕：「儲存草稿」（只更新欄位，不換 status）／「送出處置決策」（更新欄位 + 依下表轉換 status）。
-
----
-
-## 三、處置決策 → 狀態轉換對照
-
-送出時依 `planned_method` 決定後續：
-
-| 處置決策 | `planned_method` 寫入 | `actual_method` 寫入 | RMA 狀態 | 後續分頁 |
-|---|---|---|---|---|
-| 內部維修 | `internal_repair` | （不寫，等實際完工再寫）| `inspecting` → 維持 `inspecting` 並在備註標示「待內部維修」（暫不引入 `repairing` 狀態，等未來新增）| 故障登記分頁仍可見 |
-| 送上游維修 | `supplier_repair` | （同上） | 維持 `inspecting`，`internal_reference` 記單號 | 未來「供應商維修」分頁 |
-| 保固換整新機 | `warranty_replace` | `warranty_replace` | → `contacting` | 待客戶確認 |
-| 購買 A / B / C 整新機 | `purchase_a/b/c` | 同 | → `contacting` | 待客戶確認 |
-| 不維修，原機退回 | `return_no_repair` | `return_original` | → `no_repair` | 出貨處理 |
-| 無故障，原機退回 | `return_no_fault` | `return_original` | → `no_repair` | 出貨處理 |
-
-寫入順序：
-1. upsert `rma_repair_details`（`planned_method`、`actual_method`、`estimated_cost`、`internal_reference`）
-2. update `rma_requests`（`diagnosis_category`、`initial_diagnosis`、`warranty_status`、`repair_fee`、`status`）
-3. status 變動由既有 trigger `log_rma_status_change` 自動寫進 `rma_status_history`
-
-**保護機制**：送出前若必填欄位（故障類型、檢測結果、保固判斷、處置決策）任一缺漏，按鈕 disabled + tooltip 提示。
+CREATE POLICY "Admins can view refurb inventory"   ON refurbished_inventory FOR SELECT USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can insert refurb inventory" ON refurbished_inventory FOR INSERT WITH CHECK (is_admin(auth.uid()));
+CREATE POLICY "Admins can update refurb inventory" ON refurbished_inventory FOR UPDATE USING (is_admin(auth.uid()));
+CREATE POLICY "Admins can delete refurb inventory" ON refurbished_inventory FOR DELETE USING (is_admin(auth.uid()));
+```
 
 ---
 
-## 四、`AdminLogistics.tsx` 整合
+## Step 2：`src/lib/supplierMapping.ts`（純函式）
 
-把目前 `fault` tab 的 placeholder 換掉，並把 `disabled: true` 移除：
+```ts
+export type SupplierKey = 'chuangbao' | 'zhengnengliang';
+
+export const SUPPLIER_LABELS: Record<SupplierKey, string> = {
+  chuangbao:      '創葆',
+  zhengnengliang: '正能量',
+};
+
+export const PRODUCT_TO_SUPPLIER: Record<string, SupplierKey> = {
+  'CR-4':  'chuangbao',
+  'CR-1':  'chuangbao',
+  'CR-5':  'zhengnengliang',
+  'CR-5L': 'zhengnengliang',
+  // CR-F：無預設，admin 手選
+};
+
+export function getDefaultSupplier(productModel: string | null | undefined): SupplierKey | null {
+  if (!productModel) return null;
+  const normalized = productModel.trim().toUpperCase().replace(/\s|-/g, '');
+  for (const [key, supplier] of Object.entries(PRODUCT_TO_SUPPLIER)) {
+    if (key.replace(/-/g, '') === normalized) return supplier;
+  }
+  return null;
+}
+```
+
+附 vitest 單元測試覆蓋大小寫、空白、CR5L/cr-5l 變體。
+
+---
+
+## Step 3：`FaultRegistrationDialog.tsx` 修改
+
+當處置決策 = `supplier_repair` 送出時：
+
+1. 自動帶入 `supplier_name`（依型號呼叫 `getDefaultSupplier()`，UI 提供下拉可覆寫）
+2. 直接 insert `rma_supplier_repairs`（admin 透過 RLS）：
+   - `supplier_status: 'pending_send'`
+   - `supplier_name`
+   - `repair_requirement`（從 fault description 帶入）
+   - `repair_count`：先 `select count(*) where rma_request_id = ?` 再 +1
+3. RMA 狀態維持 `inspecting`
+4. Toast：「已建立送修單，請至『供應商維修』分頁追蹤進度」
+
+---
+
+## Step 4：`SupplierRepairTab.tsx`
+
+兩個 sub-tab：
+
+### Sub-tab A：送修追蹤
+
+**頂部篩選列**：文字搜尋 / 供應商篩選 / 狀態篩選 / 「逾期未回（>30 天）」toggle
+
+**批次管理 panel**（折疊，預設展開 draft + shipped）：
+- 卡片：供應商、台數、狀態、操作
+- 「建立新批次」→ 選供應商 → 從同供應商 `pending_send` 工單勾選加入
+- 「標記已出貨」：填出貨日 / 快遞 / 追蹤號 → batch `shipped` + 該批次工單全部 → `at_factory`
+- 「標記已收回」：填收回日 / 回程追蹤號 → batch `received` + 該批次工單全部 → `repaired`
+
+**表格欄位**：RMA / 客戶 / 型號 / 序號 / 供應商 badge / 狀態 badge / 送出日 / 在外天數 / 預估費 / 實際費 / 操作
+
+供應商 badge：創葆藍、正能量綠
+
+操作：「檢視 / 更新」→ 開啟 `SupplierRepairDialog`
+
+### Sub-tab B：整新品庫存
+
+**頂部 summary cards**：每型號（CR-4 / CR-1 / CR-5 / CR-5L）顯示 A/B/C 在庫數量
+
+**表格**：型號 / 序號 / 等級 badge / 來源 RMA / 成本 / 狀態 / 入庫日 / 操作
+
+**操作（in_stock 才顯示）**：
+- 撥用保固：輸入目標 RMA 編號 → `used_warranty` + `used_for_rma_id` + `released_date`
+- 標記出售：填售價日期 → `sold`
+- 報廢：填原因 → `scrapped`
+
+---
+
+## Step 5：`SupplierRepairDialog.tsx`（階段式）
+
+完成的區塊 collapse 但保留記錄。
+
+### 階段 1：寄出（`pending_send`）
+供應商下拉、維修需求、預估費、送出日 / 快遞 / 追蹤號  
+按鈕：「加入批次出貨」或「單獨標記已寄出」→ `at_factory`
+
+### 階段 2：工廠維修中（`at_factory`）
+factory_analysis / factory_repair_method / factory_repair_cost / invoice_reference / supplier_warranty_date / production_batch  
+按鈕：「工廠完成維修」→ `repaired`
+
+### 階段 3：回廠驗收（`repaired`）
+inspection_result + 後續處置 RadioGroup：
+- `add_to_refurb_stock` → 顯示等級選擇 A/B/C → 寫入 `refurbished_inventory`（cost 自動帶 `factory_repair_cost`），supplier_status → `returned`
+- `return_to_customer` → RMA 回 `inspecting`，supplier_status → `returned`
+- `scrap` → 填原因，supplier_status → `scrapped`
+
+底部歷史記錄：依 `repair_count` 排列時間軸（同一 RMA 多次送修）
+
+---
+
+## Step 6：`AdminLogistics.tsx`
 
 ```tsx
-{ id: "fault", label: "故障登記", icon: ClipboardCheck },
-// ...
-<TabsContent value="fault">
-  <FaultRegistrationTab />
+{ id: "supplier", label: "供應商維修", icon: Factory },  // 移除 disabled
+
+<TabsContent value="supplier" className="mt-0">
+  <SupplierRepairTab />
 </TabsContent>
 ```
 
-`fault` 分頁順序建議放在「收件處理」之後、「待客戶確認」之前，符合工作流向。
+---
+
+## Step 7：`AdminDashboard.tsx`（選做，這次一併做）
+
+兩張卡片：
+- **在外維修中**：`rma_supplier_repairs` WHERE supplier_status IN ('at_factory','repaired')
+- **整新品庫存**：`refurbished_inventory` WHERE status = 'in_stock' GROUP BY grade
 
 ---
 
-## 五、`ReceivingTab` 微調（最小變更）
+## 不做的事
 
-為了不破壞既有測試，只做兩件事：
-1. 在 ReceivingTab 的詳情 dialog 底部加一個提示卡片：「完成收件後請至『故障登記』登錄處置決策」+ 一鍵跳轉按鈕（`navigate('/admin/logistics?tab=fault')`）
-2. 收件確認時，預設把 status 從 `shipped` → `received`（不直接跳 `inspecting`）；admin 可在故障登記分頁開始檢測時，由系統自動把 `received` → `inspecting`（在 dialog 開啟時 update 一次）
-
----
-
-## 六、UI 規範
-
-- 完全沿用既有 `rma-card` / `Badge` / shadcn `Table` / `Dialog` / `Select` / `RadioGroup` 樣式
-- 處置決策 RadioGroup 用 2 欄 grid，每個選項旁加小字輔助說明（例如「保固換整新機 — 寄整新機給客戶，無費用」）
-- 保固判斷 badge 配色與 `WarrantyCalculator` 一致
-
----
-
-## 七、不做的事
-- 不新增資料表
-- 不新增 / 不修改 enum（`supplier_repair`、`repairing` 留待未來與「供應商維修」分頁一起做）
-- 不在這個分頁做付款、出貨、寄信
-- 不動 `AwaitingConfirmationTab` / `OutboundShippingTab` 的查詢條件（它們本來就靠 `status` 過濾，新分頁送出後資料會自動流進去）
+1. 自動配對庫存到處置決策（手動撥用即可）
+2. 成本毛利報表（資料先存好）
+3. 庫存照片（用 rma-photos bucket，不做新 bucket）
+4. 供應商表單 normalization（先 hardcode 兩家 + 自由輸入）
 
 ---
 
 ## 檔案異動清單
 
-新增：
-- `src/components/logistics/FaultRegistrationTab.tsx`
-- `src/components/logistics/FaultRegistrationDialog.tsx`
-- `src/components/logistics/FaultRegistrationTab.test.tsx`（基本渲染 + 送出後 status 轉換）
+**新增**
+- migration（補欄位 + 兩張新表 + RLS）
+- `src/lib/supplierMapping.ts` + `.test.ts`
+- `src/components/logistics/SupplierRepairTab.tsx`
+- `src/components/logistics/SupplierRepairDialog.tsx`
+- `src/components/logistics/SupplierBatchPanel.tsx`
+- `src/components/logistics/RefurbishedInventoryPanel.tsx`
 
-修改：
-- `src/pages/AdminLogistics.tsx`（啟用 fault tab）
-- `src/components/logistics/ReceivingTab.tsx`（加跳轉提示，最小改動）
+**修改**
+- `src/pages/AdminLogistics.tsx`（啟用 supplier 分頁）
+- `src/components/logistics/FaultRegistrationDialog.tsx`（送出 supplier_repair 時建立 supplier_repair 列）
+- `src/pages/AdminDashboard.tsx`（兩張統計卡）
 
----
-
-請確認方向 OK 我就開工。若有以下任一想調整請先說：
-1. 「不維修退回」要不要直接跳 `shipped_back_original` 而不是 `no_repair`？（目前依你需求採 `no_repair`）
-2. 「內部維修」目前無對應 enum，要先用 `inspecting` + 備註撐著，還是這次順便加 `repairing` enum migration？
+確認後我就開工。

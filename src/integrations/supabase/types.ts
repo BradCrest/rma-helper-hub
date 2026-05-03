@@ -337,6 +337,79 @@ export type Database = {
         }
         Relationships: []
       }
+      refurbished_inventory: {
+        Row: {
+          cost: number | null
+          created_at: string
+          grade: string
+          id: string
+          notes: string | null
+          product_model: string
+          received_date: string
+          released_date: string | null
+          serial_number: string | null
+          source_rma_id: string | null
+          source_supplier_repair_id: string | null
+          status: string
+          updated_at: string
+          used_for_rma_id: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          grade: string
+          id?: string
+          notes?: string | null
+          product_model: string
+          received_date?: string
+          released_date?: string | null
+          serial_number?: string | null
+          source_rma_id?: string | null
+          source_supplier_repair_id?: string | null
+          status?: string
+          updated_at?: string
+          used_for_rma_id?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          grade?: string
+          id?: string
+          notes?: string | null
+          product_model?: string
+          received_date?: string
+          released_date?: string | null
+          serial_number?: string | null
+          source_rma_id?: string | null
+          source_supplier_repair_id?: string | null
+          status?: string
+          updated_at?: string
+          used_for_rma_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refurbished_inventory_source_rma_id_fkey"
+            columns: ["source_rma_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refurbished_inventory_source_supplier_repair_id_fkey"
+            columns: ["source_supplier_repair_id"]
+            isOneToOne: false
+            referencedRelation: "rma_supplier_repairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refurbished_inventory_used_for_rma_id_fkey"
+            columns: ["used_for_rma_id"]
+            isOneToOne: false
+            referencedRelation: "rma_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rma_attachment_cleanup_logs: {
         Row: {
           bytes_freed: number
@@ -818,13 +891,16 @@ export type Database = {
       }
       rma_supplier_repairs: {
         Row: {
+          batch_id: string | null
           created_at: string
           factory_analysis: string | null
           factory_repair_cost: number | null
+          factory_repair_cost_estimated: number | null
           factory_repair_method: string | null
           factory_return_date: string | null
           id: string
           inspection_result: string | null
+          invoice_reference: string | null
           post_repair_action: string | null
           production_batch: string | null
           repair_count: number | null
@@ -833,18 +909,22 @@ export type Database = {
           sent_carrier: string | null
           sent_to_factory_date: string | null
           sent_tracking_number: string | null
+          supplier_name: string | null
           supplier_status: string | null
           supplier_warranty_date: string | null
           updated_at: string
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string
           factory_analysis?: string | null
           factory_repair_cost?: number | null
+          factory_repair_cost_estimated?: number | null
           factory_repair_method?: string | null
           factory_return_date?: string | null
           id?: string
           inspection_result?: string | null
+          invoice_reference?: string | null
           post_repair_action?: string | null
           production_batch?: string | null
           repair_count?: number | null
@@ -853,18 +933,22 @@ export type Database = {
           sent_carrier?: string | null
           sent_to_factory_date?: string | null
           sent_tracking_number?: string | null
+          supplier_name?: string | null
           supplier_status?: string | null
           supplier_warranty_date?: string | null
           updated_at?: string
         }
         Update: {
+          batch_id?: string | null
           created_at?: string
           factory_analysis?: string | null
           factory_repair_cost?: number | null
+          factory_repair_cost_estimated?: number | null
           factory_repair_method?: string | null
           factory_return_date?: string | null
           id?: string
           inspection_result?: string | null
+          invoice_reference?: string | null
           post_repair_action?: string | null
           production_batch?: string | null
           repair_count?: number | null
@@ -873,11 +957,19 @@ export type Database = {
           sent_carrier?: string | null
           sent_to_factory_date?: string | null
           sent_tracking_number?: string | null
+          supplier_name?: string | null
           supplier_status?: string | null
           supplier_warranty_date?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "rma_supplier_repairs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_repair_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rma_supplier_repairs_rma_request_id_fkey"
             columns: ["rma_request_id"]
@@ -1004,6 +1096,48 @@ export type Database = {
           updated_at?: string
           uploaded_by?: string | null
           uploaded_by_email?: string | null
+        }
+        Relationships: []
+      }
+      supplier_repair_batches: {
+        Row: {
+          created_at: string
+          expected_return_at: string | null
+          id: string
+          notes: string | null
+          received_at: string | null
+          shipped_at: string | null
+          status: string
+          supplier_name: string
+          tracking_number_in: string | null
+          tracking_number_out: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expected_return_at?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          shipped_at?: string | null
+          status?: string
+          supplier_name: string
+          tracking_number_in?: string | null
+          tracking_number_out?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expected_return_at?: string | null
+          id?: string
+          notes?: string | null
+          received_at?: string | null
+          shipped_at?: string | null
+          status?: string
+          supplier_name?: string
+          tracking_number_in?: string | null
+          tracking_number_out?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

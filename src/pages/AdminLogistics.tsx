@@ -10,6 +10,7 @@ import PaymentConfirmationTab from "@/components/logistics/PaymentConfirmationTa
 import OutboundShippingTab from "@/components/logistics/OutboundShippingTab";
 import ClosingTab from "@/components/logistics/ClosingTab";
 import FollowUpTab from "@/components/logistics/FollowUpTab";
+import SupplierRepairTab from "@/components/logistics/SupplierRepairTab";
 import StatusMapDialog from "@/components/logistics/StatusMapDialog";
 
 const VALID_TABS = ["receiving", "customer", "payment", "outbound", "closing", "followup", "supplier", "fault", "sales", "warranty"];
@@ -55,7 +56,7 @@ const AdminLogistics = () => {
     { id: "outbound", label: "出貨處理", icon: Truck },
     { id: "closing", label: "結案追蹤", icon: CheckSquare },
     { id: "followup", label: "客戶關懷", icon: Heart },
-    { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
+    { id: "supplier", label: "供應商維修", icon: Factory },
     { id: "sales", label: "銷貨匯入", icon: FileSpreadsheet, disabled: true },
     { id: "warranty", label: "保固審核", icon: ShieldCheck, disabled: true },
   ];
@@ -126,11 +127,7 @@ const AdminLogistics = () => {
           </TabsContent>
 
           <TabsContent value="supplier" className="mt-0">
-            <div className="rma-card text-center py-12">
-              <Factory className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground">供應商維修管理</h3>
-              <p className="text-muted-foreground mt-2">此功能將在後續階段實作</p>
-            </div>
+            <SupplierRepairTab />
           </TabsContent>
 
           <TabsContent value="fault" className="mt-0">
