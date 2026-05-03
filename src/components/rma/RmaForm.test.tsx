@@ -90,7 +90,7 @@ describe("RmaForm 渲染", () => {
     expect(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("請詳細描述問題...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail...")).toBeInTheDocument();
   });
 
   it("應顯示提交按鈕「建立RMA」", () => {
@@ -225,7 +225,7 @@ describe("RmaForm — 寄件人身分切換", () => {
     renderForm();
     await user.click(screen.getByLabelText("經銷/代理商多筆"));
     await user.click(screen.getByLabelText("一般消費者"));
-    expect(screen.getByPlaceholderText("請詳細描述問題...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail...")).toBeInTheDocument();
   });
 });
 
@@ -243,7 +243,7 @@ describe("RmaForm — 成功提交", () => {
     await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
     await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
-    await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
+    await user.type(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail..."), "螢幕出現黑點");
     fireEvent.submit(form);
 
     await waitFor(() => {
@@ -273,7 +273,7 @@ describe("RmaForm — 成功提交", () => {
     await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
     await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
-    await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
+    await user.type(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail..."), "螢幕出現黑點");
     fireEvent.submit(form);
 
     await waitFor(() => {
@@ -294,7 +294,7 @@ describe("RmaForm — 成功提交", () => {
     await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
     await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
-    await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
+    await user.type(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail..."), "螢幕出現黑點");
     fireEvent.submit(form);
 
     await waitFor(() => {
