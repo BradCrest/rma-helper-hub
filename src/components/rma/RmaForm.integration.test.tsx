@@ -127,7 +127,7 @@ describe("RmaForm 整合測試 — 成功流程", () => {
     await fillAndSubmit(user, form, clickAgree);
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
-    expect(capturedBody.issue_description as string).toContain("[一般消費者]");
+    expect(capturedBody.issue_description as string).toContain("[一般消費者 / Consumer]");
   });
 });
 
