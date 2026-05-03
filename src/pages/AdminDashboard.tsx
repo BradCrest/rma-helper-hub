@@ -13,6 +13,10 @@ const AdminDashboard = () => {
     processing: 0,
     completed: 0,
     thisMonth: 0,
+    atFactory: 0,
+    refurbA: 0,
+    refurbB: 0,
+    refurbC: 0,
   });
 
   useEffect(() => {
@@ -22,7 +26,7 @@ const AdminDashboard = () => {
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
 
-        const [p, pr, c, m] = await Promise.all([
+        const [p, pr, c, m, factory, refurb] = await Promise.all([
           supabase
             .from("rma_requests")
             .select("id", { count: "exact", head: true })
@@ -39,13 +43,26 @@ const AdminDashboard = () => {
             .from("rma_requests")
             .select("id", { count: "exact", head: true })
             .gte("created_at", startOfMonth.toISOString()),
+          supabase
+            .from("rma_supplier_repairs")
+            .select("id", { count: "exact", head: true })
+            .in("supplier_status", ["at_factory", "repaired"]),
+          supabase
+            .from("refurbished_inventory")
+            .select("grade")
+            .eq("status", "in_stock"),
         ]);
 
+        const grades = (refurb.data || []) as { grade: string }[];
         setStats({
           pending: p.count || 0,
           processing: pr.count || 0,
           completed: c.count || 0,
           thisMonth: m.count || 0,
+          atFactory: factory.count || 0,
+          refurbA: grades.filter((g) => g.grade === "A").length,
+          refurbB: grades.filter((g) => g.grade === "B").length,
+          refurbC: grades.filter((g) => g.grade === "C").length,
         });
       } catch (error) {
         console.error("Error fetching stats:", error);
