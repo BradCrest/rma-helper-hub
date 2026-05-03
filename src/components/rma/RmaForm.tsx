@@ -25,30 +25,30 @@ import {
 import { AlertTriangle } from "lucide-react";
 
 const customerTypes = [
-  { id: "consumer", label: "一般消費者" },
-  { id: "dealer", label: "經銷商" },
-  { id: "agent", label: "代理商" },
-  { id: "dealer-agent", label: "經銷/代理商多筆" },
+  { id: "consumer", label: "一般消費者 / Consumer" },
+  { id: "dealer", label: "經銷商 / Dealer" },
+  { id: "agent", label: "代理商 / Agent" },
+  { id: "dealer-agent", label: "經銷/代理商多筆 / Dealer/Agent (Multi)" },
 ];
 
-const issueTypes = [
-  "螢幕問題",
-  "電池問題",
-  "充電問題",
-  "按鍵問題",
-  "軟體問題",
-  "外觀損壞",
-  "其他",
+const issueTypes: { value: string; label: string }[] = [
+  { value: "螢幕問題", label: "螢幕問題 / Screen Issue" },
+  { value: "電池問題", label: "電池問題 / Battery Issue" },
+  { value: "充電問題", label: "充電問題 / Charging Issue" },
+  { value: "按鍵問題", label: "按鍵問題 / Button Issue" },
+  { value: "軟體問題", label: "軟體問題 / Software Issue" },
+  { value: "外觀損壞", label: "外觀損壞 / Cosmetic Damage" },
+  { value: "其他", label: "其他 / Other" },
 ];
 
 const accessories = [
-  { id: "complete", label: "完整包裝" },
-  { id: "box", label: "外包裝盒" },
-  { id: "charger", label: "充電組" },
-  { id: "warranty", label: "保固卡" },
-  { id: "strap", label: "錶帶" },
-  { id: "other", label: "其他" },
-  { id: "none", label: "無" },
+  { id: "complete", label: "完整包裝 / Complete Package" },
+  { id: "box", label: "外包裝盒 / Outer Box" },
+  { id: "charger", label: "充電組 / Charger Set" },
+  { id: "warranty", label: "保固卡 / Warranty Card" },
+  { id: "strap", label: "錶帶 / Strap" },
+  { id: "other", label: "其他 / Other" },
+  { id: "none", label: "無 / None" },
 ];
 
 const RmaForm = () => {
@@ -115,29 +115,29 @@ const RmaForm = () => {
     }
 
     if (!agreed) {
-      toast.error("請先同意服務條款和隱私政策");
+      toast.error("請先同意服務條款和隱私政策 / Please agree to the Terms of Service and Privacy Policy first");
       return;
     }
 
     // Validate required fields
     if (!customerName.trim()) {
-      toast.error("請輸入客戶姓名");
+      toast.error("請輸入客戶姓名 / Please enter customer name");
       return;
     }
     if (!customerEmail.trim()) {
-      toast.error("請輸入電子郵件");
+      toast.error("請輸入電子郵件 / Please enter email address");
       return;
     }
     if (!customerPhone.trim()) {
-      toast.error("請輸入客戶電話");
+      toast.error("請輸入客戶電話 / Please enter customer phone");
       return;
     }
     if (!issueType) {
-      toast.error("請選擇故障問題");
+      toast.error("請選擇故障問題 / Please select an issue type");
       return;
     }
     if (!issueDescription.trim()) {
-      toast.error("請描述問題");
+      toast.error("請描述問題 / Please describe the issue");
       return;
     }
     if (isInvalidSerialNumber(serialNumber)) {
@@ -151,7 +151,7 @@ const RmaForm = () => {
       // Build product name from customer type and model
       const customerTypeLabel =
         customerTypes.find((t) => t.id === customerType)?.label || customerType;
-      const productName = productModel.trim() || "未指定型號";
+      const productName = productModel.trim() || "未指定型號 / Unspecified Model";
 
       // Upload photos to storage
       const photoUrls: string[] = [];
@@ -207,7 +207,7 @@ const RmaForm = () => {
       navigate(`/rma-confirmation?rma=${data.rma_number}`);
     } catch (error: any) {
       console.error("Error submitting RMA:", error);
-      toast.error("提交失敗，請稍後再試");
+      toast.error("提交失敗，請稍後再試 / Submission failed, please try again later");
     } finally {
       setIsSubmitting(false);
     }
@@ -216,21 +216,21 @@ const RmaForm = () => {
   // Multi-product preview handler
   const handleShowPreview = () => {
     if (!agreed) {
-      toast.error("請先同意服務條款和隱私政策");
+      toast.error("請先同意服務條款和隱私政策 / Please agree to the Terms of Service and Privacy Policy first");
       return;
     }
 
     // Validate customer info
     if (!customerName.trim()) {
-      toast.error("請輸入客戶姓名");
+      toast.error("請輸入客戶姓名 / Please enter customer name");
       return;
     }
     if (!customerEmail.trim()) {
-      toast.error("請輸入電子郵件");
+      toast.error("請輸入電子郵件 / Please enter email address");
       return;
     }
     if (!customerPhone.trim()) {
-      toast.error("請輸入客戶電話");
+      toast.error("請輸入客戶電話 / Please enter customer phone");
       return;
     }
 
@@ -240,7 +240,7 @@ const RmaForm = () => {
     );
 
     if (validProducts.length === 0) {
-      toast.error("請至少新增一筆有效的產品資料（產品型號和序號為必填）");
+      toast.error("請至少新增一筆有效的產品資料（產品型號和序號為必填）/ Please add at least one valid product (model and serial number required)");
       return;
     }
 
@@ -398,12 +398,12 @@ const RmaForm = () => {
     const validFiles = files.filter((file) => {
       // Check file type
       if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name} 不是有效的圖片格式`);
+        toast.error(`${file.name} 不是有效的圖片格式 / is not a valid image format`);
         return false;
       }
       // Check file size (10MB limit)
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} 超過 10MB 限制`);
+        toast.error(`${file.name} 超過 10MB 限制 / exceeds 10MB limit`);
         return false;
       }
       return true;
@@ -412,7 +412,7 @@ const RmaForm = () => {
     if (validFiles.length > 0) {
       setUploadedFiles((prev) => [...prev, ...validFiles].slice(0, 5)); // Max 5 files
       if (uploadedFiles.length + validFiles.length > 5) {
-        toast.info("最多只能上傳 5 張照片");
+        toast.info("最多只能上傳 5 張照片 / Maximum 5 photos allowed");
       }
     }
   };
@@ -453,15 +453,16 @@ const RmaForm = () => {
     <>
       <form onSubmit={handleSubmit} className="rma-card animate-fade-in">
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-foreground">建立新的 RMA</h2>
+          <h2 className="text-xl font-bold text-foreground">建立新的 RMA / Create New RMA</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            請填寫以下資訊以申請保固
+            請填寫以下資訊以申請保固<br/>
+            <span className="text-xs">Please fill in the following information to apply for warranty service</span>
           </p>
         </div>
 
         {/* Customer Type */}
         <div className="mb-6">
-          <label className="rma-label">寄件人身分</label>
+          <label className="rma-label">寄件人身分 / Sender Type</label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {customerTypes.map((type) => (
               <label
@@ -488,10 +489,10 @@ const RmaForm = () => {
         {/* Customer Info */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="rma-label">客戶姓名 *</label>
+            <label className="rma-label">客戶姓名 / Customer Name *</label>
             <input
               type="text"
-              placeholder="請輸入客戶姓名"
+              placeholder="請輸入客戶姓名 / Enter customer name"
               className="rma-input"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
@@ -499,10 +500,10 @@ const RmaForm = () => {
             />
           </div>
           <div>
-            <label className="rma-label">電子郵件 *</label>
+            <label className="rma-label">電子郵件 / Email *</label>
             <input
               type="email"
-              placeholder="請輸入電子郵件"
+              placeholder="請輸入電子郵件 / Enter email address"
               className="rma-input"
               value={customerEmail}
               onChange={(e) => setCustomerEmail(e.target.value)}
@@ -513,10 +514,10 @@ const RmaForm = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="rma-label">客戶電話 *</label>
+            <label className="rma-label">客戶電話 / Phone *</label>
             <input
               type="tel"
-              placeholder="請輸入客戶電話"
+              placeholder="請輸入客戶電話 / Enter customer phone"
               className="rma-input"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
@@ -525,10 +526,10 @@ const RmaForm = () => {
           </div>
           {!isMultiMode && (
             <div>
-              <label className="rma-label">產品序號</label>
+              <label className="rma-label">產品序號 / Serial Number</label>
               <input
                 type="text"
-                placeholder="請輸入產品序號"
+                placeholder="請輸入產品序號 / Enter serial number"
                 className="rma-input"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
@@ -541,9 +542,9 @@ const RmaForm = () => {
         </div>
 
         <div className="mb-4">
-          <label className="rma-label">客戶地址</label>
+          <label className="rma-label">客戶地址 / Address</label>
           <textarea
-            placeholder="請輸入客戶地址"
+            placeholder="請輸入客戶地址 / Enter customer address"
             className="rma-input min-h-[80px] resize-none"
             value={customerAddress}
             onChange={(e) => setCustomerAddress(e.target.value)}
@@ -572,27 +573,27 @@ const RmaForm = () => {
             {/* Product Info - Single Mode */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="rma-label">產品型號</label>
+                <label className="rma-label">產品型號 / Product Model</label>
                 <input
                   type="text"
-                  placeholder="請輸入產品型號"
+                  placeholder="請輸入產品型號 / Enter product model"
                   className="rma-input"
                   value={productModel}
                   onChange={(e) => setProductModel(e.target.value)}
                 />
               </div>
               <div>
-                <label className="rma-label">故障問題 *</label>
+                <label className="rma-label">故障問題 / Issue Type *</label>
                 <select
                   className="rma-input"
                   value={issueType}
                   onChange={(e) => setIssueType(e.target.value)}
                   required
                 >
-                  <option value="">選擇故障問題</option>
+                  <option value="">選擇故障問題 / Select issue type</option>
                   {issueTypes.map((issue) => (
-                    <option key={issue} value={issue}>
-                      {issue}
+                    <option key={issue.value} value={issue.value}>
+                      {issue.label}
                     </option>
                   ))}
                 </select>
@@ -600,7 +601,7 @@ const RmaForm = () => {
             </div>
 
             <div className="mb-4">
-              <label className="rma-label">購買日期</label>
+              <label className="rma-label">購買日期 / Purchase Date</label>
               <input
                 type="date"
                 className="rma-input"
@@ -610,9 +611,9 @@ const RmaForm = () => {
             </div>
 
             <div className="mb-4">
-              <label className="rma-label">問題描述 *</label>
+              <label className="rma-label">問題描述 / Issue Description *</label>
               <textarea
-                placeholder="請詳細描述問題..."
+                placeholder="請詳細描述問題... / Please describe the issue in detail..."
                 className="rma-input min-h-[120px] resize-none"
                 value={issueDescription}
                 onChange={(e) => setIssueDescription(e.target.value)}
@@ -622,7 +623,7 @@ const RmaForm = () => {
 
             {/* Accessories - Single Mode Only */}
             <div className="mb-6">
-              <label className="rma-label">隨附寄出物品</label>
+              <label className="rma-label">隨附寄出物品 / Included Accessories</label>
               <div className="space-y-2">
                 {accessories.map((acc) => (
                   <label
@@ -652,7 +653,7 @@ const RmaForm = () => {
         {/* Photo Upload - Common for both modes */}
         <div className="mb-6">
           <label className="rma-label">
-            產品照片 {isMultiMode && "(共用所有產品)"}
+            產品照片 / Product Photos {isMultiMode && "(共用所有產品 / Shared across all products)"}
           </label>
           <input
             type="file"
@@ -677,12 +678,12 @@ const RmaForm = () => {
             <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               <span className="text-primary font-medium hover:underline">
-                點擊上傳照片
+                點擊上傳照片 / Click to upload
               </span>{" "}
-              或拖放到此處
+              或拖放到此處 / or drag and drop here
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              PNG, JPG, GIF 最大 10MB，最多 5 張
+              PNG, JPG, GIF 最大 10MB，最多 5 張 / Max 10MB, up to 5 photos
             </p>
           </div>
 
@@ -729,7 +730,7 @@ const RmaForm = () => {
               {agreed && <Check className="w-3 h-3 text-primary-foreground" />}
             </div>
             <span className="text-sm text-foreground">
-              我同意
+              我同意 / I agree to
               <Link
                 to="/terms"
                 target="_blank"
@@ -737,9 +738,9 @@ const RmaForm = () => {
                 onClick={(e) => e.stopPropagation()}
                 className="text-primary hover:underline mx-1"
               >
-                服務條款
+                服務條款 / Terms of Service
               </Link>
-              和
+              和 / and
               <Link
                 to="/privacy"
                 target="_blank"
@@ -747,7 +748,7 @@ const RmaForm = () => {
                 onClick={(e) => e.stopPropagation()}
                 className="text-primary hover:underline mx-1"
               >
-                隱私政策
+                隱私政策 / Privacy Policy
               </Link>
               *
             </span>
@@ -763,21 +764,21 @@ const RmaForm = () => {
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              提交中...
+              提交中... / Submitting...
             </>
           ) : isMultiMode ? (
             <>
               <Eye className="w-5 h-5" />
-              預覽 (
+              預覽 / Preview (
               {
                 multiProducts.filter(
                   (p) => p.productModel.trim() && p.serialNumber.trim()
                 ).length
               }{" "}
-              筆)
+              筆 items)
             </>
           ) : (
-            "建立RMA"
+            "建立RMA / Create RMA"
           )}
         </button>
       </form>
@@ -810,7 +811,7 @@ const RmaForm = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:justify-center">
-            <AlertDialogAction className="px-8">我知道了</AlertDialogAction>
+            <AlertDialogAction className="px-8">我知道了 / Got it</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

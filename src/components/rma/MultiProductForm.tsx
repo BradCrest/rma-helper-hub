@@ -13,23 +13,23 @@ import {
 import { isInvalidSerialNumber } from "@/lib/serialNumberValidator";
 
 const issueTypes = [
-  "螢幕問題",
-  "電池問題",
-  "充電問題",
-  "按鍵問題",
-  "軟體問題",
-  "外觀損壞",
-  "其他",
+  { value: "螢幕問題", label: "螢幕問題 / Screen Issue" },
+  { value: "電池問題", label: "電池問題 / Battery Issue" },
+  { value: "充電問題", label: "充電問題 / Charging Issue" },
+  { value: "按鍵問題", label: "按鍵問題 / Button Issue" },
+  { value: "軟體問題", label: "軟體問題 / Software Issue" },
+  { value: "外觀損壞", label: "外觀損壞 / Cosmetic Damage" },
+  { value: "其他", label: "其他 / Other" },
 ];
 
 const accessoryOptions = [
-  { id: "complete", label: "完整包裝" },
-  { id: "box", label: "外包裝盒" },
-  { id: "charger", label: "充電組" },
-  { id: "warranty", label: "保固卡" },
-  { id: "strap", label: "錶帶" },
-  { id: "other", label: "其他" },
-  { id: "none", label: "無" },
+  { id: "complete", label: "完整包裝 / Complete Package" },
+  { id: "box", label: "外包裝盒 / Outer Box" },
+  { id: "charger", label: "充電組 / Charger Set" },
+  { id: "warranty", label: "保固卡 / Warranty Card" },
+  { id: "strap", label: "錶帶 / Strap" },
+  { id: "other", label: "其他 / Other" },
+  { id: "none", label: "無 / None" },
 ];
 
 interface MultiProductFormProps {
@@ -84,7 +84,7 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-foreground">
-          產品列表 ({products.length} 筆)
+          產品列表 ({products.length} 筆) / Product List ({products.length} item(s))
         </h3>
         <Button
           type="button"
@@ -94,7 +94,7 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
           className="gap-2"
         >
           <Plus className="w-4 h-4" />
-          新增產品
+          新增產品 / Add Product
         </Button>
       </div>
 
@@ -106,7 +106,7 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-muted-foreground">
-                產品 #{index + 1}
+                產品 #{index + 1} / Product #{index + 1}
               </span>
               {products.length > 1 && (
                 <Button
@@ -123,9 +123,9 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="rma-label">產品型號 *</label>
+                <label className="rma-label">產品型號 / Product Model *</label>
                 <Input
-                  placeholder="請輸入產品型號"
+                  placeholder="請輸入產品型號 / Enter product model"
                   value={product.productModel}
                   onChange={(e) =>
                     updateProduct(product.id, "productModel", e.target.value)
@@ -134,9 +134,9 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
                 />
               </div>
               <div>
-                <label className="rma-label">產品序號 *</label>
+                <label className="rma-label">產品序號 / Serial Number *</label>
                 <Input
-                  placeholder="請輸入產品序號"
+                  placeholder="請輸入產品序號 / Enter serial number"
                   value={product.serialNumber}
                   onChange={(e) =>
                     updateProduct(product.id, "serialNumber", e.target.value)
@@ -154,7 +154,7 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
-                <label className="rma-label">故障問題</label>
+                <label className="rma-label">故障問題 / Issue Type</label>
                 <Select
                   value={product.issueType}
                   onValueChange={(value) =>
@@ -162,19 +162,19 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="選擇故障問題" />
+                    <SelectValue placeholder="選擇故障問題 / Select issue type" />
                   </SelectTrigger>
                   <SelectContent>
                     {issueTypes.map((issue) => (
-                      <SelectItem key={issue} value={issue}>
-                        {issue}
+                      <SelectItem key={issue.value} value={issue.value}>
+                        {issue.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="rma-label">購買日期</label>
+                <label className="rma-label">購買日期 / Purchase Date</label>
                 <Input
                   type="date"
                   value={product.purchaseDate}
@@ -186,9 +186,9 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
             </div>
 
             <div className="mt-4">
-              <label className="rma-label">問題描述</label>
+              <label className="rma-label">問題描述 / Issue Description</label>
               <Textarea
-                placeholder="請詳細描述問題..."
+                placeholder="請詳細描述問題... / Please describe the issue in detail..."
                 value={product.issueDescription}
                 onChange={(e) =>
                   updateProduct(product.id, "issueDescription", e.target.value)
@@ -198,7 +198,7 @@ const MultiProductForm = ({ products, onChange, onInvalidSerial }: MultiProductF
             </div>
 
             <div className="mt-4">
-              <label className="rma-label">隨附物品</label>
+              <label className="rma-label">隨附物品 / Included Accessories</label>
               <div className="flex flex-wrap gap-2">
                 {accessoryOptions.map((acc) => (
                   <button

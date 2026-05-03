@@ -44,7 +44,7 @@ function renderForm() {
   const form = utils.container.querySelector("form")!;
   const clickAgree = () => {
     // 條款文字已拆成連結，改用連結文字定位 label
-    const label = screen.getByText("服務條款").closest("label")!;
+    const label = screen.getByText(/服務條款/).closest("label")!;
     fireEvent.click(label.querySelector("div")!);
   };
   return { ...utils, form, clickAgree };
@@ -56,11 +56,11 @@ async function fillAndSubmit(
   clickAgree: () => void
 ) {
   clickAgree();
-  await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-  await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-  await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
+  await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+  await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+  await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
   await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
-  await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
+  await user.type(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail..."), "螢幕出現黑點");
   fireEvent.submit(form);
 }
 
@@ -127,7 +127,7 @@ describe("RmaForm 整合測試 — 成功流程", () => {
     await fillAndSubmit(user, form, clickAgree);
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
-    expect(capturedBody.issue_description as string).toContain("[一般消費者]");
+    expect(capturedBody.issue_description as string).toContain("[一般消費者 / Consumer]");
   });
 });
 
@@ -141,7 +141,7 @@ describe("RmaForm 整合測試 — 錯誤處理", () => {
     await fillAndSubmit(user, form, clickAgree);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試");
+      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試 / Submission failed, please try again later");
     });
   });
 
@@ -173,12 +173,12 @@ describe("RmaForm 整合測試 — 序號欄位", () => {
 
     const { form, clickAgree } = renderForm();
     clickAgree();
-    await user.type(screen.getByPlaceholderText("請輸入客戶姓名"), "王小明");
-    await user.type(screen.getByPlaceholderText("請輸入電子郵件"), "test@example.com");
-    await user.type(screen.getByPlaceholderText("請輸入客戶電話"), "0912345678");
-    await user.type(screen.getByPlaceholderText("請輸入產品序號"), "CREST-ABC123");
+    await user.type(screen.getByPlaceholderText("請輸入客戶姓名 / Enter customer name"), "王小明");
+    await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
+    await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
+    await user.type(screen.getByPlaceholderText("請輸入產品序號 / Enter serial number"), "CREST-ABC123");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
-    await user.type(screen.getByPlaceholderText("請詳細描述問題..."), "螢幕出現黑點");
+    await user.type(screen.getByPlaceholderText("請詳細描述問題... / Please describe the issue in detail..."), "螢幕出現黑點");
     fireEvent.submit(form);
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
