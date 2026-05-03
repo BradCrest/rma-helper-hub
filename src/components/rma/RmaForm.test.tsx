@@ -111,7 +111,7 @@ describe("RmaForm 驗證 — 未填必填欄位", () => {
     const { form } = renderForm();
     // 使用 fireEvent.submit 繞過 jsdom 原生 required 驗證，直接測試 JS 邏輯
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請先同意服務條款和隱私政策");
+    expect(mockToastError).toHaveBeenCalledWith("請先同意服務條款和隱私政策 / Please agree to the Terms of Service and Privacy Policy first");
   });
 
   it("同意條款但未填姓名時應顯示錯誤", () => {
@@ -148,7 +148,7 @@ describe("RmaForm 驗證 — 未填必填欄位", () => {
     await user.type(screen.getByPlaceholderText("請輸入電子郵件 / Enter email address"), "test@example.com");
     await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請選擇故障問題");
+    expect(mockToastError).toHaveBeenCalledWith("請選擇故障問題 / Please select an issue type");
   });
 
   it("未填問題描述時應顯示錯誤", async () => {
@@ -160,7 +160,7 @@ describe("RmaForm 驗證 — 未填必填欄位", () => {
     await user.type(screen.getByPlaceholderText("請輸入客戶電話 / Enter customer phone"), "0912345678");
     await user.selectOptions(screen.getByRole("combobox"), "螢幕問題");
     fireEvent.submit(form);
-    expect(mockToastError).toHaveBeenCalledWith("請描述問題");
+    expect(mockToastError).toHaveBeenCalledWith("請描述問題 / Please describe the issue");
   });
 });
 
@@ -298,7 +298,7 @@ describe("RmaForm — 成功提交", () => {
     fireEvent.submit(form);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試");
+      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試 / Submission failed, please try again later");
     });
   });
 });

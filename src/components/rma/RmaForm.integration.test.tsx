@@ -141,7 +141,7 @@ describe("RmaForm 整合測試 — 錯誤處理", () => {
     await fillAndSubmit(user, form, clickAgree);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試");
+      expect(mockToastError).toHaveBeenCalledWith("提交失敗，請稍後再試 / Submission failed, please try again later");
     });
   });
 
