@@ -44,7 +44,7 @@ function renderForm() {
   const form = utils.container.querySelector("form")!;
   const clickAgree = () => {
     // 條款文字已拆成連結，改用連結文字定位 label
-    const label = screen.getByText("服務條款").closest("label")!;
+    const label = screen.getByText(/服務條款/).closest("label")!;
     fireEvent.click(label.querySelector("div")!);
   };
   return { ...utils, form, clickAgree };
