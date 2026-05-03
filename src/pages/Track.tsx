@@ -33,20 +33,20 @@ interface RmaResult {
 }
 
 const statusLabels: Record<RmaStatus, string> = {
-  registered: "已登記",
-  shipped: "已寄出",
-  received: "已收件",
-  inspecting: "檢修中",
-  contacting: "聯系中",
-  quote_confirmed: "確認報價",
-  paid: "已付費",
-  no_repair: "不維修",
-  shipped_back: "已回寄",
-  shipped_back_refurbished: "已寄回整新品",
-  shipped_back_original: "已寄回原錶",
-  shipped_back_new: "已寄出全新品",
-  follow_up: "後續關懷",
-  closed: "已結案",
+  registered: "已登記 / Registered",
+  shipped: "已寄出 / Shipped by Customer",
+  received: "已收件 / Received",
+  inspecting: "檢修中 / Inspecting",
+  contacting: "聯系中 / Contacting Customer",
+  quote_confirmed: "確認報價 / Quote Confirmed",
+  paid: "已付費 / Paid",
+  no_repair: "不維修 / No Repair",
+  shipped_back: "已回寄 / Shipped Back",
+  shipped_back_refurbished: "已寄回整新品 / Refurbished Unit Shipped",
+  shipped_back_original: "已寄回原錶 / Original Unit Returned",
+  shipped_back_new: "已寄出全新品 / New Unit Shipped",
+  follow_up: "後續關懷 / Follow-up Care",
+  closed: "已結案 / Closed",
 };
 
 const statusIcons: Record<RmaStatus, React.ReactNode> = {
