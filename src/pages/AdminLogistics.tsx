@@ -56,7 +56,7 @@ const AdminLogistics = () => {
     { id: "outbound", label: "出貨處理", icon: Truck },
     { id: "closing", label: "結案追蹤", icon: CheckSquare },
     { id: "followup", label: "客戶關懷", icon: Heart },
-    { id: "supplier", label: "供應商維修", icon: Factory, disabled: true },
+    { id: "supplier", label: "供應商維修", icon: Factory },
     { id: "sales", label: "銷貨匯入", icon: FileSpreadsheet, disabled: true },
     { id: "warranty", label: "保固審核", icon: ShieldCheck, disabled: true },
   ];
