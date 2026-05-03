@@ -31,10 +31,10 @@ const Shipping = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!rmaNumber) {
-      toast.error("請輸入RMA號碼");
+      toast.error("請輸入RMA號碼 / Please enter RMA number");
       return;
     }
-    toast.info("正在搜尋...");
+    toast.info("正在搜尋... / Searching...");
   };
 
   const resetModal = () => {
@@ -51,7 +51,7 @@ const Shipping = () => {
   const performSearch = async (rawRma: string) => {
     const trimmed = rawRma.trim();
     if (!trimmed) {
-      toast.error("請輸入RMA號碼");
+      toast.error("請輸入RMA號碼 / Please enter RMA number");
       return;
     }
 
@@ -68,7 +68,7 @@ const Shipping = () => {
       const result = await response.json();
 
       if (!response.ok || !result.results || result.results.length === 0) {
-        toast.error("找不到此 RMA 編號");
+        toast.error("找不到此 RMA 編號 / RMA number not found");
         return;
       }
 
@@ -81,10 +81,10 @@ const Shipping = () => {
         product_name: rma.product_name,
       });
       setStep("form");
-      toast.success("已找到 RMA，請填寫寄件資訊");
+      toast.success("已找到 RMA，請填寫寄件資訊 / RMA found, please fill in shipping info");
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("搜尋失敗，請稍後再試");
+      toast.error("搜尋失敗，請稍後再試 / Search failed, please try again later");
     } finally {
       setIsSearching(false);
     }
@@ -133,7 +133,7 @@ const Shipping = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error("照片大小不能超過 5MB");
+        toast.error("照片大小不能超過 5MB / Photo size cannot exceed 5MB");
         return;
       }
       setPhoto(file);
@@ -149,15 +149,15 @@ const Shipping = () => {
     e.preventDefault();
     
     if (!carrier.trim()) {
-      toast.error("請輸入物流名稱");
+      toast.error("請輸入物流名稱 / Please enter carrier name");
       return;
     }
     if (!trackingNumber.trim()) {
-      toast.error("請輸入物流單號");
+      toast.error("請輸入物流單號 / Please enter tracking number");
       return;
     }
     if (!foundRma) {
-      toast.error("請先搜尋 RMA");
+      toast.error("請先搜尋 RMA / Please search for RMA first");
       return;
     }
 
@@ -206,11 +206,11 @@ const Shipping = () => {
         throw new Error(result.error || "提交失敗");
       }
 
-      toast.success("寄件資訊已新增成功！");
+      toast.success("寄件資訊已新增成功！/ Shipping info added successfully!");
       resetModal();
     } catch (error) {
       console.error("Submit error:", error);
-      const errorMessage = error instanceof Error ? error.message : "提交失敗，請稍後再試";
+      const errorMessage = error instanceof Error ? error.message : "提交失敗，請稍後再試 / Submission failed, please try again later";
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -227,17 +227,17 @@ const Shipping = () => {
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回首頁
+            返回首頁 / Home
           </Link>
 
           <div className="flex items-center gap-3">
-            <span className="font-semibold text-foreground">RMA 狀態追蹤</span>
+            <span className="font-semibold text-foreground">RMA 狀態追蹤 / Status Tracking</span>
             <button
               onClick={() => setShowModal(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-card text-foreground text-sm font-medium rounded-lg border border-border hover:bg-secondary transition-colors"
             >
               <Globe className="w-4 h-4" />
-              新增寄件資訊
+              新增寄件資訊 / Add Shipping Info
             </button>
           </div>
 
@@ -253,9 +253,13 @@ const Shipping = () => {
               <div className="text-center mb-8">
                 <h1 className="text-2xl font-bold text-foreground mb-2">
                   查詢您的RMA保固服務狀態
+                  <br />
+                  <span className="text-muted-foreground text-base font-normal">Track Your RMA Warranty Service Status</span>
                 </h1>
                 <p className="text-muted-foreground">
                   請輸入您的相關資訊，查看您的保固服務進度
+                  <br />
+                  <span className="text-sm">Enter your information to view warranty service progress</span>
                 </p>
               </div>
 
@@ -265,28 +269,30 @@ const Shipping = () => {
                   to="/track"
                   className="flex-1 py-3 px-4 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground text-center transition-all"
                 >
-                  使用客戶資訊查詢
+                  使用客戶資訊查詢 / Search by Customer Info
                 </Link>
                 <button
                   className="flex-1 py-3 px-4 text-sm font-medium rounded-md bg-card text-foreground shadow-sm transition-all"
                 >
-                  使用RMA編號查詢
+                  使用RMA編號查詢 / Search by RMA Number
                 </button>
               </div>
 
               {/* Form */}
               <form onSubmit={handleSearch}>
                 <div>
-                  <label className="rma-label">RMA編號</label>
+                  <label className="rma-label">RMA編號 / RMA Number</label>
                   <input
                     type="text"
                     value={rmaNumber}
                     onChange={(e) => setRmaNumber(e.target.value)}
-                    placeholder="請輸入您的RMA編號"
+                    placeholder="請輸入您的RMA編號 / Enter your RMA number"
                     className="rma-input"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
                     輸入RMA編號時，可以省略中間的「-」符號
+                    <br />
+                    You may omit the dash (-) in the RMA number
                   </p>
                 </div>
 
@@ -295,7 +301,7 @@ const Shipping = () => {
                   className="w-full mt-6 rma-btn-primary py-4 text-base"
                 >
                   <Search className="w-5 h-5" />
-                  查詢
+                  查詢 / Search
                 </button>
               </form>
             </div>
@@ -323,10 +329,12 @@ const Shipping = () => {
             {step === "search" ? (
               <>
                 <h2 className="text-xl font-bold text-foreground mb-2">
-                  輸入RMA號碼
+                  輸入RMA號碼 / Enter RMA Number
                 </h2>
                 <p className="text-sm text-muted-foreground mb-6">
                   請輸入已登記但尚未寄出的RMA號碼以新增寄件資訊
+                  <br />
+                  Enter a registered but not-yet-shipped RMA number to add shipping info
                 </p>
 
                 <form onSubmit={handleModalSearch}>
@@ -334,7 +342,7 @@ const Shipping = () => {
                     type="text"
                     value={rmaNumber}
                     onChange={(e) => setRmaNumber(e.target.value)}
-                    placeholder="RMA號碼"
+                    placeholder="RMA號碼 / RMA Number"
                     className="rma-input mb-6"
                   />
 
@@ -344,7 +352,7 @@ const Shipping = () => {
                       onClick={resetModal}
                       className="px-6 py-2.5 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-secondary transition-colors"
                     >
-                      取消
+                      取消 / Cancel
                     </button>
                     <button
                       type="submit"
@@ -356,7 +364,7 @@ const Shipping = () => {
                       ) : (
                         <Search className="w-4 h-4" />
                       )}
-                      搜尋
+                      搜尋 / Search
                     </button>
                   </div>
                 </form>
@@ -364,37 +372,37 @@ const Shipping = () => {
             ) : (
               <>
                 <h2 className="text-xl font-bold text-foreground mb-2">
-                  新增寄件資訊
+                  新增寄件資訊 / Add Shipping Info
                 </h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  RMA 編號：<span className="font-mono text-primary">{foundRma?.rma_number}</span>
+                  RMA 編號 / RMA Number: <span className="font-mono text-primary">{foundRma?.rma_number}</span>
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="rma-label">物流名稱 *</label>
+                    <label className="rma-label">物流名稱 / Carrier Name *</label>
                     <input
                       type="text"
                       value={carrier}
                       onChange={(e) => setCarrier(e.target.value)}
-                      placeholder="例如：黑貓宅急便、7-11 交貨便"
+                      placeholder="例如：黑貓宅急便、7-11 交貨便 / e.g. FedEx, DHL, UPS"
                       className="rma-input"
                     />
                   </div>
 
                   <div>
-                    <label className="rma-label">物流單號 *</label>
+                    <label className="rma-label">物流單號 / Tracking Number *</label>
                     <input
                       type="text"
                       value={trackingNumber}
                       onChange={(e) => setTrackingNumber(e.target.value)}
-                      placeholder="請輸入物流追蹤號碼"
+                      placeholder="請輸入物流追蹤號碼 / Enter tracking number"
                       className="rma-input"
                     />
                   </div>
 
                   <div>
-                    <label className="rma-label">寄件照片（選填）</label>
+                    <label className="rma-label">寄件照片（選填）/ Shipping Photo (Optional)</label>
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -407,7 +415,7 @@ const Shipping = () => {
                       <div className="relative">
                         <img
                           src={photoPreview}
-                          alt="寄件照片預覽"
+                          alt="寄件照片預覽 / Shipping photo preview"
                           className="w-full h-48 object-cover rounded-lg border border-border"
                         />
                         <button
@@ -431,23 +439,23 @@ const Shipping = () => {
                           <Camera className="w-5 h-5" />
                           <Upload className="w-5 h-5" />
                         </div>
-                        <span className="text-sm">點擊上傳寄件單據照片</span>
+                        <span className="text-sm">點擊上傳寄件單據照片 / Click to upload shipping receipt photo</span>
                       </button>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
-                      支援 JPG、PNG 格式，最大 5MB
+                      支援 JPG、PNG 格式，最大 5MB / JPG/PNG, max 5MB
                     </p>
                   </div>
 
                   {/* 後續步驟說明 */}
                   <div className="bg-muted/50 rounded-lg p-4">
-                    <h3 className="font-semibold text-foreground mb-2">後續步驟</h3>
+                    <h3 className="font-semibold text-foreground mb-2">後續步驟 / Next Steps</h3>
                     <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                      <li>請將產品妥善包裝，附上此 RMA 編號</li>
-                      <li>寄送至本公司收件地址：242039 新北市新莊區化成路11巷86號1樓（英文地址：No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039）</li>
-                      <li>我們收到產品後會盡快處理並更新狀態</li>
-                      <li>您可以隨時使用 RMA 編號查詢保固服務進度</li>
-                      <li>因人力因素及保固服務中心無對外開放，無法支援親送，敬請見諒。</li>
+                      <li>請將產品妥善包裝，附上此 RMA 編號 / Please pack the product properly and include this RMA number</li>
+                      <li>寄送至本公司收件地址：242039 新北市新莊區化成路11巷86號1樓 / Ship to: No. 86, Ln. 11, Huacheng Rd., Xinzhuang Dist., New Taipei City, Taiwan, 242039</li>
+                      <li>我們收到產品後會盡快處理並更新狀態 / We will process and update the status as soon as we receive the product</li>
+                      <li>您可以隨時使用 RMA 編號查詢保固服務進度 / You can check warranty service progress anytime using your RMA number</li>
+                      <li>因人力因素及保固服務中心無對外開放，<strong>無法支援親送</strong>，敬請見諒。/ Due to manpower constraints, <strong>in-person delivery is not accepted</strong>. We appreciate your understanding.</li>
                     </ol>
                   </div>
 
@@ -457,7 +465,7 @@ const Shipping = () => {
                       onClick={() => setStep("search")}
                       className="px-6 py-2.5 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-secondary transition-colors"
                     >
-                      返回
+                      返回 / Back
                     </button>
                     <button
                       type="submit"
@@ -469,7 +477,7 @@ const Shipping = () => {
                       ) : (
                         <Check className="w-4 h-4" />
                       )}
-                      確認送出
+                      確認送出 / Confirm & Submit
                     </button>
                   </div>
                 </form>

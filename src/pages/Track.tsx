@@ -123,11 +123,11 @@ const Track = () => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          toast.error("找不到符合的 RMA 申請");
+          toast.error("找不到符合的 RMA 申請 / No matching RMA found");
           setResults([]);
           return;
         }
-        throw new Error(result.error || '查詢失敗');
+        throw new Error(result.error || '查詢失敗 / Search failed');
       }
 
       const rmaResults = result.results as RmaResult[];
@@ -136,11 +136,11 @@ const Track = () => {
       if (rmaResults.length === 1) {
         setSelectedRma(rmaResults[0]);
       } else if (rmaResults.length === 0) {
-        toast.error("找不到符合的 RMA 申請");
+        toast.error("找不到符合的 RMA 申請 / No matching RMA found");
       }
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("查詢失敗，請稍後再試");
+      toast.error("查詢失敗，請稍後再試 / Search failed, please try again later");
     } finally {
       setIsLoading(false);
     }
@@ -164,11 +164,11 @@ const Track = () => {
 
       if (!response.ok) {
         if (response.status === 404) {
-          toast.error("找不到符合的 RMA 申請");
+          toast.error("找不到符合的 RMA 申請 / No matching RMA found");
           setResults([]);
           return;
         }
-        throw new Error(result.error || '查詢失敗');
+        throw new Error(result.error || '查詢失敗 / Search failed');
       }
 
       const rmaResults = result.results as RmaResult[];
@@ -177,11 +177,11 @@ const Track = () => {
       if (rmaResults.length === 1) {
         setSelectedRma(rmaResults[0]);
       } else if (rmaResults.length === 0) {
-        toast.error("找不到符合的 RMA 申請");
+        toast.error("找不到符合的 RMA 申請 / No matching RMA found");
       }
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("查詢失敗，請稍後再試");
+      toast.error("查詢失敗，請稍後再試 / Search failed, please try again later");
     } finally {
       setIsLoading(false);
     }
@@ -193,13 +193,13 @@ const Track = () => {
 
     if (activeTab === "customer") {
       if (!customerName.trim() || !phone.trim()) {
-        toast.error("請填寫完整的客戶資訊");
+        toast.error("請填寫完整的客戶資訊 / Please fill in all customer information");
         return;
       }
       handleSearchByCustomer();
     } else {
       if (!rmaNumber.trim()) {
-        toast.error("請輸入RMA編號");
+        toast.error("請輸入RMA編號 / Please enter RMA number");
         return;
       }
       handleSearchByRma(rmaNumber);
@@ -232,17 +232,17 @@ const Track = () => {
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回首頁
+            返回首頁 / Home
           </Link>
 
           <div className="flex items-center gap-3">
-            <span className="font-semibold text-foreground">RMA 狀態追蹤</span>
+            <span className="font-semibold text-foreground">RMA 狀態追蹤 / Status Tracking</span>
             <Link
               to="/shipping"
               className="inline-flex items-center gap-2 px-4 py-2 bg-card text-foreground text-sm font-medium rounded-lg border border-border hover:bg-secondary transition-colors"
             >
               <Globe className="w-4 h-4" />
-              新增寄件資訊
+              新增寄件資訊 / Add Shipping Info
             </Link>
           </div>
 
@@ -260,9 +260,13 @@ const Track = () => {
                 <div className="text-center mb-8">
                   <h1 className="text-2xl font-bold text-foreground mb-2">
                     查詢保固服務進度狀態
+                    <br />
+                    <span className="text-muted-foreground text-base font-normal">Track Warranty Service Status</span>
                   </h1>
                   <p className="text-muted-foreground">
                     請輸入您的相關資訊，查看您的保固服務進度
+                    <br />
+                    <span className="text-sm">Enter your information to view warranty service progress</span>
                   </p>
                 </div>
 
@@ -276,7 +280,7 @@ const Track = () => {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    使用客戶資訊查詢
+                    使用客戶資訊查詢 / Search by Customer Info
                   </button>
                   <button
                     onClick={() => { setActiveTab("rma"); resetSearch(); }}
@@ -286,7 +290,7 @@ const Track = () => {
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    使用RMA編號查詢
+                    使用RMA編號查詢 / Search by RMA Number
                   </button>
                 </div>
 
@@ -295,22 +299,22 @@ const Track = () => {
                   {activeTab === "customer" ? (
                     <div className="space-y-4">
                       <div>
-                        <label className="rma-label">客戶姓名</label>
+                        <label className="rma-label">客戶姓名 / Customer Name</label>
                         <input
                           type="text"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder="請輸入您的姓名"
+                          placeholder="請輸入您的姓名 / Enter your name"
                           className="rma-input"
                         />
                       </div>
                       <div>
-                        <label className="rma-label">電話號碼</label>
+                        <label className="rma-label">電話號碼 / Phone Number</label>
                         <input
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          placeholder="請輸入您的電話號碼"
+                          placeholder="請輸入您的電話號碼 / Enter your phone number"
                           className="rma-input"
                         />
                       </div>
@@ -318,16 +322,18 @@ const Track = () => {
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <label className="rma-label">RMA編號</label>
+                        <label className="rma-label">RMA編號 / RMA Number</label>
                         <input
                           type="text"
                           value={rmaNumber}
                           onChange={(e) => setRmaNumber(e.target.value)}
-                          placeholder="請輸入您的RMA編號"
+                          placeholder="請輸入您的RMA編號 / Enter your RMA number"
                           className="rma-input"
                         />
                         <p className="text-xs text-muted-foreground mt-2">
                           輸入RMA編號時，可以省略中間的「-」符號
+                          <br />
+                          You may omit the dash (-) in the RMA number
                         </p>
                       </div>
                     </div>
@@ -341,12 +347,12 @@ const Track = () => {
                     {isLoading ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        查詢中...
+                        查詢中... / Searching...
                       </>
                     ) : (
                       <>
                         <Search className="w-5 h-5" />
-                        查詢
+                        查詢 / Search
                       </>
                     )}
                   </button>
@@ -355,7 +361,7 @@ const Track = () => {
                 {/* Multiple Results */}
                 {hasSearched && results.length > 1 && (
                   <div className="mt-8 pt-6 border-t border-border">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">找到 {results.length} 筆申請</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-4">找到 {results.length} 筆申請 / Found {results.length} request(s)</h3>
                     <div className="space-y-3">
                       {results.map((rma) => (
                         <button
@@ -391,14 +397,14 @@ const Track = () => {
                   className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  返回搜尋
+                  返回搜尋 / Back to Search
                 </button>
 
                 {/* Status Card */}
                 <div className="rma-card">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <p className="text-sm text-muted-foreground">RMA 編號</p>
+                      <p className="text-sm text-muted-foreground">RMA 編號 / RMA Number</p>
                       <p className="text-2xl font-mono font-bold text-primary">{selectedRma.rma_number}</p>
                     </div>
                     <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${statusColors[selectedRma.status]}`}>
@@ -409,46 +415,46 @@ const Track = () => {
 
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                     <div>
-                      <p className="text-sm text-muted-foreground">產品名稱</p>
+                      <p className="text-sm text-muted-foreground">產品名稱 / Product Name</p>
                       <p className="text-foreground">{selectedRma.product_name}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">產品型號</p>
+                      <p className="text-sm text-muted-foreground">產品型號 / Product Model</p>
                       <p className="text-foreground">{selectedRma.product_model || "-"}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">問題類型</p>
+                      <p className="text-sm text-muted-foreground">問題類型 / Issue Type</p>
                       <p className="text-foreground">{selectedRma.issue_type}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">建立日期</p>
+                      <p className="text-sm text-muted-foreground">建立日期 / Submitted</p>
                       <p className="text-foreground">{formatDate(selectedRma.created_at)}</p>
                     </div>
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
-                    📋 保固政策說明：
+                    📋 保固政策說明 / Warranty Policy:
                     <a
                       href="https://crestdiving.com/blogs/crest-news/crest-warranty-repair-policy-update"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline ml-1"
                     >
-                      查看 CREST 官方保固維修政策公告
+                      查看 CREST 官方保固維修政策公告 / View CREST Warranty Policy
                     </a>
                   </div>
                 </div>
 
                 {/* Status Timeline */}
                 <div className="rma-card">
-                  <h3 className="text-lg font-semibold text-foreground mb-6">進度歷史</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-6">進度歷史 / Status History</h3>
                   
                   {selectedRma.status_history.length === 0 ? (
                     <div className="text-center py-8">
                       <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                      <p className="text-muted-foreground">尚無狀態更新記錄</p>
+                      <p className="text-muted-foreground">尚無狀態更新記錄 / No status updates yet</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        目前狀態：{statusLabels[selectedRma.status]}
+                        目前狀態 / Current status: {statusLabels[selectedRma.status]}
                       </p>
                     </div>
                   ) : (
@@ -464,7 +470,7 @@ const Track = () => {
                           </div>
                           <div className="flex-1 pt-1">
                             <p className="font-medium text-foreground">{statusLabels[selectedRma.status]}</p>
-                            <p className="text-sm text-muted-foreground">目前狀態</p>
+                            <p className="text-sm text-muted-foreground">目前狀態 / Current Status</p>
                           </div>
                         </div>
 
@@ -492,14 +498,14 @@ const Track = () => {
 
                 {/* Contact Info (Masked) */}
                 <div className="rma-card">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">聯絡資訊</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-4">聯絡資訊 / Contact Information</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">客戶姓名</p>
+                      <p className="text-sm text-muted-foreground">客戶姓名 / Customer Name</p>
                       <p className="text-foreground">{selectedRma.customer_name}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">電話</p>
+                      <p className="text-sm text-muted-foreground">電話 / Phone</p>
                       <p className="text-foreground">{selectedRma.customer_phone}</p>
                     </div>
                     <div>
@@ -509,6 +515,8 @@ const Track = () => {
                   </div>
                   <p className="text-xs text-muted-foreground mt-4">
                     * 為保護您的隱私，部分資訊已遮蔽
+                    <br />
+                    * For privacy protection, some information is masked
                   </p>
                 </div>
               </div>
