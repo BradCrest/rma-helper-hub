@@ -4,7 +4,7 @@
 
 此 Tab 讓管理員確認客戶寄回的產品，並記錄收件資訊。
 
-![收件處理 Tab](/rma-helper-hub/screenshots/logistics-receive.jpg)
+![收件處理 Tab](/screenshots/logistics-receive.jpg)
 
 ## 什麼時候需要操作這個 Tab？
 

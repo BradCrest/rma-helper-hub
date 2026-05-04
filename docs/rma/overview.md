@@ -2,7 +2,7 @@
 
 **RMA（Return Merchandise Authorization）** 是退貨授權申請流程的標準縮寫。在 CREST 系統中，RMA 代表客戶將產品送回進行維修或換貨的申請單。
 
-![RMA 申請列表](/rma-helper-hub/screenshots/rma-list.jpg)
+![RMA 申請列表](/screenshots/rma-list.jpg)
 
 ## 誰可以申請 RMA？
 

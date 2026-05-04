@@ -4,7 +4,7 @@
 
 此 Tab 整合 Gmail 收件匣，讓管理員在系統內直接處理客戶的一般來信，無需切換到 Gmail。
 
-![客戶來信 Tab](/rma-helper-hub/screenshots/knowledge-email.jpg)
+![客戶來信 Tab](/screenshots/knowledge-email.jpg)
 
 ## 運作原理
 

@@ -4,7 +4,7 @@
 
 此功能追蹤將產品送交外部維修供應商（工廠）進行維修的完整流程，以及管理整修後的整新品庫存。
 
-![供應商送修追蹤 Tab](/rma-helper-hub/screenshots/logistics-supplier.jpg)
+![供應商送修追蹤 Tab](/screenshots/logistics-supplier.jpg)
 
 ## 供應商說明
 

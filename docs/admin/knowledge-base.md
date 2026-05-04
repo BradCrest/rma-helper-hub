@@ -8,7 +8,7 @@
 
 ## 📖 知識庫建立 Tab
 
-![知識庫建立 Tab](/rma-helper-hub/screenshots/knowledge-base.jpg)
+![知識庫建立 Tab](/screenshots/knowledge-base.jpg)
 
 知識庫是 AI 輔助回覆功能的核心。管理員上傳的文件、FAQ、範本，都會被向量化（Embedding），供 AI 在起草回覆時語意搜尋參考。
 

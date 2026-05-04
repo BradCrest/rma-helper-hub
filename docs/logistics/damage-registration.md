@@ -4,7 +4,7 @@
 
 此 Tab 用於產品到貨後，登記實際故障狀況及初步診斷結果，為後續維修方案的決策依據。
 
-![故障登記 Tab](/rma-helper-hub/screenshots/logistics-fault.jpg)
+![故障登記 Tab](/screenshots/logistics-fault.jpg)
 
 ## 什麼時候需要操作這個 Tab？
 

@@ -4,7 +4,7 @@
 
 此 Tab 追蹤已完成出貨的工單，確認客戶確實收到產品後進行正式結案。
 
-![結案追蹤 Tab](/rma-helper-hub/screenshots/logistics-closing.jpg)
+![結案追蹤 Tab](/screenshots/logistics-closing.jpg)
 
 ## 什麼時候需要操作這個 Tab？
 

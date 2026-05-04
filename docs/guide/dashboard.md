@@ -2,9 +2,9 @@
 
 登入後第一個看到的是 **Dashboard**（`/admin/dashboard`）。
 
-![Dashboard 主控台上半](/rma-helper-hub/screenshots/dashboard-top.jpg)
+![Dashboard 主控台上半](/screenshots/dashboard-top.jpg)
 
-![Dashboard 主控台下半（RAG、AI 分析）](/rma-helper-hub/screenshots/dashboard-bottom.jpg)
+![Dashboard 主控台下半（RAG、AI 分析）](/screenshots/dashboard-bottom.jpg)
 
 ## 數字卡片區
 
