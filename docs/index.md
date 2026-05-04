@@ -5,9 +5,6 @@ hero:
   name: "CREST RMA"
   text: "管理員操作手冊"
   tagline: 完整的 RMA 保固管理系統使用指南，涵蓋所有流程、規則與操作說明
-  image:
-    src: /hero.png
-    alt: CREST RMA System
   actions:
     - theme: brand
       text: 快速入門 →

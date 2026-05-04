@@ -7,12 +7,10 @@ export default defineConfig({
   base: "/rma-helper-hub/",
 
   head: [
-    ["link", { rel: "icon", href: "/rma-helper-hub/favicon.ico" }],
     ["meta", { name: "theme-color", content: "#1d4ed8" }],
   ],
 
   themeConfig: {
-    logo: "/logo.png",
     siteTitle: "CREST RMA 管理員手冊",
 
     nav: [
