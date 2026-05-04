@@ -4,10 +4,10 @@ export default defineConfig({
   title: "CREST RMA 管理員手冊",
   description: "CREST 潛水電腦錶 RMA 保固管理系統 — 管理員完整操作指南",
   lang: "zh-TW",
-  base: "/rma-admin-docs/",
+  base: "/rma-helper-hub/",
 
   head: [
-    ["link", { rel: "icon", href: "/rma-admin-docs/favicon.ico" }],
+    ["link", { rel: "icon", href: "/rma-helper-hub/favicon.ico" }],
     ["meta", { name: "theme-color", content: "#1d4ed8" }],
   ],
 
