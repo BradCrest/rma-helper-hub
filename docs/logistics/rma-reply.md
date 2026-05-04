@@ -1,6 +1,6 @@
 # RMA 回覆（Email 往返）
 
-**位置**：物流作業 → RMA 回覆 Tab
+**位置**：客戶回覆及知識庫（`/admin/email-knowledge`）→ RMA 回覆 Tab
 
 此 Tab 管理每筆 RMA 的 Email thread，讓管理員與客戶保持溝通。
 

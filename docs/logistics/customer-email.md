@@ -1,6 +1,6 @@
 # 客戶來信（Gmail 整合）
 
-**位置**：物流作業 → 客戶來信 Tab
+**位置**：客戶回覆及知識庫（`/admin/email-knowledge`）→ 客戶來信 Tab
 
 此 Tab 整合 Gmail 收件匣，讓管理員在系統內直接處理客戶的一般來信，無需切換到 Gmail。
 
