@@ -4,6 +4,8 @@
 
 此 Tab 管理維修完成後的後續追蹤，確認客戶滿意並建立良好的售後關係。
 
+![客戶關懷 Tab](/rma-helper-hub/screenshots/logistics-followup.jpg)
+
 ## 什麼時候需要操作這個 Tab？
 
 - 工單已結案（`completed`）且設定了關懷追蹤日期

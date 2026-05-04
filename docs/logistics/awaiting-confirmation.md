@@ -4,6 +4,8 @@
 
 此 Tab 管理所有等候客戶回覆確認的 RMA 工單，主要用於過保（保固外）維修的費用確認場景。
 
+![待客戶確認 Tab](/rma-helper-hub/screenshots/logistics-customer.jpg)
+
 ## 什麼時候需要操作這個 Tab？
 
 - 工單為保固外維修，已通知客戶維修費用，等候客戶決定

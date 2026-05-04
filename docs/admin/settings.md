@@ -4,6 +4,8 @@
 
 設定頁讓管理員管理常用檔案、AI 模型參數，以及管理員帳號（部分功能限 `super_admin`）。
 
+![系統設定上半](/rma-helper-hub/screenshots/settings-top.jpg)
+
 ## 常用檔案庫
 
 **位置**：設定頁最上方
@@ -79,6 +81,8 @@
 - 資安稽核
 
 ---
+
+![系統設定下半](/rma-helper-hub/screenshots/settings-bottom.jpg)
 
 ## AI 模型設定
 

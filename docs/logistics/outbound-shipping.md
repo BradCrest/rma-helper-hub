@@ -4,6 +4,8 @@
 
 此 Tab 管理產品維修完成後，寄回給客戶的出貨作業。
 
+![出貨處理 Tab](/rma-helper-hub/screenshots/logistics-outbound.jpg)
+
 ## 什麼時候需要操作這個 Tab？
 
 - 維修完成，準備寄回給客戶

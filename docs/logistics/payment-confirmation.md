@@ -4,6 +4,8 @@
 
 此 Tab 用於確認過保（保固外）維修費用已由客戶繳清，才能繼續進行維修作業。
 
+![付款確認 Tab](/rma-helper-hub/screenshots/logistics-payment.jpg)
+
 ## 什麼時候需要操作這個 Tab？
 
 - 客戶已同意維修費用，並表示已完成付款

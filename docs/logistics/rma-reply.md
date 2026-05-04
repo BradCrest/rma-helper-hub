@@ -4,6 +4,8 @@
 
 此 Tab 管理每筆 RMA 的 Email thread，讓管理員與客戶保持溝通。
 
+![RMA 回覆 Tab](/rma-helper-hub/screenshots/knowledge-rma-reply.jpg)
+
 ## 功能說明
 
 ### Thread 列表

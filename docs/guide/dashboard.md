@@ -2,6 +2,10 @@
 
 登入後第一個看到的是 **Dashboard**（`/admin/dashboard`）。
 
+![Dashboard 主控台上半](/rma-helper-hub/screenshots/dashboard-top.jpg)
+
+![Dashboard 主控台下半（RAG、AI 分析）](/rma-helper-hub/screenshots/dashboard-bottom.jpg)
+
 ## 數字卡片區
 
 畫面頂部排列數個統計卡片，即時反映系統現況：
