@@ -43,14 +43,19 @@ export default defineConfig({
       },
       {
         text: "🚚 物流作業",
+        collapsed: false,
         items: [
           { text: "物流總覽", link: "/logistics/overview" },
-          { text: "RMA 回覆（Email 往返）", link: "/logistics/rma-reply" },
-          { text: "客戶來信（Gmail 整合）", link: "/logistics/customer-email" },
-          { text: "收件管理", link: "/logistics/receiving" },
-          { text: "客戶處理", link: "/logistics/customer-handling" },
-          { text: "供應商送修追蹤", link: "/logistics/supplier-repair" },
-          { text: "後續關懷追蹤", link: "/logistics/followup" },
+          { text: "① 收件處理", link: "/logistics/receiving" },
+          { text: "② 故障登記", link: "/logistics/damage-registration" },
+          { text: "③ 待客戶確認", link: "/logistics/awaiting-confirmation" },
+          { text: "④ 付款確認", link: "/logistics/payment-confirmation" },
+          { text: "⑤ 出貨處理", link: "/logistics/outbound-shipping" },
+          { text: "⑥ 結案追蹤", link: "/logistics/case-closing" },
+          { text: "⑦ 客戶關懷", link: "/logistics/customer-care" },
+          { text: "⑧ 供應商維修", link: "/logistics/supplier-repair" },
+          { text: "⑨ 銷貨匯入", link: "/logistics/sales-import" },
+          { text: "⑩ 保固審核", link: "/logistics/warranty-review" },
         ],
       },
       {
@@ -63,8 +68,8 @@ export default defineConfig({
       {
         text: "⚙️ 後台工具",
         items: [
-          { text: "知識庫管理", link: "/admin/knowledge-base" },
-          { text: "AI 設定", link: "/admin/settings" },
+          { text: "知識庫 & 客戶回覆", link: "/admin/knowledge-base" },
+          { text: "系統設定", link: "/admin/settings" },
           { text: "CSV 批次匯入", link: "/admin/csv-import" },
           { text: "使用者管理", link: "/admin/user-management" },
         ],
@@ -79,7 +84,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: "github", link: "https://github.com/your-org/rma-helper-hub" },
+      { icon: "github", link: "https://github.com/BradCrest/rma-helper-hub" },
     ],
 
     footer: {
@@ -93,7 +98,7 @@ export default defineConfig({
 
     editLink: {
       pattern:
-        "https://github.com/your-org/rma-helper-hub/edit/main/docs/:path",
+        "https://github.com/BradCrest/rma-helper-hub/edit/main/docs/:path",
       text: "在 GitHub 上編輯此頁",
     },
 
