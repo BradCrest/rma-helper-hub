@@ -40,7 +40,7 @@ const ShippingForm = () => {
     (async () => {
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaParam)}`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rmaParam)}&purpose=email_link`,
           { method: "GET", headers: { "Content-Type": "application/json" } }
         );
         const result = await response.json();
