@@ -17,37 +17,54 @@
 | [銷貨匯入](/logistics/sales-import) | 整新品銷售記錄匯入 | 業務/倉庫 |
 | [保固審核](/logistics/warranty-review) | 保固判斷人工審核 | 管理員 |
 
+## 各 Tab 對應狀態
+
+| Tab | 涵蓋狀態 |
+|-----|---------|
+| 收件處理 | `shipped`、`received`、`inspecting` |
+| 待客戶確認 | `contacting` |
+| 付款確認 | `quote_confirmed` |
+| 出貨處理 | `paid`、`no_repair` |
+| 結案追蹤 | `shipped_back`、`shipped_back_new`、`shipped_back_refurbished`、`shipped_back_original`、`follow_up` |
+
+> `registered` 顯示在 Dashboard 待處理桶，不在物流頁任何 Tab。
+> `closed` 不在任何 Tab，只可在 `/admin/rma-list` 搜尋查詢。
+
 ## 典型工作流程
 
 ### 一般 RMA 完整流程
 
 ```
-客戶申請（pending）
+客戶申請（registered）
   ↓
 [收件處理] 確認包裹到貨 → received
   ↓
-[故障登記] 登記故障狀況、初步診斷
+[收件處理] 初步診斷 → inspecting
   ↓
-  ├─ 保固內 → 進行維修
-  └─ 保固外 → [待客戶確認] 等候客戶確認費用
-                   ↓
-               [付款確認] 確認款項
+  ├─ 保固內 → 直接 paid，進入出貨處理
+  └─ 保固外 → [待客戶確認] contacting，等候客戶確認費用
+                   ↓ 客戶確認 → quote_confirmed
+               [付款確認] 收款確認 → paid
   ↓
-  ├─ 自行維修 → 完成後 [出貨處理]
-  └─ 送廠維修 → [供應商維修] 追蹤進度 → 返廠後 [出貨處理]
+  ├─ 自行維修 → [出貨處理] shipped_back_original
+  ├─ 整新品替換 → [出貨處理] shipped_back_refurbished
+  ├─ 新品替換 → [出貨處理] shipped_back_new
+  └─ 不維修 → [出貨處理] no_repair → closed
   ↓
-[結案追蹤] 確認工單完成結案
+[結案追蹤] follow_up（後續關懷）
   ↓
-[客戶關懷] 維修後 7 天追蹤回饋
+[結案追蹤] closed（結案）
 ```
+
+若需送廠維修，在 `inspecting` 階段從「供應商維修 Tab」建立送修批次，完成後再回到出貨流程。
 
 ### 每日例行工作建議順序
 
-1. **收件處理 Tab** — 確認新到的包裹，更新 `received`
+1. **收件處理 Tab** — 確認新到的包裹，推進 `received` → `inspecting`
 2. **供應商維修 Tab** — 確認有無工廠完工需驗收
-3. **待客戶確認 Tab** — 追蹤等候中的確認項目（避免超時）
-4. **出貨處理 Tab** — 確認當日應寄出的工單
-5. **客戶關懷 Tab** — 確認今日到期的關懷排程
+3. **待客戶確認 Tab** — 追蹤 `contacting` 工單（避免超時）
+4. **出貨處理 Tab** — 確認當日應寄出的工單（`paid` / `no_repair`）
+5. **結案追蹤 Tab** — 確認 `follow_up` 到期的關懷排程，推進至 `closed`
 
 ## 共用篩選器功能
 

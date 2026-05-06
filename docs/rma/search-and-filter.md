@@ -19,13 +19,19 @@
 | 按鈕 | 篩選結果 |
 |------|---------|
 | 全部 | 顯示所有 RMA |
-| 待處理 | `pending` |
-| 處理中 | `processing` |
-| 已寄出 | `shipped` |
+| 已登錄 | `registered` |
+| 已寄出（客→公司）| `shipped` |
 | 已收到 | `received` |
-| 維修中 | `repairing` |
-| 已完成 | `completed` |
-| 已取消 | `cancelled` |
+| 檢測中 | `inspecting` |
+| 聯繫客戶中 | `contacting` |
+| 已確認方案 | `quote_confirmed` |
+| 已付款 | `paid` |
+| 不維修 | `no_repair` |
+| 寄回新品 | `shipped_back_new` |
+| 寄回整新機 | `shipped_back_refurbished` |
+| 寄回原機 | `shipped_back_original` |
+| 後續追蹤 | `follow_up` |
+| 已結案 | `closed` |
 
 ### 日期篩選
 

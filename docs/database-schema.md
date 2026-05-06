@@ -62,13 +62,20 @@ ai_settings
 
 **rma_status enum**：
 ```
-pending     → 待處理
-processing  → 處理中
-shipped     → 已寄出（客戶寄來）
-received    → 已收到
-repairing   → 維修中
-completed   → 已完成
-cancelled   → 已取消
+registered            → 已登錄
+shipped               → 已寄出（客→公司）
+received              → 已收到
+inspecting            → 檢測中
+contacting            → 聯繫客戶中
+quote_confirmed       → 已確認方案
+paid                  → 已付款
+no_repair             → 不維修
+shipped_back          → 已寄回（舊版歷史匯入）
+shipped_back_new      → 寄回新品
+shipped_back_refurbished → 寄回整新機
+shipped_back_original → 寄回原機
+follow_up             → 後續追蹤
+closed                → 已結案
 ```
 
 **觸發器**：

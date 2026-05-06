@@ -190,7 +190,7 @@ CREST 目前合作的維修供應商：
 1. 在整新品庫存中找合適的機器（型號相符、等級 A 或 B）
 2. 在客戶 RMA 工單詳情中記錄替換整新品的序號
 3. 更新整新品狀態為 `used_warranty`
-4. 更新 RMA 狀態為 `completed`
+4. 更新 RMA 狀態為 `shipped_back_refurbished`（整新品替換）或 `shipped_back_original`（原機返還）
 
 ---
 
@@ -227,7 +227,7 @@ CREST 目前合作的維修供應商：
 1. 工廠回報 → 更新工單狀態為 `scrapped`
 2. 通知客戶（透過 RMA 回覆）
 3. 協商後續處理（退費 / 換機方案）
-4. RMA 最終狀態更新為 `cancelled` 或 `completed`（視結果）
+4. RMA 最終狀態更新為 `no_repair` 或 `shipped_back_*`（視結果）
 
 ### 情境 3：逾期追蹤
 

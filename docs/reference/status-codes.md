@@ -2,27 +2,40 @@
 
 ## RMA 工單狀態（rma_status）
 
-| 狀態值 | 中文 | 說明 | 物流 Tab 顯示 |
-|--------|------|------|-------------|
-| `pending` | 待處理 | 新申請，等待管理員審核 | Dashboard 待處理 |
-| `processing` | 處理中 | 管理員已接手，進行中 | — |
-| `shipped` | 已寄出 | 客戶已填寄件資訊，等待到貨 | 收件管理 |
-| `received` | 已收到 | 產品已到達，準備維修 | — |
-| `repairing` | 維修中 | 維修作業進行中 | — |
-| `completed` | 已完成 | 維修完畢，產品已寄回 | — |
-| `cancelled` | 已取消 | 工單已取消 | — |
+> **來源**：`src/lib/rmaStatusMap.ts`（`RMA_STATUS_LABELS`、`TAB_STATUS_BUCKETS`）。
+
+| 狀態值 | 中文 | 說明 | 物流 Tab |
+|--------|------|------|---------|
+| `registered` | 已登錄 | 客戶送出申請，等待後續處理 | Dashboard 待處理 |
+| `shipped` | 已寄出（客→公司）| 客戶已填寄件資訊，等待到貨 | 收件處理 |
+| `received` | 已收到 | 產品已到達，準備檢測 | 收件處理 |
+| `inspecting` | 檢測中 | 技術人員初步診斷中 | 收件處理 |
+| `contacting` | 聯繫客戶中 | 告知費用或維修方案，等候客戶回覆 | 待客戶確認 |
+| `quote_confirmed` | 已確認方案 | 客戶已確認維修方案，等待付款 | 付款確認 |
+| `paid` | 已付款 | 確認收款，準備出貨 | 出貨處理 |
+| `no_repair` | 不維修 | 客戶拒絕維修或設備無法修復 | 出貨處理 |
+| `shipped_back_new` | 寄回新品 | 已寄出全新替換品 | 結案追蹤 |
+| `shipped_back_refurbished` | 寄回整新機 | 已寄出整新品替換 | 結案追蹤 |
+| `shipped_back_original` | 寄回原機 | 已寄回維修後原機 | 結案追蹤 |
+| `shipped_back` | 已寄回（舊版）| 歷史匯入狀態，建議遷移至 `shipped_back_*` | 結案追蹤 |
+| `follow_up` | 後續追蹤 | 產品已寄回，等待後續關懷確認 | 結案追蹤 |
+| `closed` | 已結案 | 工單完成，所有流程結束 | — |
 
 ### 狀態 Badge 顏色
 
 | 狀態 | Badge 顏色 |
 |------|-----------|
-| pending | 🟡 黃色（amber）|
-| processing | 🔵 藍色（blue）|
+| registered | 🟡 黃色（amber）|
 | shipped | 🟣 紫色（violet）|
 | received | 🟤 橘色（orange）|
-| repairing | 🔵 靛色（indigo）|
-| completed | 🟢 綠色（emerald）|
-| cancelled | ⬜ 灰色（gray）|
+| inspecting | 🔵 靛色（indigo）|
+| contacting | 🔵 藍色（blue）|
+| quote_confirmed | 🟣 紫色（violet）|
+| paid | 🟢 綠色（emerald）|
+| no_repair | ⬜ 灰色（gray）|
+| shipped_back / shipped_back_* | 🟢 綠色（emerald）|
+| follow_up | 🟡 黃色（amber）|
+| closed | ⬜ 灰色（gray）|
 
 ---
 

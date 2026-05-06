@@ -12,9 +12,9 @@
 
 | 卡片 | 說明 |
 |------|------|
-| 待處理 | `pending` 狀態的 RMA 數量，需要最優先關注 |
-| 處理中 | `processing` 狀態，正在進行中 |
-| 已收到 | `received` 狀態，產品已到手但尚未開始維修 |
+| 待處理 | `registered` 狀態的 RMA 數量，需要最優先關注 |
+| 處理中 | 物流進行中的工單數量（`shipped` / `received` / `inspecting` / `contacting` / `quote_confirmed` / `paid`）|
+| 已完成 | 已寄回或結案的工單數量（`shipped_back_*` / `follow_up` / `closed`）|
 | 本月新增 | 當月新申請的 RMA 總數 |
 | 逾期未處理 | 超過指定天數仍未完成的工單（需定期清零）|
 

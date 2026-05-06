@@ -44,13 +44,22 @@
 
 | CSV 中文狀態 | 系統狀態 |
 |------------|---------|
-| 待處理 | `pending` |
-| 處理中 | `processing` |
+| 已登記 | `registered` |
 | 已寄出 | `shipped` |
-| 已收到 | `received` |
-| 維修中 | `repairing` |
-| 已完成 | `completed` |
-| 已取消 | `cancelled` |
+| 已收件 | `received` |
+| 檢修中 | `inspecting` |
+| 聯繫中 | `contacting` |
+| 確認報價 | `quote_confirmed` |
+| 已付費 | `paid` |
+| 不維修 | `no_repair` |
+| 已寄出整新品 / 已寄回整新品 | `shipped_back_refurbished` |
+| 已寄出原錶 / 已寄回原錶 | `shipped_back_original` |
+| 已寄出全新品 / 已寄回全新品 | `shipped_back_new` |
+| 已回寄 | `shipped_back` |
+| 後續關懷 | `follow_up` |
+| 結案 | `closed` |
+| ~~維修中~~ | ⛔ 封鎖（需手動確認正確狀態後重新匯入）|
+| ~~原錶維修中~~ | ⛔ 封鎖（需手動確認正確狀態後重新匯入）|
 
 ### 匯入步驟
 
