@@ -28,7 +28,7 @@ interface RmaResult {
     id: string;
     status: RmaStatus;
     created_at: string;
-    notes: string | null;
+    notes?: string | null;
   }>;
 }
 
