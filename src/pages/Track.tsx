@@ -216,7 +216,11 @@ const Track = () => {
         toast.error("請輸入RMA編號 / Please enter RMA number");
         return;
       }
-      handleSearchByRma(rmaNumber);
+      if (!rmaPhone.trim() && !rmaEmail.trim()) {
+        toast.error("請輸入電話或 Email 以驗證身分 / Please enter phone or email for verification");
+        return;
+      }
+      handleSearchByRma(rmaNumber, { phone: rmaPhone, email: rmaEmail });
     }
   };
 
