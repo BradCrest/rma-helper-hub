@@ -354,6 +354,31 @@ const Track = () => {
                           You may omit the dash (-) in the RMA number
                         </p>
                       </div>
+                      <div>
+                        <label className="rma-label">電話號碼 / Phone Number</label>
+                        <input
+                          type="tel"
+                          value={rmaPhone}
+                          onChange={(e) => setRmaPhone(e.target.value)}
+                          placeholder="請輸入電話 / Enter phone"
+                          className="rma-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="rma-label">或 Email / or Email</label>
+                        <input
+                          type="email"
+                          value={rmaEmail}
+                          onChange={(e) => setRmaEmail(e.target.value)}
+                          placeholder="請輸入 Email / Enter email"
+                          className="rma-input"
+                        />
+                        <p className="text-xs text-muted-foreground mt-2">
+                          為保護您的隱私，需提供電話或 Email 驗證身分（擇一即可）
+                          <br />
+                          For privacy, please provide phone or email to verify (either one)
+                        </p>
+                      </div>
                     </div>
                   )}
 
