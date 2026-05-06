@@ -4,8 +4,8 @@
 **Reviewer**: Codex
 **Task**: 更新全套使用手冊（17 份文件），同步 RMA 狀態機至現行流程
 **Branch**: main
-**Commit**: 0736bdb（含 8f2f74c、99ba97f、9dae24a 共 4 commits）
-**Date**: 2026-05-06
+**Commit**: 5267c60（本輪修正）；累計 8f2f74c、99ba97f、9dae24a、0736bdb、0c199aa
+**Date**: 2026-05-06（第三輪）
 
 ## What Changed
 
@@ -47,15 +47,13 @@
 
 ## Fixes Since Last Review
 
-這是第二輪送審（第一輪由 Codex 提出 6 個 BLOCKING，已全部修正）。
+這是第三輪送審，修正第二輪 Codex 的 3 個 BLOCKING：
 
-修正項目總結見上方「What Changed」第 2 點。每一個 Finding 都有對應的程式碼驗證：
-- Finding #1：確認 `ReceivingTab.tsx:478` 的 `new_status: "contacting"`
-- Finding #2：確認 `OutboundShippingTab.tsx` 的 `.in("status", ["paid", "no_repair"])`
-- Finding #3：確認 `ClosingTab.tsx` 的 `SHIPPED_BACK_STATUSES` + `follow_up`
-- Finding #4：確認 `rmaStatusMap.ts` 的 `TAB_STATUS_BUCKETS` 包含 `shipped_back`
-- Finding #5：確認 `ReceivingTab.tsx` query 的三個狀態
-- Finding #6：確認 `architecture.md` 舊文字替換
+- **Blocking #1**（`lifecycle.md` paid 觸發條件）：移除「保固內免費直接從 inspecting 推進」錯誤說法，改為「在付款確認 Tab 確認後更新；保固內費用 $0，走 quote_confirmed → 付款確認 Tab → paid 流程」
+- **Blocking #2**（`case-closing.md` 結案後段落）：重寫為正確順序：follow_up 先於 closed，closed 後工單不再出現於任何 Tab
+- **Blocking #3**（`supplier-repair.md` 整新品撥用流程）：改寫為實際流程：供應商驗收 → returned → 入庫 → 撥用時走「出貨處理 Tab」出貨，原始 RMA 回到 inspecting 後走正常出貨流程
+
+第一輪（6 BLOCKING）修正說明仍有效，見 commit `99ba97f`。
 
 ## How To Verify
 
