@@ -1,5 +1,5 @@
 // Scheduled (and manual) cleanup of RMA reply attachments.
-// Rule: when an RMA's status = 'completed' and it was completed > 90 days ago,
+// Rule: when an RMA's status = 'closed' and it was closed > 90 days ago,
 // remove all storage objects under rma-attachments/rma-replies/{rma_id}/
 // and clear the `attachments` jsonb arrays in rma_thread_messages.
 // Writes an audit log row to rma_attachment_cleanup_logs.
@@ -45,12 +45,12 @@ Deno.serve(async (req) => {
   let runError: string | null = null;
 
   try {
-    // 1. Find candidate RMAs: completed and stale.
+    // 1. Find candidate RMAs: closed and stale.
     const cutoff = new Date(Date.now() - RETENTION_DAYS * 86400 * 1000).toISOString();
     const { data: rmas, error: rmaErr } = await admin
       .from("rma_requests")
       .select("id, rma_number, status, updated_at")
-      .eq("status", "completed")
+      .eq("status", "closed")
       .lt("updated_at", cutoff);
     if (rmaErr) throw new Error(`load rmas: ${rmaErr.message}`);
 
