@@ -542,25 +542,41 @@ const Track = () => {
                 {/* Contact Info (Masked) */}
                 <div className="rma-card">
                   <h3 className="text-lg font-semibold text-foreground mb-4">聯絡資訊 / Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">客戶姓名 / Customer Name</p>
-                      <p className="text-foreground">{selectedRma.customer_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">電話 / Phone</p>
-                      <p className="text-foreground">{selectedRma.customer_phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="text-foreground">{selectedRma.customer_email}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    * 為保護您的隱私，部分資訊已遮蔽
-                    <br />
-                    * For privacy protection, some information is masked
-                  </p>
+                  {(selectedRma.customer_name || selectedRma.customer_phone || selectedRma.customer_email) ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedRma.customer_name && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">客戶姓名 / Customer Name</p>
+                            <p className="text-foreground">{selectedRma.customer_name}</p>
+                          </div>
+                        )}
+                        {selectedRma.customer_phone && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">電話 / Phone</p>
+                            <p className="text-foreground">{selectedRma.customer_phone}</p>
+                          </div>
+                        )}
+                        {selectedRma.customer_email && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Email</p>
+                            <p className="text-foreground">{selectedRma.customer_email}</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-4">
+                        * 為保護您的隱私，部分資訊已遮蔽
+                        <br />
+                        * For privacy protection, some information is masked
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      為保護隱私，從 email 連結進入時不顯示聯絡資訊。如需查看，請於首頁使用 RMA + 電話/Email 重新查詢。
+                      <br />
+                      For privacy, contact info is hidden when accessed via email link. To view, please re-search using RMA + phone/email from the home page.
+                    </p>
+                  )}
                 </div>
               </div>
             )}
