@@ -349,6 +349,7 @@
 6. **不要假設**系統的任何細節，先查 codebase 再動手
 7. **系統 Repo**：https://github.com/BradCrest/rma-helper-hub
 8. **本計劃檔案路徑**：`RMA_ZERO_HUMAN_PLAN.md`（repo 根目錄）
+9. **交接給另一個 AI 時**，更新 `.ai_handoff/claude_review.md`（如果你是 Claude）或 `.ai_handoff/codex_review.md`（如果你是 Codex），記錄你做了什麼、有什麼問題。
 
 ---
 
