@@ -49,7 +49,9 @@
   ├─ 自行維修 → [出貨處理] shipped_back_original
   ├─ 整新品替換 → [出貨處理] shipped_back_refurbished
   ├─ 新品替換 → [出貨處理] shipped_back_new
-  └─ 不維修 → [出貨處理] no_repair → 退回原機 → shipped_back_original → 結案追蹤
+  └─ 不維修 → [出貨處理] no_repair
+      ├─ 退回客戶 → shipped_back_original → 結案追蹤
+      └─ 不退回（送廠整新 / 報廢）→ 直接 closed（設備轉供應商送修工單追蹤）
   ↓
 [結案追蹤] follow_up（後續關懷）
   ↓
