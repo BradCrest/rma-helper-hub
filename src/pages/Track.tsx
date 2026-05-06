@@ -89,28 +89,42 @@ const Track = () => {
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [rmaNumber, setRmaNumber] = useState("");
+  const [rmaPhone, setRmaPhone] = useState("");
+  const [rmaEmail, setRmaEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<RmaResult[]>([]);
   const [selectedRma, setSelectedRma] = useState<RmaResult | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Auto-search if RMA number is in URL
+  // Auto-search if RMA number is in URL (from email link)
   useEffect(() => {
     const rmaFromUrl = searchParams.get("rma");
     if (rmaFromUrl) {
       setRmaNumber(rmaFromUrl);
       setActiveTab("rma");
-      handleSearchByRma(rmaFromUrl);
+      handleSearchByRma(rmaFromUrl, { fromEmailLink: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleSearchByRma = async (rma: string) => {
+  const handleSearchByRma = async (
+    rma: string,
+    opts: { fromEmailLink?: boolean; phone?: string; email?: string } = {}
+  ) => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      // Use GET method with query params via URL
+      const params = new URLSearchParams();
+      params.set("rma_number", rma.trim());
+      if (opts.fromEmailLink) {
+        params.set("purpose", "email_link");
+      } else {
+        if (opts.phone) params.set("customer_phone", opts.phone.trim());
+        if (opts.email) params.set("customer_email", opts.email.trim());
+      }
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rma.trim())}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?${params.toString()}`,
         {
           method: 'GET',
           headers: {
