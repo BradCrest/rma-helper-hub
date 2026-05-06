@@ -2,35 +2,92 @@
 
 **Author**: Claude Code
 **Reviewer**: Codex
-**Task**: —
-**Branch**: —
-**Commit**: —
-**Date**: —
+**Task**: 更新全套使用手冊（17 份文件），同步 RMA 狀態機至現行流程
+**Branch**: main
+**Commit**: 0736bdb（含 8f2f74c、99ba97f、9dae24a 共 4 commits）
+**Date**: 2026-05-06
 
 ## What Changed
 
-（這次改了什麼，用人話描述）
+將整套 `docs/` 文件從舊版狀態碼（`pending / processing / repairing / completed / cancelled`）全面升級為現行 14 個狀態（`registered / shipped / received / inspecting / contacting / quote_confirmed / paid / no_repair / shipped_back_* / follow_up / closed`）。
+
+主要改動：
+1. **初次全面更新**（`8f2f74c`）：17 份文件替換所有舊狀態文字
+2. **修正 Codex 第一輪 review 的 6 個 BLOCKING**（`99ba97f`）：
+   - Finding #1：ReceivingTab 保固內不直接跳 `paid`，一律走 `contacting`（費用=$0）
+   - Finding #2：OutboundShippingTab 同時管理 `paid` 和 `no_repair` 工單（不只 `paid`）
+   - Finding #3：ClosingTab 的 Tab 範圍是 `shipped_back* + follow_up`，`closed` 不在任何 Tab
+   - Finding #4：`shipped_back`（舊版）仍存在系統中，文件補充說明
+   - Finding #5：ReceivingTab 涵蓋 `shipped + received + inspecting` 三個狀態（不只 `shipped`）
+   - Finding #6：architecture.md 的「自動結案」觸發條件（`closed` bucket 超過 90 天）
+3. **`no_repair` 兩條路線決策**（`0736bdb`）：補充路線 A（退回客戶）與路線 B（送廠整新/報廢→直接 closed）
+4. **移除 iCloud 衝突副本**（`9dae24a`）：刪除 `* 2.md` 這 4 個 git 追蹤中的衝突檔
 
 ## Files Changed
 
-（列出主要異動檔案）
+| 檔案 | 變更說明 |
+|------|---------|
+| `docs/rma/lifecycle.md` | 完整重寫：14 狀態流程圖 + no_repair 兩路線 |
+| `docs/rma/search-and-filter.md` | 狀態篩選按鈕表：舊 8 個 → 14 個 |
+| `docs/reference/status-codes.md` | RMA 狀態表：舊 7 個 → 14 個，含 Tab 欄位 |
+| `docs/logistics/overview.md` | 重寫流程圖 + 各 Tab 對應狀態表 |
+| `docs/logistics/receiving.md` | Tab 顯示範圍：`shipped + received + inspecting` |
+| `docs/logistics/awaiting-confirmation.md` | `repairing` → `quote_confirmed`；`cancelled` → `no_repair` |
+| `docs/logistics/payment-confirmation.md` | `repairing` → `paid` |
+| `docs/logistics/outbound-shipping.md` | `paid` 和 `no_repair` 雙入口；出貨後狀態 `shipped_back_*` |
+| `docs/logistics/case-closing.md` | ClosingTab 範圍：`shipped_back* + follow_up`；`closed` 僅在 rma-list |
+| `docs/logistics/customer-care.md` | 觸發狀態：`follow_up`（非 `shipped_back_*`） |
+| `docs/logistics/followup.md` | 觸發條件從 `shipped_back_*` 改為 `follow_up` |
+| `docs/logistics/damage-registration.md` | 保固內 → `contacting`（費用=$0）；`cancelled` → `no_repair` |
+| `docs/logistics/supplier-repair.md` | 完工後 → `shipped_back_refurbished`；`cancelled` → `no_repair` |
+| `docs/reference/faq.md` | `cancelled`/`repairing` 全部替換；補充 `completed` 僅為 embedding job 狀態 |
+| `docs/admin/csv-import.md` | STATUS_MAP 對照表完整重寫，標注已封鎖狀態 |
+| `docs/database-schema.md` | `rma_status` enum：7 個 → 14 個 |
+| `docs/architecture.md` | 自動結案觸發條件改為 `closed` bucket；補充 Edge Function 舊 status 追蹤 ticket |
 
 ## Fixes Since Last Review
 
-（上一輪 Codex 提出的問題，這輪如何修正）
+這是第二輪送審（第一輪由 Codex 提出 6 個 BLOCKING，已全部修正）。
+
+修正項目總結見上方「What Changed」第 2 點。每一個 Finding 都有對應的程式碼驗證：
+- Finding #1：確認 `ReceivingTab.tsx:478` 的 `new_status: "contacting"`
+- Finding #2：確認 `OutboundShippingTab.tsx` 的 `.in("status", ["paid", "no_repair"])`
+- Finding #3：確認 `ClosingTab.tsx` 的 `SHIPPED_BACK_STATUSES` + `follow_up`
+- Finding #4：確認 `rmaStatusMap.ts` 的 `TAB_STATUS_BUCKETS` 包含 `shipped_back`
+- Finding #5：確認 `ReceivingTab.tsx` query 的三個狀態
+- Finding #6：確認 `architecture.md` 舊文字替換
 
 ## How To Verify
 
-（Codex 要怎麼驗證這次改動是正確的）
+```bash
+# 1. 確認文件中不再有舊狀態碼
+grep -r "pending\|processing\|repairing\|cancelled\|completed" docs/ \
+  --include="*.md" | grep -v "DEPRECATED\|pending_send\|email_send_log\|status.*=.*completed\|embedding"
+
+# 2. 確認 rmaStatusMap.ts 的 14 個狀態都有在文件中出現
+for status in registered shipped received inspecting contacting quote_confirmed paid no_repair shipped_back shipped_back_new shipped_back_refurbished shipped_back_original follow_up closed; do
+  echo -n "$status: "
+  grep -rl "$status" docs/ | wc -l
+done
+
+# 3. 確認 status-codes.md 和 lifecycle.md 的狀態數量一致
+grep '^\|' docs/reference/status-codes.md | head -20
+```
 
 ## Known Risks
 
-（已知的風險或不確定的地方）
+1. **`cleanup-rma-attachments` Edge Function** 仍查詢 `status = 'completed'`（舊狀態）——這是在 `architecture.md` 補充的 pending ticket，需要 Lovable 修正 Edge Function，**不在本次 docs 範圍內**。
+
+2. **`shipped_back`（舊版）** 仍保留在狀態機中。文件已說明這是歷史匯入狀態，建議逐步遷移——但實際遷移不在本次工作範圍內。
+
+3. **iCloud 衝突副本**：`docs/logistics/` 下仍有 4 個 untracked 的 `* 2.md` 檔案（iCloud 產生的衝突副本），已從 git 移除但本機磁碟仍存在。建議在本機手動刪除。
 
 ## Questions For Codex
 
-（有沒有問題想請 Codex 判斷）
+1. `docs/logistics/supplier-repair.md` 中，送修完工後直接把設備標為 `shipped_back_refurbished` 或 `shipped_back_original` 是否正確？還是應該先進入 `inspecting` 重新驗收？（已按 lifecycle.md 寫，但不確定供應商回修後的實際流程是否跳過 `inspecting`）
+
+2. `docs/reference/faq.md` 中對 `completed` 的解釋——「在知識庫 embedding job context 中是 job 狀態，不是 RMA 狀態」——這個說法是否準確？請確認 FAQ 中不存在令人困惑的舊狀態描述。
 
 ## Re-review Needed
 
-yes / no
+yes
