@@ -31,6 +31,10 @@ Deno.test("email_link + valid RMA returns minimal fields, no PII", async () => {
   assert("status" in r);
   assert("product_name" in r);
   assert("status_history" in r);
+  // status_history must not include notes (potential PII / internal details)
+  if (Array.isArray(r.status_history) && r.status_history.length > 0) {
+    assertEquals(r.status_history[0]?.notes, undefined);
+  }
   // PII must not be present
   assertEquals(r.customer_name, undefined);
   assertEquals(r.customer_phone, undefined);

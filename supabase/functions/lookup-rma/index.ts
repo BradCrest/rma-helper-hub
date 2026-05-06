@@ -151,9 +151,10 @@ serve(async (req) => {
         );
       }
       const rma = matched[0];
+      // NOTE: do NOT select notes — they may contain customer PII or internal details
       const { data: historyData } = await supabaseAdmin
         .from('rma_status_history')
-        .select('id, status, created_at, notes')
+        .select('id, status, created_at')
         .eq('rma_request_id', rma.id)
         .order('created_at', { ascending: false });
 
@@ -167,8 +168,8 @@ serve(async (req) => {
         purchase_date: rma.purchase_date,
         created_at: rma.created_at,
         updated_at: rma.updated_at,
-        status_history: (historyData || []).map((h: { id: string; status: string; created_at: string; notes: string | null }) => ({
-          id: h.id, status: h.status, created_at: h.created_at, notes: h.notes,
+        status_history: (historyData || []).map((h: { id: string; status: string; created_at: string }) => ({
+          id: h.id, status: h.status, created_at: h.created_at,
         })),
       };
       console.log('email_link lookup OK', { rma_number: rma.rma_number });
