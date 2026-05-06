@@ -15,15 +15,15 @@ interface RmaResult {
   status: RmaStatus;
   product_name: string;
   product_model: string | null;
-  serial_number: string | null;
+  serial_number?: string | null;
   issue_type: string;
   purchase_date: string | null;
   created_at: string;
   updated_at: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  customer_address: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  customer_address?: string | null;
   status_history: Array<{
     id: string;
     status: RmaStatus;
