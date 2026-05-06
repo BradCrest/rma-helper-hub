@@ -198,4 +198,4 @@ AdminLogistics 是一個 Tab 式介面，包含四個子分頁：
 | `rma-attachments` | 管理員回覆附件 | `rma-replies/{rmaId}/...` 或 `email-replies/{gmailMessageId}/...` |
 | `shared-library` | 客服常用文件庫 | 由管理員上傳，可在回覆中引用 |
 
-`cleanup-rma-attachments`（cron）自動清理 completed 超過 90 天的 RMA 附件。`email-replies/` 目前不在清理範圍。
+`cleanup-rma-attachments`（cron）自動清理已結案（`closed` bucket）超過 90 天的 RMA 附件。注意：Edge Function 內部仍查詢舊 `status = "completed"`，需另行追蹤修正。`email-replies/` 目前不在清理範圍。

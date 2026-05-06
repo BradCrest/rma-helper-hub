@@ -41,15 +41,15 @@
   ↓
 [收件處理] 初步診斷 → inspecting
   ↓
-  ├─ 保固內 → 直接 paid，進入出貨處理
-  └─ 保固外 → [待客戶確認] contacting，等候客戶確認費用
-                   ↓ 客戶確認 → quote_confirmed
-               [付款確認] 收款確認 → paid
+  ↓（無論保固內外）→ [待客戶確認] contacting
+      保固內：費用 $0，確認方案即可
+      保固外：等候客戶確認費用 → quote_confirmed
+  [付款確認] 確認付款 → paid
   ↓
   ├─ 自行維修 → [出貨處理] shipped_back_original
   ├─ 整新品替換 → [出貨處理] shipped_back_refurbished
   ├─ 新品替換 → [出貨處理] shipped_back_new
-  └─ 不維修 → [出貨處理] no_repair → closed
+  └─ 不維修 → [出貨處理] no_repair → 退回原機 → shipped_back_original → 結案追蹤
   ↓
 [結案追蹤] follow_up（後續關懷）
   ↓

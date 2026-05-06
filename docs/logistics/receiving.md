@@ -12,7 +12,7 @@
 
 ## 列表說明
 
-顯示所有「已寄出（shipped）」狀態的 RMA，即等待確認到貨的工單。
+顯示所有 `shipped`（已寄出）、`received`（已收到）、`inspecting`（檢測中）狀態的 RMA。
 
 每列顯示：
 - RMA 號碼

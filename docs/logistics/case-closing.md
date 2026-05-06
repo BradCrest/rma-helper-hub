@@ -25,12 +25,16 @@
 
 ## 結案流程
 
+此 Tab 顯示所有 `shipped_back*`（已寄回）及 `follow_up`（後續追蹤）狀態的工單。
+
 ```
-出貨完成（`shipped_back_*`）
-  ↓ 追蹤物流（3-7 天）
-  ↓ 確認客戶收件
-  → 工單正式結案
-  → 設定客戶關懷日期（7 天後）
+出貨完成（shipped_back_* 或 no_repair → shipped_back_original）
+  ↓ 追蹤物流（3-7 天），確認客戶收件
+  ↓
+  ├─ 設定後續關懷 → 更新為 follow_up（設定關懷到期日）
+  │     ↓ 關懷完成
+  │   更新為 closed
+  └─ 直接結案 → 更新為 closed
 ```
 
 ## 追蹤物流

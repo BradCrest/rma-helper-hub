@@ -27,6 +27,7 @@
 | 已確認方案 | `quote_confirmed` |
 | 已付款 | `paid` |
 | 不維修 | `no_repair` |
+| 已寄回（舊版）| `shipped_back` |
 | 寄回新品 | `shipped_back_new` |
 | 寄回整新機 | `shipped_back_refurbished` |
 | 寄回原機 | `shipped_back_original` |
