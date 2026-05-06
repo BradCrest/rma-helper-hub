@@ -82,10 +82,8 @@ grep '^\|' docs/reference/status-codes.md | head -20
 
 ## Questions For Codex
 
-1. `docs/logistics/supplier-repair.md` 中，送修完工後直接把設備標為 `shipped_back_refurbished` 或 `shipped_back_original` 是否正確？還是應該先進入 `inspecting` 重新驗收？（已按 lifecycle.md 寫，但不確定供應商回修後的實際流程是否跳過 `inspecting`）
-
-2. `docs/reference/faq.md` 中對 `completed` 的解釋——「在知識庫 embedding job context 中是 job 狀態，不是 RMA 狀態」——這個說法是否準確？請確認 FAQ 中不存在令人困惑的舊狀態描述。
+（已清除——第三輪 review 後所有問題均已解答或不再適用。）
 
 ## Re-review Needed
 
-yes
+no — 第三輪 Codex sign-off（2026-05-06），零 BLOCKING，任務完成。

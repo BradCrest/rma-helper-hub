@@ -4,13 +4,13 @@
 
 **Author**: Brad（透過 Claude Code 執行）
 **Date**: 2026-05-06
-**Phase**: Ready for Codex review（第三輪）
+**Phase**: Approved — 第三輪 Codex review 通過（零 BLOCKING）
 
 ## Task Description
 
 將 `docs/` 下的 17 份使用手冊文件，從舊版 RMA 狀態碼（pending / processing / repairing / completed / cancelled）全面更新為現行 14 個狀態碼，確保文件與 `src/lib/rmaStatusMap.ts` 及各 logistics Tab 元件的實際行為一致。
 
-第一輪 Codex review 發現 6 個 BLOCKING，已全部修正，現送第二輪 review。
+三輪 Codex review 共修正 9 個 BLOCKING（第一輪 6 個、第二輪 3 個），第三輪零 BLOCKING，任務完成。
 
 詳細改動見 `claude_review.md`。
 
@@ -31,6 +31,6 @@
 ## Status
 
 - [ ] In progress
-- [x] Ready for review
-- [ ] Approved
-- [ ] Merged
+- [ ] Ready for review
+- [x] Approved（Codex 第三輪 sign-off，2026-05-06）
+- [ ] Merged（直接 push main，無 PR）
