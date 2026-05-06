@@ -15,15 +15,15 @@ interface RmaResult {
   status: RmaStatus;
   product_name: string;
   product_model: string | null;
-  serial_number: string | null;
+  serial_number?: string | null;
   issue_type: string;
   purchase_date: string | null;
   created_at: string;
   updated_at: string;
-  customer_name: string;
-  customer_phone: string;
-  customer_email: string;
-  customer_address: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  customer_address?: string | null;
   status_history: Array<{
     id: string;
     status: RmaStatus;
@@ -89,28 +89,42 @@ const Track = () => {
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [rmaNumber, setRmaNumber] = useState("");
+  const [rmaPhone, setRmaPhone] = useState("");
+  const [rmaEmail, setRmaEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<RmaResult[]>([]);
   const [selectedRma, setSelectedRma] = useState<RmaResult | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Auto-search if RMA number is in URL
+  // Auto-search if RMA number is in URL (from email link)
   useEffect(() => {
     const rmaFromUrl = searchParams.get("rma");
     if (rmaFromUrl) {
       setRmaNumber(rmaFromUrl);
       setActiveTab("rma");
-      handleSearchByRma(rmaFromUrl);
+      handleSearchByRma(rmaFromUrl, { fromEmailLink: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleSearchByRma = async (rma: string) => {
+  const handleSearchByRma = async (
+    rma: string,
+    opts: { fromEmailLink?: boolean; phone?: string; email?: string } = {}
+  ) => {
     setIsLoading(true);
     setHasSearched(true);
     try {
-      // Use GET method with query params via URL
+      const params = new URLSearchParams();
+      params.set("rma_number", rma.trim());
+      if (opts.fromEmailLink) {
+        params.set("purpose", "email_link");
+      } else {
+        if (opts.phone) params.set("customer_phone", opts.phone.trim());
+        if (opts.email) params.set("customer_email", opts.email.trim());
+      }
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?rma_number=${encodeURIComponent(rma.trim())}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/lookup-rma?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -202,7 +216,11 @@ const Track = () => {
         toast.error("請輸入RMA編號 / Please enter RMA number");
         return;
       }
-      handleSearchByRma(rmaNumber);
+      if (!rmaPhone.trim() && !rmaEmail.trim()) {
+        toast.error("請輸入電話或 Email 以驗證身分 / Please enter phone or email for verification");
+        return;
+      }
+      handleSearchByRma(rmaNumber, { phone: rmaPhone, email: rmaEmail });
     }
   };
 
@@ -334,6 +352,31 @@ const Track = () => {
                           輸入RMA編號時，可以省略中間的「-」符號
                           <br />
                           You may omit the dash (-) in the RMA number
+                        </p>
+                      </div>
+                      <div>
+                        <label className="rma-label">電話號碼 / Phone Number</label>
+                        <input
+                          type="tel"
+                          value={rmaPhone}
+                          onChange={(e) => setRmaPhone(e.target.value)}
+                          placeholder="請輸入電話 / Enter phone"
+                          className="rma-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="rma-label">或 Email / or Email</label>
+                        <input
+                          type="email"
+                          value={rmaEmail}
+                          onChange={(e) => setRmaEmail(e.target.value)}
+                          placeholder="請輸入 Email / Enter email"
+                          className="rma-input"
+                        />
+                        <p className="text-xs text-muted-foreground mt-2">
+                          為保護您的隱私，需提供電話或 Email 驗證身分（擇一即可）
+                          <br />
+                          For privacy, please provide phone or email to verify (either one)
                         </p>
                       </div>
                     </div>
@@ -499,25 +542,41 @@ const Track = () => {
                 {/* Contact Info (Masked) */}
                 <div className="rma-card">
                   <h3 className="text-lg font-semibold text-foreground mb-4">聯絡資訊 / Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">客戶姓名 / Customer Name</p>
-                      <p className="text-foreground">{selectedRma.customer_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">電話 / Phone</p>
-                      <p className="text-foreground">{selectedRma.customer_phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="text-foreground">{selectedRma.customer_email}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-4">
-                    * 為保護您的隱私，部分資訊已遮蔽
-                    <br />
-                    * For privacy protection, some information is masked
-                  </p>
+                  {(selectedRma.customer_name || selectedRma.customer_phone || selectedRma.customer_email) ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedRma.customer_name && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">客戶姓名 / Customer Name</p>
+                            <p className="text-foreground">{selectedRma.customer_name}</p>
+                          </div>
+                        )}
+                        {selectedRma.customer_phone && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">電話 / Phone</p>
+                            <p className="text-foreground">{selectedRma.customer_phone}</p>
+                          </div>
+                        )}
+                        {selectedRma.customer_email && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Email</p>
+                            <p className="text-foreground">{selectedRma.customer_email}</p>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-4">
+                        * 為保護您的隱私，部分資訊已遮蔽
+                        <br />
+                        * For privacy protection, some information is masked
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      為保護隱私，從 email 連結進入時不顯示聯絡資訊。如需查看，請於首頁使用 RMA + 電話/Email 重新查詢。
+                      <br />
+                      For privacy, contact info is hidden when accessed via email link. To view, please re-search using RMA + phone/email from the home page.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

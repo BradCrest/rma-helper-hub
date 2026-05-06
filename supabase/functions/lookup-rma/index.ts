@@ -106,8 +106,77 @@ serve(async (req) => {
     const customerPhoneParam = url.searchParams.get('customer_phone');
     const customerEmailParam = url.searchParams.get('customer_email');
     const requestedFullDetails = url.searchParams.get('full_details') === 'true';
+    const purposeParam = url.searchParams.get('purpose');
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+    // ---------- Email-link path (bearer-by-link) ----------
+    // Used when customers click a link in our automated emails. The email itself
+    // is the proof-of-access; we skip phone/email second-factor BUT return zero PII.
+    if (purposeParam === 'email_link') {
+      if (!rmaNumberParam || !rmaNumberParam.trim()) {
+        console.log('email_link lookup rejected: missing rma_number');
+        return new Response(
+          JSON.stringify({ error: '缺少 RMA 編號' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const normalized = normalizeRma(rmaNumberParam);
+      if (normalized.length < 6) {
+        console.log('email_link lookup rejected: rma too short', normalized);
+        return new Response(
+          JSON.stringify({ error: '請提供完整 RMA 編號' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('rma_requests')
+        .select('id, rma_number, status, product_name, product_model, issue_type, purchase_date, created_at, updated_at')
+        .ilike('rma_number', `%${normalized.slice(0, 8)}%`)
+        .limit(50);
+      if (error) {
+        console.error('email_link lookup error:', error);
+        return new Response(
+          JSON.stringify({ error: '查詢失敗' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const matched = (data || []).filter((r: { rma_number: string }) => normalizeRma(r.rma_number) === normalized);
+      if (matched.length !== 1) {
+        console.log('email_link lookup miss', { rma_number: normalized, matched: matched.length });
+        return new Response(
+          JSON.stringify({ error: '找不到符合的 RMA 申請', results: [] }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const rma = matched[0];
+      const { data: historyData } = await supabaseAdmin
+        .from('rma_status_history')
+        .select('id, status, created_at, notes')
+        .eq('rma_request_id', rma.id)
+        .order('created_at', { ascending: false });
+
+      const minimal = {
+        id: rma.id,
+        rma_number: rma.rma_number,
+        status: rma.status,
+        product_name: rma.product_name,
+        product_model: rma.product_model,
+        issue_type: rma.issue_type,
+        purchase_date: rma.purchase_date,
+        created_at: rma.created_at,
+        updated_at: rma.updated_at,
+        status_history: (historyData || []).map((h: { id: string; status: string; created_at: string; notes: string | null }) => ({
+          id: h.id, status: h.status, created_at: h.created_at, notes: h.notes,
+        })),
+      };
+      console.log('email_link lookup OK', { rma_number: rma.rma_number });
+      return new Response(
+        JSON.stringify({ results: [minimal] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // ---------- Admin path ----------
     if (requestedFullDetails) {
