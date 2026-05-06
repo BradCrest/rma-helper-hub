@@ -44,6 +44,24 @@ plan: update Phase X - [簡短說明]
 
 ---
 
+## AI 交接協議（.ai_handoff/）
+
+`.ai_handoff/` 目錄是 Claude 與 Codex 之間的交接頻道：
+
+| 檔案 | 負責人 | 用途 |
+|------|--------|------|
+| `current_task.md` | 人類 | 目前任務、目標、限制、review focus |
+| `claude_review.md` | Claude Code | Claude 改完後寫給 Codex 的 review request |
+| `codex_review.md` | Codex | Codex 看完後回寫的 findings / sign-off |
+| `pr_notes.md` | 任一方 | 準備 PR 時才填 |
+
+**規則：**
+- Claude 完成工作後，更新 `claude_review.md`，不要寫到 `codex_review.md`
+- Codex 完成 review 後，更新 `codex_review.md`，不要覆蓋 `claude_review.md`
+- `current_task.md` 由人類維護，AI 只讀不改（除非人類明確要求）
+
+---
+
 ## 狀態說明
 
 | 符號 | 意義 |
